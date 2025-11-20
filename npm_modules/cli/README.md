@@ -1,16 +1,88 @@
 # Valdi CLI
 
-The Valdi CLI tool provides helpful commands for working with Valdi applications.
+The Valdi CLI tool provides helpful commands for setting up your environment, creating projects, building applications, and managing your Valdi workflow.
 
-When working on this module please set your npm registry
+## For Users
 
-```sh
-npm config set registry https://registry.npmjs.org/
+The CLI is published to npm as `@snap/valdi`:
+
+```bash
+# Install globally
+npm install -g @snap/valdi
+
+# Set up your development environment
+valdi dev_setup
+
+# Verify your setup
+valdi doctor
+
+# Get help
+valdi --help
 ```
 
-## General Use
+### Create Your First App
 
-### New Module Creations
+After setting up your environment, create a new Valdi project:
+
+```bash
+# Create a new directory for your project
+mkdir my_valdi_app
+cd my_valdi_app
+
+# Initialize the project
+valdi bootstrap
+
+# Build and install on iOS
+valdi install ios
+
+# Or build and install on Android
+valdi install android
+
+# Start hot reload for development
+valdi hotreload
+```
+
+Now you can edit your TypeScript files and see changes instantly on your device!
+
+For complete documentation, see:
+- [Command Line Reference](https://github.com/Snapchat/Valdi/blob/main/docs/docs/command-line-references.md)
+- [Installation Guide](https://github.com/Snapchat/Valdi/blob/main/docs/INSTALL.md)
+
+### Key Commands
+
+**`valdi dev_setup`** - Automated environment setup
+- Installs all required dependencies (Bazel, Node.js, Java JDK 17, Android SDK, etc.)
+- Configures environment variables and PATH
+- Initializes Git LFS
+- Sets up shell autocomplete
+- Platform-specific: macOS (Homebrew, Xcode) or Linux (apt packages)
+
+**`valdi doctor`** - Environment diagnostics
+- Validates Node.js, Bazel, Java, Android SDK installations
+- Checks Git LFS initialization
+- Verifies shell autocomplete configuration
+- Checks VSCode/Cursor extensions (warns if missing)
+- macOS: Validates Xcode installation
+- Supports `--framework` mode for additional checks
+- Supports `--fix` to auto-repair issues
+- Supports `--json` for CI/CD integration
+
+**`valdi bootstrap`** - Project initialization
+- Creates a new Valdi project in the current directory
+- Sets up BUILD.bazel, WORKSPACE, package.json, and source files
+- Supports multiple application templates (Hello World, Counter, etc.)
+
+**`valdi install <platform>`** - Build and install
+- Builds and installs app to connected device/simulator
+- Platforms: `ios`, `android`, `macos`
+
+**`valdi hotreload`** - Development server
+- Enables instant hot reload during development
+- Watches for file changes and updates app in milliseconds
+
+For complete command documentation, see [Command Line Reference](https://github.com/Snapchat/Valdi/blob/main/docs/docs/command-line-references.md).
+
+### Creating New Modules
 
 ```sh
 valdi new_module
@@ -68,17 +140,29 @@ Options:
   --ios-module-name     iOS class prefix to use for generated iOS sources.                                                                                        [string]
 ```
 
-## Development Setup
+## For Contributors
 
-# Install dependencies
+This section is for developers working on the Valdi CLI itself.
+
+### Prerequisites
+
+Set your npm registry when working on this module:
+
+```sh
+npm config set registry https://registry.npmjs.org/
+```
+
+### Development Setup
+
+Install dependencies:
 
 ```sh
 npm install
 ```
 
-## Development
+### Development
 
-# Run the cli
+Run the CLI:
 
 ```sh
 npm run main
@@ -90,13 +174,13 @@ npm run main
 npm run main bootstrap -- --confirm-bootstrap
 ```
 
-# Build javascript output to ./dist
+Build JavaScript output to `./dist`:
 
 ```sh
 npm run build
 ```
 
-# Develop with hotreload
+Develop with hot reload:
 
 ```sh
 npm run watch
@@ -104,19 +188,19 @@ node ./dist/index.js
 node ./dist/index.js bootstrap --confirm-bootstrap
 ```
 
-# Show the help menu
+Show the help menu:
 
 ```sh
 node ./dist/index.js new_module --help
 ```
 
-# Run unit tests
+Run unit tests:
 
 ```sh
 npm test
 ```
 
-# Install the `valdi` command
+Install the `valdi` command locally:
 
 ```sh
 npm run cli:install

@@ -9,18 +9,23 @@ const BAZELISK_URL = 'https://github.com/bazelbuild/bazelisk/releases/download/v
 export async function linuxSetup(): Promise<void> {
   const devSetup = new DevSetupHelper();
 
-  await devSetup.runShell('Installing dependencies from apt', [
-    `sudo apt-get install zlib1g-dev git-lfs watchman libfontconfig-dev adb`,
+  // Setup git-lfs repository before installing
+  await devSetup.runShell('Setting up git-lfs repository', [
+    'curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash',
   ]);
+
+  await devSetup.runShell('Installing dependencies from apt', [
+    `sudo apt-get install npm openjdk-17-jdk git-lfs libfontconfig1-dev zlib1g-dev watchman adb`,
+  ]);
+
+  await devSetup.setupGitLfs();
+
+  await devSetup.setupShellAutoComplete();
 
   await devSetup.runShell('Installing libtinfo5', [
     `wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb`,
     `sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb`,
   ]);
-
-  if (!checkCommandExists('java')) {
-    await devSetup.runShell('Installing Java Runtime Environment', ['sudo apt install default-jre']);
-  }
 
   const bazeliskPathSuffix = '.valdi/bin/bazelisk';
   const bazeliskTargetPath = path.join(HOME_DIR, bazeliskPathSuffix);

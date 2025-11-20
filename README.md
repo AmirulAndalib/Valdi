@@ -34,6 +34,26 @@ class HelloWorld extends Component {
   <img src="./docs/docs/assets/start-about/IMG_1445.jpg" width="400" alt="Hello World example running on iOS" />
 </p>
 
+## Quick Start
+
+**Prerequisites:** Xcode (macOS only) - everything else is automatic!
+
+```bash
+# Install Valdi CLI
+npm install -g @snap/valdi
+
+# One-command setup (installs all dependencies)
+valdi dev_setup
+
+# Create your first project
+mkdir my_project && cd my_project
+valdi bootstrap
+valdi install ios  # or android
+```
+
+> [!TIP]
+> **Editor Extensions:** For the best development experience, install the [Valdi VSCode/Cursor extensions](./docs/INSTALL.md#vscodecursor-setup-optional-but-recommended) for syntax highlighting, debugging, and device logs during hot reload.
+
 ## Quick Links
 
 - [Getting Started Guide](./docs/INSTALL.md)

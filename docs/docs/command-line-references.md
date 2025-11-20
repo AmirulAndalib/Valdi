@@ -1,10 +1,23 @@
 # Valdi Command Line References
 
-The Valdi command line tools will be installed as part of the installation steps, and serves as a single point to getting started and managing existing projects.
+The Valdi command line tools serve as the primary interface for setting up your environment, creating projects, building applications, and managing your Valdi workflow.
 
 ## Installation
 
-See [INSTALL.md](../INSTALL.md).
+```bash
+npm install -g @snap/valdi
+valdi dev_setup  # Sets up your entire development environment
+```
+
+For detailed installation instructions, see the [Installation Guide](../INSTALL.md).
+
+> [!TIP]
+> If you're contributing to Valdi itself, install from source instead:
+> ```bash
+> git clone git@github.com:Snapchat/Valdi.git
+> cd Valdi/npm_modules/cli/
+> npm run cli:install
+> ```
 
 ## Basic Usage
 
