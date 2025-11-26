@@ -3,6 +3,8 @@ import { Size } from './DrawingModuleProvider';
 import { IBitmap } from './IBitmap';
 import type { Rect } from './ManagedContextNative';
 
+export type { Rect };
+
 export const enum MeasureMode {
   UNSPECIFIED = 0,
   EXACTLY = 1,
