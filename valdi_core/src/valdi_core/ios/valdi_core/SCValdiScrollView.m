@@ -691,7 +691,18 @@ static CGFloat const kSCValdiKeyboardTranslationPadding = 10.0;
                           return [view valdi_setFadingEdgeEnd:attributeValue];
                       }
                          resetBlock:^(SCValdiScrollView *view, id<SCValdiAnimatorProtocol> animator) {
-                            [view valdi_setFadingEdgeEnd:YES];
+                           [view valdi_setFadingEdgeEnd:YES];
+                         }];
+    
+    // Android-only attribute - no-op on iOS
+    [attributesBinder bindAttribute:@"androidOnlyEnableExtendedFadingEdge"
+           invalidateLayoutOnChange:NO
+                      withBoolBlock:^BOOL(SCValdiScrollView *view, BOOL attributeValue, id<SCValdiAnimatorProtocol> animator) {
+                          // This attribute is Android-only and has no effect on iOS
+                          return YES;
+                      }
+                         resetBlock:^(SCValdiScrollView *view, id<SCValdiAnimatorProtocol> animator) {
+                           // No-op
                          }];
     
     [attributesBinder bindAttribute:@"decelerationRate"
