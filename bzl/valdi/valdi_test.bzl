@@ -20,6 +20,9 @@ def _valdi_test_impl(ctx):
 
     has_tests = len(test_paths) > 0
 
+    # Check if code coverage is enabled
+    code_coverage_enabled = ctx.attr.code_coverage[BuildSettingInfo].value
+
     # Always include standalone module runfiles
     valdimodules = _collect_target_runfiles(ctx.attr.target)
     valdimodules += _collect_target_runfiles(ctx.attr._valdi_standalone)
@@ -37,6 +40,14 @@ def _valdi_test_impl(ctx):
 
         cmd += " -- --allow_incomplete_test_run --include_module {}".format(ctx.attr.target[ValdiModuleInfo].name)
         cmd += " --junit_report_filename `basename $XML_OUTPUT_FILE` --junit_report_output_dir `dirname $XML_OUTPUT_FILE`"
+
+        # Add code coverage flags when enabled
+        if code_coverage_enabled:
+            cmd += " --code_coverage"
+
+            # Use COVERAGE_OUTPUT_FILE if set by Bazel (when using `bazel coverage`),
+            # otherwise fallback to a file in TEST_UNDECLARED_OUTPUTS_DIR
+            cmd += " --code_coverage_result \"${COVERAGE_OUTPUT_FILE:-$TEST_UNDECLARED_OUTPUTS_DIR/coverage.dat}\""
     else:
         cmd = "echo 'No tests to run'"
 
@@ -76,6 +87,10 @@ valdi_test = rule(
         "js_engine": attr.label(
             default = Label("@valdi//bzl/valdi:js_engine"),
             doc = "The JS engine to use to run the tests",
+        ),
+        "code_coverage": attr.label(
+            default = Label("@valdi//bzl/valdi:code_coverage_enabled"),
+            doc = "Enable code coverage collection during tests",
         ),
         "_valdi_standalone": attr.label(
             default = Label("@valdi//src/valdi_modules/src/valdi/valdi_standalone"),
