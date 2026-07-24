@@ -129,6 +129,24 @@ export function postInit(): void {
     global.TextEncoder = textCoding.TextEncoder;
   });
 
+  // Provide the standard `WeakRef` global on engines without native support (e.g.
+  // QuickJS), backed by the runtime's engine-independent weak-reference machinery.
+  if (typeof global.WeakRef === 'undefined') {
+    class ValdiWeakRef {
+      private _handle: unknown;
+      constructor(target: object) {
+        if (target === null || (typeof target !== 'object' && typeof target !== 'function')) {
+          throw new TypeError('WeakRef: target must be an object');
+        }
+        this._handle = runtime.newWeakRef(target);
+      }
+      deref(): object | undefined {
+        return runtime.derefWeakRef(this._handle);
+      }
+    }
+    global.WeakRef = ValdiWeakRef;
+  }
+
   // Without this, parsing worker code that does something like:
   // onmessage = e => { /* blah */ };
   // fails with:

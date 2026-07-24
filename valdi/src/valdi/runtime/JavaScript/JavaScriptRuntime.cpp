@@ -2098,6 +2098,17 @@ JSValueRef JavaScriptRuntime::runtimePerformGC(JSFunctionNativeCallContext& call
     return callContext.getContext().newUndefined();
 }
 
+JSValueRef JavaScriptRuntime::runtimeNewWeakRef(JSFunctionNativeCallContext& callContext) {
+    // Engine-independent weak reference to a JS object (backs the standard WeakRef global
+    // installed by PostInit on engines without native support). Returns an opaque handle.
+    return callContext.getContext().newWeakRef(callContext.getParameter(0), callContext.getExceptionTracker());
+}
+
+JSValueRef JavaScriptRuntime::runtimeDerefWeakRef(JSFunctionNativeCallContext& callContext) {
+    // Returns the referenced object, or undefined once it has been collected.
+    return callContext.getContext().derefWeakRef(callContext.getParameter(0), callContext.getExceptionTracker());
+}
+
 JSValueRef JavaScriptRuntime::runtimeHeapDump(JSFunctionNativeCallContext& callContext) {
     auto dumpHeapResult = dumpHeap();
     CHECK_CALL_CONTEXT(callContext);
@@ -2471,6 +2482,8 @@ void JavaScriptRuntime::buildContext(Valdi::IJavaScriptContext& context,
 
     JS_BIND(context, exceptionTracker, runtimeObject, "dumpMemoryStatistics", runtimeDumpMemoryStatistics);
     JS_BIND(context, exceptionTracker, runtimeObject, "performGC", runtimePerformGC);
+    JS_BIND(context, exceptionTracker, runtimeObject, "newWeakRef", runtimeNewWeakRef);
+    JS_BIND(context, exceptionTracker, runtimeObject, "derefWeakRef", runtimeDerefWeakRef);
 
     JS_BIND(
         context, exceptionTracker, runtimeObject, "setUncaughtExceptionHandler", runtimeSetUncaughtExceptionHandler);

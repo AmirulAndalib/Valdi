@@ -535,6 +535,8 @@ private:
 
     JSValueRef runtimeDumpMemoryStatistics(JSFunctionNativeCallContext& callContext);
     JSValueRef runtimePerformGC(JSFunctionNativeCallContext& callContext);
+    JSValueRef runtimeNewWeakRef(JSFunctionNativeCallContext& callContext);
+    JSValueRef runtimeDerefWeakRef(JSFunctionNativeCallContext& callContext);
     JSValueRef runtimeHeapDump(JSFunctionNativeCallContext& callContext);
 
     JSValueRef runtimeSetUncaughtExceptionHandler(JSFunctionNativeCallContext& callContext);
