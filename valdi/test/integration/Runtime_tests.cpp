@@ -5238,6 +5238,18 @@ TEST_P(RuntimeFixture, canUnregisterFromLoadedAssetFromTSSide) {
     ASSERT_FALSE(assetsManager->isAssetAlive(assetKey));
 }
 
+TEST_P(RuntimeFixture, preloadBatchIsolatesThrowingModules) {
+    auto jsRuntime = wrapper.runtime->getJavaScriptRuntime();
+
+    // ErrorModule throws at evaluation; the batch must continue to the next entry instead
+    // of aborting.
+    jsRuntime->preloadModules({STRING_LITERAL("test/src/ErrorModule"), STRING_LITERAL("test/src/DirectionalAsset")}, 0);
+
+    ASSERT_FALSE(jsRuntime->isJsModuleLoaded(ResourceId(STRING_LITERAL("test"), STRING_LITERAL("src/ErrorModule"))));
+    ASSERT_TRUE(
+        jsRuntime->isJsModuleLoaded(ResourceId(STRING_LITERAL("test"), STRING_LITERAL("src/DirectionalAsset"))));
+}
+
 TEST_P(RuntimeFixture, supportsModulePreloading) {
     // "test/src/DirectionAsset" module imports "valdi_core/src/Asset"
     ASSERT_FALSE(wrapper.runtime->getJavaScriptRuntime()->isJsModuleLoaded(
