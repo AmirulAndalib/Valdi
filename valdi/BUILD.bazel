@@ -521,6 +521,32 @@ kt_android_library(
     ],
 )
 
+# Plain Espresso/Hamcrest test bindings over Valdi's element/view-node API
+# (com.snap.valdi.test.*). Lets instrumented tests locate and assert on Valdi
+# elements mounted in a ValdiRootView. Only depends on the public Valdi Java API
+# plus Espresso/Hamcrest/JUnit - no Snap-internal runtime glue.
+kt_android_library(
+    name = "valdi_android_test_support",
+    testonly = True,
+    srcs = glob([
+        "src/android_test_support/java/**/*.kt",
+    ]),
+    custom_package = "com.snap.valdi.test",
+    kotlinc_opts = ":kotlinc_opts",
+    manifest = "src/valdi/android/AndroidManifest.xml",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":valdi_java",
+        "@android_mvn//:androidx_annotation_annotation",
+        "@test_mvn//:androidx_test_core",
+        "@test_mvn//:androidx_test_espresso_espresso_core",
+        "@test_mvn//:androidx_test_monitor",
+        "@test_mvn//:junit_junit",
+        "@test_mvn//:org_hamcrest_hamcrest_core",
+        "@test_mvn//:org_hamcrest_hamcrest_library",
+    ],
+)
+
 kt_jvm_test(
     name = "test_java",
     size = "small",
