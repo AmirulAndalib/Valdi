@@ -235,9 +235,6 @@ class ValdiDoctor {
     // Shell autocomplete configuration
     this.checkShellAutoComplete();
 
-    // VSCode/Cursor extensions check
-    await this.checkEditorExtensions();
-
     // Framework-specific checks (only if requested)
     if (this.frameworkMode) {
       this.checkFrameworkDependencies();
@@ -1004,88 +1001,6 @@ class ValdiDoctor {
         name: 'Shell autocomplete',
         status: 'warn',
         message: 'Could not verify shell autocomplete configuration',
-        category: 'Development tools',
-      });
-    }
-  }
-
-  /**
-   * Validates VSCode/Cursor extensions installation.
-   *
-   * Checks if Valdi extensions are installed in VSCode or Cursor:
-   * - valdi-vivaldi: Device logs and language support
-   * - valdi-debug: JavaScript debugger
-   *
-   * @returns Promise that resolves when extension checks are complete
-   * @private
-   */
-  private async checkEditorExtensions(): Promise<void> {
-    const hasCode = checkCommandExists('code');
-    const hasCursor = checkCommandExists('cursor');
-
-    if (!hasCode && !hasCursor) {
-      // No editor installed, skip check
-      return;
-    }
-
-    let extensionsInstalled = false;
-
-    // Check VSCode extensions
-    if (hasCode) {
-      try {
-        const { stdout } = await runCliCommand('code --list-extensions');
-        const installedExtensions = stdout.toLowerCase();
-        
-        const hasVivaldi = installedExtensions.includes('valdi-vivaldi');
-        const hasDebug = installedExtensions.includes('valdi-debug');
-
-        if (hasVivaldi && hasDebug) {
-          extensionsInstalled = true;
-          this.addResult({
-            name: 'VSCode Extensions',
-            status: 'pass',
-            message: 'Valdi extensions installed in VSCode',
-            category: 'Development tools',
-          });
-        }
-      } catch {
-        // Could not check VSCode extensions
-      }
-    }
-
-    // Check Cursor extensions
-    if (hasCursor) {
-      try {
-        const { stdout } = await runCliCommand('cursor --list-extensions');
-        const installedExtensions = stdout.toLowerCase();
-        
-        const hasVivaldi = installedExtensions.includes('valdi-vivaldi');
-        const hasDebug = installedExtensions.includes('valdi-debug');
-
-        if (hasVivaldi && hasDebug) {
-          extensionsInstalled = true;
-          this.addResult({
-            name: 'Cursor Extensions',
-            status: 'pass',
-            message: 'Valdi extensions installed in Cursor',
-            category: 'Development tools',
-          });
-        }
-      } catch {
-        // Could not check Cursor extensions
-      }
-    }
-
-    // If neither editor has extensions, show info
-    if (!extensionsInstalled && (hasCode || hasCursor)) {
-      const editor = hasCode ? 'VSCode' : 'Cursor';
-      this.addResult({
-        name: `${editor} Extensions`,
-        status: 'warn',
-        message: 'Valdi editor extensions not installed',
-        details: 'Extensions provide syntax highlighting, debugging, and device logs',
-        fixable: true,
-        fixCommand: 'See installation instructions: https://github.com/Snapchat/Valdi/blob/main/docs/INSTALL.md#vscodecursor-setup-optional-but-recommended',
         category: 'Development tools',
       });
     }
