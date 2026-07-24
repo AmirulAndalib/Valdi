@@ -2591,6 +2591,12 @@ JavaScriptContextMemoryStatistics JavaScriptRuntime::dumpMemoryStatistics() {
     return stats;
 }
 
+void JavaScriptRuntime::dumpMemoryStatisticsAsync(Function<void(JavaScriptContextMemoryStatistics)> completion) {
+    dispatchOnJsThreadAsync(nullptr, [this, completion](JavaScriptEntryParameters& entry) {
+        completion(this->dumpMemoryStatistics(entry.jsContext));
+    });
+}
+
 Shared<JavaScriptModuleContainer> JavaScriptRuntime::getValdiModule(JavaScriptEntryParameters& jsEntry) {
     return importModule(valdiModuleResourceId(), jsEntry);
 }

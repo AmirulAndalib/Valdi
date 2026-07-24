@@ -269,6 +269,7 @@ public:
 
     void performGc();
     JavaScriptContextMemoryStatistics dumpMemoryStatistics();
+    void dumpMemoryStatisticsAsync(Function<void(JavaScriptContextMemoryStatistics)> completion);
 
     Result<Value> evaluateScript(const BytesView& script, const StringBox& sourceFilename);
 

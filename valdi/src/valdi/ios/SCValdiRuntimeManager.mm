@@ -704,6 +704,28 @@ static SCValdiCapturedJSStacktrace *toObjCStacktrace(const Valdi::JavaScriptCapt
     return result;
 }
 
+- (void)dumpMemoryStatisticsAsyncWithCompletion:(void (^)(SCValdiMemoryStatistics))completion
+{
+    // Take a strong reference under the lock so the manager stays alive across the async dump,
+    // but drive the (potentially long) dispatch outside the lock so we never block teardown.
+    Valdi::Ref<Valdi::RuntimeManager> cppInstance;
+    @synchronized (self) {
+        cppInstance = _cppInstance;
+    }
+
+    if (cppInstance == nullptr) {
+        completion((SCValdiMemoryStatistics){0, 0});
+        return;
+    }
+
+    cppInstance->dumpMemoryStatisticsAsync([completion](Valdi::JavaScriptContextMemoryStatistics stats) {
+        SCValdiMemoryStatistics result;
+        result.memoryUsageBytes = static_cast<int64_t>(stats.memoryUsageBytes);
+        result.objectsCount = static_cast<int64_t>(stats.objectsCount);
+        completion(result);
+    });
+}
+
 - (void *)cppInstance
 {
     @synchronized (self) {
