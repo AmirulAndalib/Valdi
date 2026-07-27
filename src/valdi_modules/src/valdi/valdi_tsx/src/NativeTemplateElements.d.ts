@@ -2078,6 +2078,15 @@ export interface BlurView extends _BlurView, ViewAttributes, LayoutAttributes, C
 export type GlassStyle = 'regular' | 'clear';
 
 /**
+ * The light/dark appearance a `<glass>` element's material resolves against,
+ * independent of the app's appearance.
+ *
+ * - `light`: pins the material to its light variant.
+ * - `dark`: pins the material to its dark variant.
+ */
+export type GlassAppearance = 'light' | 'dark';
+
+/**
  * `<glass>` renders an Apple "Liquid Glass" material (iOS 26+) behind its children.
  *
  * iOS ONLY. There is no Android equivalent for `UIGlassEffect`, so on Android
@@ -2117,6 +2126,14 @@ export interface GlassView
    * animation. Defaults to `false`. iOS 26+ only; ignored on Android and older iOS.
    */
   interactive?: boolean;
+
+  /**
+   * Pins the material to a light or dark variant (`overrideUserInterfaceStyle`)
+   * regardless of the app's appearance. When absent the material follows the app,
+   * and `regular` glass renders bright in light mode, which `glassTintColor` can't
+   * fully darken. iOS only; ignored on Android.
+   */
+  glassAppearance?: GlassAppearance;
 
   /**
    * Styling object allows to set multiple attribute at once
