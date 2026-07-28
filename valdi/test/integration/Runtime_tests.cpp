@@ -50,6 +50,7 @@
 #include "valdi_core/cpp/Utils/ValueTypedProxyObject.hpp"
 #include "valdi_test_utils.hpp"
 #include "gtest/gtest.h"
+#include <yoga/Yoga.h>
 #include <yoga/node/Node.h>
 
 #include "valdi_core/cpp/Marshalling/RegisteredCppGeneratedClass.hpp"
@@ -1351,7 +1352,7 @@ TEST_P(RuntimeFixture, canSetupFlexboxTreeWithRenderIfs) {
     wrapper.waitUntilAllUpdatesCompleted();
 
     auto rootViewNode = tree->getRootViewNode();
-    auto* rootYogaNode = facebook::yoga::resolveRef(rootViewNode->getYogaNode());
+    auto rootYogaNode = rootViewNode->getYogaNode();
 
     // All ViewNodes should be generated
 
@@ -1372,11 +1373,11 @@ TEST_P(RuntimeFixture, canSetupFlexboxTreeWithRenderIfs) {
 
     ASSERT_EQ(2, static_cast<int>(rootYogaNode->getChildren().size()));
 
-    auto* child2YogaNode = rootYogaNode->getChild(0);
-    auto* child4YogaNode = rootYogaNode->getChild(1);
+    auto child2YogaNode = rootYogaNode->getChild(0);
+    auto child4YogaNode = rootYogaNode->getChild(1);
 
-    ASSERT_EQ(child2ViewNode->getYogaNode(), static_cast<YGNode*>(child2YogaNode));
-    ASSERT_EQ(child4ViewNode->getYogaNode(), static_cast<YGNode*>(child4YogaNode));
+    ASSERT_EQ(child2YogaNode, child2ViewNode->getYogaNode());
+    ASSERT_EQ(child4YogaNode, child4ViewNode->getYogaNode());
 
     // We then add child3
 
@@ -1390,9 +1391,9 @@ TEST_P(RuntimeFixture, canSetupFlexboxTreeWithRenderIfs) {
     auto child3ViewNode = child3ViewNodes[0];
 
     ASSERT_EQ(3, static_cast<int>(rootYogaNode->getChildren().size()));
-    ASSERT_EQ(child2ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(0)));
-    ASSERT_EQ(child3ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(1)));
-    ASSERT_EQ(child4ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(2)));
+    ASSERT_EQ(child2ViewNode->getYogaNode(), rootYogaNode->getChild(0));
+    ASSERT_EQ(child3ViewNode->getYogaNode(), rootYogaNode->getChild(1));
+    ASSERT_EQ(child4ViewNode->getYogaNode(), rootYogaNode->getChild(2));
 
     // We now insert the last child, child1
 
@@ -1406,10 +1407,10 @@ TEST_P(RuntimeFixture, canSetupFlexboxTreeWithRenderIfs) {
     auto child1ViewNode = child1ViewNodes[0];
 
     ASSERT_EQ(4, static_cast<int>(rootYogaNode->getChildren().size()));
-    ASSERT_EQ(child1ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(0)));
-    ASSERT_EQ(child2ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(1)));
-    ASSERT_EQ(child3ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(2)));
-    ASSERT_EQ(child4ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(3)));
+    ASSERT_EQ(child1ViewNode->getYogaNode(), rootYogaNode->getChild(0));
+    ASSERT_EQ(child2ViewNode->getYogaNode(), rootYogaNode->getChild(1));
+    ASSERT_EQ(child3ViewNode->getYogaNode(), rootYogaNode->getChild(2));
+    ASSERT_EQ(child4ViewNode->getYogaNode(), rootYogaNode->getChild(3));
 
     // Now removing all the render-if nodes
 
@@ -1419,8 +1420,8 @@ TEST_P(RuntimeFixture, canSetupFlexboxTreeWithRenderIfs) {
     wrapper.waitUntilAllUpdatesCompleted();
 
     ASSERT_EQ(2, static_cast<int>(rootYogaNode->getChildren().size()));
-    ASSERT_EQ(child2ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(0)));
-    ASSERT_EQ(child4ViewNode->getYogaNode(), static_cast<YGNode*>(rootYogaNode->getChild(1)));
+    ASSERT_EQ(child2ViewNode->getYogaNode(), rootYogaNode->getChild(0));
+    ASSERT_EQ(child4ViewNode->getYogaNode(), rootYogaNode->getChild(1));
 }
 
 TEST_P(RuntimeFixture, jsCanAttachToMainThread) {
@@ -6081,9 +6082,9 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
 
     ASSERT_TRUE(attributedText != nullptr);
 
-    ASSERT_EQ("Hello World!?!", attributedText->toString());
+    ASSERT_EQ("Hello World Code!?!", attributedText->toString());
 
-    ASSERT_EQ(static_cast<size_t>(6), attributedText->getPartsSize());
+    ASSERT_EQ(static_cast<size_t>(8), attributedText->getPartsSize());
 
     {
         ASSERT_EQ(STRING_LITERAL("Hello"), attributedText->getContentAtIndex(0));
@@ -6092,6 +6093,7 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
         ASSERT_EQ(std::nullopt, style.font);
         ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
         ASSERT_EQ(std::nullopt, style.color);
+        ASSERT_EQ(nullptr, style.background);
         ASSERT_EQ(nullptr, style.onTap);
     }
 
@@ -6100,8 +6102,12 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
         const auto& style = attributedText->getStyleAtIndex(1);
 
         ASSERT_EQ(std::make_optional(STRING_LITERAL("title")), style.font);
-        ASSERT_EQ(TextDecoration::Underline, style.textDecoration);
+        ASSERT_EQ(TextDecoration::DashedUnderline, style.textDecoration);
         ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0xFF0000FF))), style.color);
+        ASSERT_NE(nullptr, style.background);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0xFFFF00FF))), style.background->color);
+        ASSERT_EQ((Valdi::TextBackgroundPadding{1, 2, 3, 4}), style.background->padding);
+        ASSERT_EQ((Valdi::Dimension{5, Valdi::Dimension::Unit::Percent}), style.background->borderRadius);
         ASSERT_EQ(nullptr, style.onTap);
     }
 
@@ -6110,28 +6116,36 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
         const auto& style = attributedText->getStyleAtIndex(2);
 
         ASSERT_EQ(std::make_optional(STRING_LITERAL("title")), style.font);
-        ASSERT_EQ(TextDecoration::Underline, style.textDecoration);
+        ASSERT_EQ(TextDecoration::DashedUnderline, style.textDecoration);
         ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0xFF0000FF))), style.color);
+        ASSERT_NE(nullptr, style.background);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0xFFFF00FF))), style.background->color);
+        ASSERT_EQ((Valdi::TextBackgroundPadding{1, 2, 3, 4}), style.background->padding);
+        ASSERT_EQ((Valdi::Dimension{5, Valdi::Dimension::Unit::Percent}), style.background->borderRadius);
         ASSERT_EQ(nullptr, style.onTap);
     }
 
     {
-        ASSERT_EQ(STRING_LITERAL("!"), attributedText->getContentAtIndex(3));
+        ASSERT_EQ(STRING_LITERAL(" "), attributedText->getContentAtIndex(3));
         const auto& style = attributedText->getStyleAtIndex(3);
 
         ASSERT_EQ(std::nullopt, style.font);
         ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
-        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x0000FFFF))), style.color);
+        ASSERT_EQ(std::nullopt, style.color);
+        ASSERT_EQ(nullptr, style.background);
         ASSERT_EQ(nullptr, style.onTap);
     }
 
     {
-        ASSERT_EQ(STRING_LITERAL("?"), attributedText->getContentAtIndex(4));
+        ASSERT_EQ(STRING_LITERAL("Code"), attributedText->getContentAtIndex(4));
         const auto& style = attributedText->getStyleAtIndex(4);
 
         ASSERT_EQ(std::nullopt, style.font);
         ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
-        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x008000FF))), style.color);
+        ASSERT_EQ(std::nullopt, style.color);
+        ASSERT_NE(nullptr, style.background);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0xFFFF00FF))), style.background->color);
+        ASSERT_EQ((Valdi::TextBackgroundPadding{6, 6, 6, 6}), style.background->padding);
         ASSERT_EQ(nullptr, style.onTap);
     }
 
@@ -6142,8 +6156,292 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
         ASSERT_EQ(std::nullopt, style.font);
         ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
         ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x0000FFFF))), style.color);
+        ASSERT_EQ(nullptr, style.background);
         ASSERT_EQ(nullptr, style.onTap);
     }
+
+    {
+        ASSERT_EQ(STRING_LITERAL("?"), attributedText->getContentAtIndex(6));
+        const auto& style = attributedText->getStyleAtIndex(6);
+
+        ASSERT_EQ(std::nullopt, style.font);
+        ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x008000FF))), style.color);
+        ASSERT_EQ(nullptr, style.background);
+        ASSERT_EQ(nullptr, style.onTap);
+    }
+
+    {
+        ASSERT_EQ(STRING_LITERAL("!"), attributedText->getContentAtIndex(7));
+        const auto& style = attributedText->getStyleAtIndex(7);
+
+        ASSERT_EQ(std::nullopt, style.font);
+        ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x0000FFFF))), style.color);
+        ASSERT_EQ(nullptr, style.background);
+        ASSERT_EQ(nullptr, style.onTap);
+    }
+}
+
+static Ref<TextAttributeValue> getTextAttributeValueFromNode(ViewNode* viewNode) {
+    auto view = StandaloneView::unwrap(viewNode->getView());
+    EXPECT_TRUE(view != nullptr);
+    if (view == nullptr) {
+        return nullptr;
+    }
+
+    auto value = view->getAttribute(STRING_LITERAL("value"));
+    EXPECT_EQ(ValueType::ValdiObject, value.getType());
+    auto attributedText = value.getTypedRef<TextAttributeValue>();
+    EXPECT_TRUE(attributedText != nullptr);
+    return attributedText;
+}
+
+static std::vector<Ref<TextInlineAttachment>> getInlineViewAttachments(const Ref<TextAttributeValue>& attributedText) {
+    std::vector<Ref<TextInlineAttachment>> attachments;
+    if (attributedText == nullptr) {
+        return attachments;
+    }
+
+    for (size_t i = 0; i < attributedText->getPartsSize(); i++) {
+        const auto& attachment = attributedText->getStyleAtIndex(i).inlineViewAttachment;
+        if (attachment != nullptr) {
+            attachments.push_back(attachment);
+        }
+    }
+    return attachments;
+}
+
+static Value inlineViewDynamicSizeViewModel(double width, double height) {
+    return Value().setMapValue("childWidth", Value(width)).setMapValue("childHeight", Value(height));
+}
+
+TEST_P(RuntimeFixture, supportsManagedChildFrameViewClasses) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("ManagedChildFrameView"),
+                                                                              true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ManagedChildFrames@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto managedNodes = findViewNodesWithId(tree->getRootViewNode(), "managed");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "managedChild");
+    ASSERT_EQ(static_cast<size_t>(1), managedNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* managedNode = managedNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(managedNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(YGPositionTypeAbsolute, YGNodeStyleGetPositionType(childNode->getYogaNode()));
+    ASSERT_EQ(Frame(10, 0, 30, 20), childNode->getCalculatedFrame());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewAttachmentsFromTextChildren) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewTextAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* labelNode = labelNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(labelNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(Frame(0, 0, 18, 12), childNode->getCalculatedFrame());
+
+    auto labelView = StandaloneView::unwrap(labelNode->getView());
+    ASSERT_TRUE(labelView != nullptr);
+
+    auto value = labelView->getAttribute(STRING_LITERAL("value"));
+    ASSERT_EQ(ValueType::ValdiObject, value.getType());
+
+    auto attributedText = value.getTypedRef<TextAttributeValue>();
+    ASSERT_TRUE(attributedText != nullptr);
+    ASSERT_EQ(static_cast<size_t>(3), attributedText->getPartsSize());
+    ASSERT_EQ(STRING_LITERAL("Before "), attributedText->getContentAtIndex(0));
+    ASSERT_EQ(STRING_LITERAL(" after"), attributedText->getContentAtIndex(2));
+
+    const auto& inlineStyle = attributedText->getStyleAtIndex(1);
+    ASSERT_TRUE(inlineStyle.inlineViewAttachment != nullptr);
+    ASSERT_EQ(static_cast<size_t>(0), inlineStyle.inlineViewAttachment->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Bottom, inlineStyle.inlineViewAttachment->getVerticalAlignment());
+    ASSERT_EQ(Size(18, 12), inlineStyle.inlineViewAttachment->getSize());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewVerticalAlignmentEnumValuesFromTS) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewVerticalAlignmentTextAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto topNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineTop");
+    auto centerNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineCenter");
+    auto bottomNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineBottom");
+    auto baselineNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineBaseline");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), topNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), centerNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), bottomNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), baselineNodes.size());
+
+    auto* labelNode = labelNodes[0];
+    ASSERT_TRUE(labelNode->managesChildFrames());
+    ASSERT_TRUE(topNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(centerNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(bottomNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(baselineNodes[0]->parentManagesChildFrames());
+
+    ASSERT_EQ(Frame(0, 0, 11, 12), topNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 22, 24), centerNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 33, 36), bottomNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 44, 14), baselineNodes[0]->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(labelNode);
+    ASSERT_TRUE(attributedText != nullptr);
+    ASSERT_EQ(static_cast<size_t>(9), attributedText->getPartsSize());
+    ASSERT_EQ(STRING_LITERAL("A"), attributedText->getContentAtIndex(0));
+    ASSERT_EQ(STRING_LITERAL("B"), attributedText->getContentAtIndex(2));
+    ASSERT_EQ(STRING_LITERAL("C"), attributedText->getContentAtIndex(4));
+    ASSERT_EQ(STRING_LITERAL("D"), attributedText->getContentAtIndex(6));
+    ASSERT_EQ(STRING_LITERAL("E"), attributedText->getContentAtIndex(8));
+
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(4), attachments.size());
+    ASSERT_EQ(static_cast<size_t>(0), attachments[0]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Top, attachments[0]->getVerticalAlignment());
+    ASSERT_EQ(Size(11, 12), attachments[0]->getSize());
+    ASSERT_EQ(static_cast<size_t>(1), attachments[1]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Center, attachments[1]->getVerticalAlignment());
+    ASSERT_EQ(Size(22, 24), attachments[1]->getSize());
+    ASSERT_EQ(static_cast<size_t>(2), attachments[2]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Bottom, attachments[2]->getVerticalAlignment());
+    ASSERT_EQ(Size(33, 36), attachments[2]->getSize());
+    ASSERT_EQ(static_cast<size_t>(3), attachments[3]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Baseline, attachments[3]->getVerticalAlignment());
+    ASSERT_EQ(Size(44, 14), attachments[3]->getSize());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewAttachmentsForTextViewChildren) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiTextView"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewTextViewAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto textViewNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineTextView");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "textViewInlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), textViewNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* textViewNode = textViewNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(textViewNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(YGPositionTypeAbsolute, YGNodeStyleGetPositionType(childNode->getYogaNode()));
+    ASSERT_EQ(Frame(0, 0, 26, 16), childNode->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(textViewNode);
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(1), attachments.size());
+    ASSERT_EQ(static_cast<size_t>(0), attachments[0]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Top, attachments[0]->getVerticalAlignment());
+    ASSERT_EQ(Size(26, 16), attachments[0]->getSize());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, rejectsInvalidInlineViewChildIndexesFromTSAttributedText) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewInvalidChildIndexAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+    ASSERT_TRUE(labelNodes[0]->managesChildFrames());
+    ASSERT_TRUE(childNodes[0]->parentManagesChildFrames());
+
+    auto labelView = StandaloneView::unwrap(labelNodes[0]->getView());
+    ASSERT_TRUE(labelView != nullptr);
+    ASSERT_TRUE(labelView->getAttribute(STRING_LITERAL("value")).isUndefined());
+}
+
+TEST_P(RuntimeFixture, inlineViewAttachmentSizeProviderTracksChildLayoutChanges) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewDynamicSizeAttribute@test/src/ManagedChildFrames"),
+        inlineViewDynamicSizeViewModel(18, 12),
+        Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+    ASSERT_EQ(Frame(0, 0, 18, 12), childNodes[0]->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(labelNodes[0]);
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(1), attachments.size());
+    auto attachment = attachments[0];
+    ASSERT_EQ(Size(18, 12), attachment->getSize());
+
+    auto labelView = StandaloneView::unwrap(labelNodes[0]->getView());
+    ASSERT_TRUE(labelView != nullptr);
+    auto invalidateLayoutCountBeforeSizeChange = labelView->getInvalidateLayoutCount();
+
+    wrapper.setViewModel(tree->getContext(), inlineViewDynamicSizeViewModel(31, 17));
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    ASSERT_EQ(Frame(0, 0, 31, 17), childNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Size(31, 17), attachment->getSize());
+
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto updatedChildNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), updatedChildNodes.size());
+    ASSERT_EQ(Frame(0, 0, 31, 17), updatedChildNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Size(31, 17), attachment->getSize());
+
+    auto updatedAttributedText = getTextAttributeValueFromNode(labelNodes[0]);
+    auto updatedAttachments = getInlineViewAttachments(updatedAttributedText);
+    ASSERT_EQ(static_cast<size_t>(1), updatedAttachments.size());
+    ASSERT_EQ(Size(31, 17), updatedAttachments[0]->getSize());
+    ASSERT_GT(labelView->getInvalidateLayoutCount(), invalidateLayoutCountBeforeSizeChange);
 }
 
 TEST_P(RuntimeFixture, supportsAccesibilityValueInTextAttribute) {
@@ -6159,7 +6457,7 @@ TEST_P(RuntimeFixture, supportsAccesibilityValueInTextAttribute) {
     auto labelViewNode = rootViewNode->getChildAt(0);
     auto accessibilityValue = labelViewNode->getAccessibilityValue();
 
-    ASSERT_EQ(STRING_LITERAL("Hello World!?!"), accessibilityValue);
+    ASSERT_EQ(STRING_LITERAL("Hello World Code!?!"), accessibilityValue);
 }
 
 TEST_P(RuntimeFixture, FLAKY_workerWorks) {

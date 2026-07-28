@@ -24,6 +24,7 @@
 
 #import "valdi/ios/Text/SCValdiAttributedTextHelper.h"
 #import "valdi/ios/Text/SCValdiFont.h"
+#import "valdi/ios/Text/SCValdiProcessedText.h"
 
 @implementation SCValdiTextField {
     /// YES if pressing the return key should dismiss the keyboard, o/w NO
@@ -83,6 +84,12 @@
 {
     [self _updateAttributedTextIfNeeded];
     [super layoutSubviews];
+}
+
+- (CGSize)sizeThatFits:(CGSize)size
+{
+    [self _updateAttributedTextIfNeeded];
+    return [super sizeThatFits:size];
 }
 
 - (CGPoint)convertPoint:(CGPoint)point fromView:(UIView *)view
@@ -332,11 +339,14 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextField
         self.minimumFontSize = _minimumScaleFactor * resolvedFont.pointSize;
 
         if ([self _needAttributedString]) {
-            NSAttributedString *attributedString = [NSAttributedString attributedStringWithValdiText:_textValue
-                                                                                             attributes:[fontAttributes resolveAttributesWithIsRightToLeft:isRightToLeft traitCollection:traitCollection]
-                                                                                          isRightToLeft:isRightToLeft
-                                                                                            fontManager:_fontManager
-                                                                                        traitCollection:traitCollection];
+            SCValdiProcessedText *processedText =
+                [SCValdiProcessedText processedTextWithAttributeValue:_textValue
+                                                           attributes:[fontAttributes resolveAttributesWithIsRightToLeft:isRightToLeft traitCollection:traitCollection]
+                                                        isRightToLeft:isRightToLeft
+                                                          fontManager:_fontManager
+                                                      traitCollection:traitCollection
+                                                        configuration:nil];
+            NSAttributedString *attributedString = processedText.attributedString;
 
             [self updateLabelMode:SCValdiTextModeAttributedText];
 
@@ -366,9 +376,7 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextField
             // NSTextAlignmentNatural switches alignment based on keyboard language instead of app language,
             // introduce fix under COF to use NSTextAlignmentLeft and NSTextAlignmentRight
             // instead of Natural (the NSTextAlignment used for left)
-            if (resolvedTextAlignment != NSTextAlignmentCenter &&
-                resolvedTextAlignment != NSTextAlignmentJustified) {
-
+            if (resolvedTextAlignment == NSTextAlignmentNatural) {
                 if (traitCollection.layoutDirection == UITraitEnvironmentLayoutDirectionRightToLeft) {
                     resolvedTextAlignment = NSTextAlignmentRight;
                 }
