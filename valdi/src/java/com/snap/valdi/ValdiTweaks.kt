@@ -51,11 +51,6 @@ data class ValdiTweaks(
           */
          val editTextResetSelectionMatchesIos: Boolean = false,
          /**
-          * When true, use Valdi-owned virtual IDs for custom Android view descendants in the
-          * accessibility hierarchy.
-          */
-         val enableAccessibilityCustomViewVirtualIdFix: Boolean = false,
-         /**
           * When true, use [Locale.toLanguageTag] for device locale strings instead of
           * manually concatenating language and country codes. Fixes trailing-dash issues
           * (e.g. "nl-" instead of "nl") for locales without a country component.
