@@ -131,7 +131,8 @@ bool ValdiRuntimeTweaks::enableMmapModuleArchives() const {
     return getConfigKey("VALDI_ENABLE_MMAP_MODULE_ARCHIVES");
 }
 
-bool ValdiRuntimeTweaks::enableModuleLoadDiagnostics() const {
+bool ValdiRuntimeTweaks::enableANRDiagnostics() const {
+    // Key name kept from the earlier module-load diagnostics so the existing COF config carries over.
     return getConfigKey("VALDI_ENABLE_MODULE_LOAD_DIAGNOSTICS");
 }
 

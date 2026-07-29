@@ -37,7 +37,7 @@ public:
     // True when VALDI_MAX_VIEW_OPERATIONS_PROCESSING_TIME > 0 (throttling enabled). Gates top-down move order in TS.
     bool useTopDownMoveOrder() const;
     bool enableMmapModuleArchives() const;
-    bool enableModuleLoadDiagnostics() const;
+    bool enableANRDiagnostics() const;
     bool enableFixFlexBasisFitContent() const;
     // Number of modules ModuleLoader.preloadBatch evaluates per JS-scheduler task before yielding.
     // 0 (default) keeps preload as a single uninterrupted task. > 0 bounds the max contiguous JS
