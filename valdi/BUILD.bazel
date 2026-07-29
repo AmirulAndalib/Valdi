@@ -724,6 +724,30 @@ objc_library(
     ],
 )
 
+ios_unit_test(
+    name = "valdi_ios_perf_test",
+    minimum_os_version = "13.0",
+    runner = "@build_bazel_rules_apple//apple/testing/default_runner:ios_xctestrun_ordered_runner",
+    deps = [":objc_perf_tests_lib"],
+)
+
+# Deliberately depends on :valdi_ios only (no valdi_test fixtures) so the
+# lock-contention coverage stays runnable independently of the heavier test deps.
+objc_library(
+    name = "objc_perf_tests_lib",
+    testonly = True,
+    srcs = glob([
+        "test/ios_perf/**/*.mm",
+    ]),
+    copts = ["-I."],
+    includes = ["src"],
+    module_name = "ValdiIosObjcPerfTests",
+    target_compatible_with = ["@platforms//os:ios"],
+    deps = [
+        ":valdi_ios",
+    ],
+)
+
 objc_library(
     name = "macos_unit_tests_lib",
     testonly = True,
