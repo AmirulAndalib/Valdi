@@ -488,16 +488,6 @@ void ViewNodeAttributesApplier::updateAttributeHandlers() {
             }
         });
     }
-
-    auto dirtyIt = _dirtyCompositeAttributes.begin();
-    while (dirtyIt != _dirtyCompositeAttributes.end()) {
-        const auto* handler = _boundAttributes->getAttributeHandlerForId(dirtyIt->first);
-        if (handler == nullptr || handler->getCompositeAttribute() == nullptr) {
-            dirtyIt = _dirtyCompositeAttributes.erase(dirtyIt);
-        } else {
-            ++dirtyIt;
-        }
-    }
 }
 
 void ViewNodeAttributesApplier::destroy() {

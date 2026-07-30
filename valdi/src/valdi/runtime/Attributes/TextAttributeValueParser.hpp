@@ -7,11 +7,10 @@
 
 #pragma once
 
-#include "valdi_core/cpp/Attributes/TextInlineAttachment.hpp"
 #include "valdi_core/cpp/Utils/Result.hpp"
 #include "valdi_core/cpp/Utils/Value.hpp"
 
-#include <cstddef>
+#include <vector>
 
 namespace Valdi {
 
@@ -27,12 +26,7 @@ public:
      If "strict" is false, parse errors that are recoverable will be logged
      without causing the whole parsing to fail.
      */
-    static Result<Value> parse(const ColorPalette& colorPalette,
-                               const Value& value,
-                               ILogger& logger,
-                               const Ref<TextInlineAttachment>* attachments,
-                               size_t attachmentsLength,
-                               bool strict);
+    static Result<Value> parse(const ColorPalette& colorPalette, const Value& value, ILogger& logger, bool strict);
 
     /**
      Parse the TextAttributeValue from a ValueArray representation and output a string

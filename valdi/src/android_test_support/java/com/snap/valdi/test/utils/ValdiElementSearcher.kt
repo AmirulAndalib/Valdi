@@ -5,7 +5,6 @@ import android.view.ViewGroup
 import com.snap.valdi.extensions.ViewUtils
 import com.snap.valdi.test.ValdiElementWithRootView
 import com.snap.valdi.views.ValdiRootView
-import com.snap.valdi.views.ValdiTextViewBase
 import org.hamcrest.Matcher
 
 object ValdiElementSearcher {
@@ -54,7 +53,7 @@ object ValdiElementSearcher {
 
         if (viewNode != null) {
             if (composerContext === rootView.valdiContext && viewNode.id == viewNodeId) {
-                return (view as? ValdiTextViewBase)?.backingTextView ?: view
+                return view
             }
         }
 

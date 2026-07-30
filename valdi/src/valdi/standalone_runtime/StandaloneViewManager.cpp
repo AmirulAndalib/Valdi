@@ -77,12 +77,8 @@ StandaloneViewManager::StandaloneViewManager(PlatformType platformType) : _platf
 
 Valdi::Ref<Valdi::ViewFactory> StandaloneViewManager::createViewFactory(
     const Valdi::StringBox& className, const Valdi::Ref<Valdi::BoundAttributes>& boundAttributes) {
-    auto factory = Valdi::makeShared<DummyViewFactory>(
+    return Valdi::makeShared<DummyViewFactory>(
         className, *this, boundAttributes, _keepAttributesHistory, _allowViewPooling);
-    if (_managedChildFrameClasses.find(className) != _managedChildFrameClasses.end()) {
-        factory->setManagesChildFrames(true);
-    }
-    return factory;
 }
 
 void StandaloneViewManager::callAction(ViewNodeTree* /*viewNodeTree*/,
@@ -157,7 +153,7 @@ void StandaloneViewManager::bindAttributes(const Valdi::StringBox& className, Va
         doRegisterAttribute("backgroundColor", binder);
     }
 
-    if (className == "UIButton" || className == "SCValdiLabel" || className == "SCValdiTextView") {
+    if (className == "UIButton" || className == "SCValdiLabel") {
         doRegisterTextAttribute("value", binder);
         doRegisterAttribute("font", binder);
         doRegisterAttribute("text", binder);
@@ -225,14 +221,6 @@ void StandaloneViewManager::setAllowViewPooling(bool allowViewPooling) {
 
 void StandaloneViewManager::setAlwaysRenderInMainThread(bool alwaysRenderInMainThread) {
     _alwaysRenderInMainThread = alwaysRenderInMainThread;
-}
-
-void StandaloneViewManager::setManagesChildFramesForClass(const StringBox& className, bool managesChildFrames) {
-    if (managesChildFrames) {
-        _managedChildFrameClasses.insert(className);
-    } else {
-        _managedChildFrameClasses.erase(className);
-    }
 }
 
 } // namespace Valdi

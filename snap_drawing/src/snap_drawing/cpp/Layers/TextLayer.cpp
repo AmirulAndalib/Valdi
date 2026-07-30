@@ -17,57 +17,12 @@
 #include "snap_drawing/cpp/Text/TextLayoutBuilder.hpp"
 #include "snap_drawing/cpp/Touches/AttributedTextOnTapGestureRecognizer.hpp"
 #include "snap_drawing/cpp/Utils/GradientWrapper.hpp"
-#include "snap_drawing/cpp/Utils/Path.hpp"
 
 #include <cmath>
 
 namespace snap::drawing {
 
 constexpr double kMaxAdjustsFontSizeToFitWidthAttempt = 8;
-
-static Path makeTextDecorationPath(const Rect& bounds) {
-    Path path;
-    auto centerY = bounds.y() + bounds.height() / 2.0f;
-    path.moveTo(bounds.x(), centerY);
-    path.lineTo(bounds.right, centerY);
-    return path;
-}
-
-static void drawTextDecoration(DrawingContext& drawingContext,
-                               Paint& paint,
-                               TextLayoutDecorationStyle style,
-                               const std::optional<TextCustomUnderlineStyle>& customUnderlineStyle,
-                               const Rect& bounds) {
-    if (customUnderlineStyle) {
-        paint.setStroke(true);
-        paint.setStrokeWidth(customUnderlineStyle->height);
-        paint.setStrokeCap(PaintStrokeCapButt);
-        if (customUnderlineStyle->isPatterned()) {
-            paint.setStrokeDashPattern(customUnderlineStyle->onWidth, customUnderlineStyle->offWidth);
-        }
-
-        auto path = makeTextDecorationPath(bounds);
-        drawingContext.drawPaint(paint, path);
-    } else if (style == TextLayoutDecorationStyleDashed) {
-        auto strokeWidth = std::max<Scalar>(bounds.height(), 1.0f);
-        paint.setStroke(true);
-        paint.setStrokeWidth(strokeWidth);
-        paint.setStrokeCap(PaintStrokeCapButt);
-        paint.setStrokeDashPattern(strokeWidth * 3.0f, strokeWidth * 2.0f);
-
-        auto path = makeTextDecorationPath(bounds);
-        drawingContext.drawPaint(paint, path);
-    } else if (style == TextLayoutDecorationStyleDotted) {
-        auto strokeWidth = std::max<Scalar>(bounds.height(), 1.0f);
-        paint.setStroke(false);
-        paint.setStrokeDotPattern(strokeWidth / 2.0f, strokeWidth * 2.0f);
-
-        auto path = makeTextDecorationPath(bounds);
-        drawingContext.drawPaint(paint, path);
-    } else {
-        drawingContext.drawPaint(paint, bounds);
-    }
-}
 
 TextLayer::TextLayer(const Ref<Resources>& resources) : Layer(resources) {
     _textPaint.setAntiAlias(true);
@@ -77,8 +32,10 @@ TextLayer::TextLayer(const Ref<Resources>& resources) : Layer(resources) {
 TextLayer::~TextLayer() = default;
 
 Size TextLayer::sizeThatFits(Size maxSize) {
+    auto respectDynamicType = getResources()->getRespectDynamicType();
     auto displayScale = getResources()->getDisplayScale();
-    auto& layout = getTextLayout(maxSize, *getResources());
+    auto dynamicTypeScale = getResources()->getDynamicTypeScale();
+    auto& layout = getTextLayout(maxSize, respectDynamicType, displayScale, dynamicTypeScale);
 
     return Size::make(layout.getBounds().width() / displayScale, layout.getBounds().height() / displayScale);
 }
@@ -86,15 +43,16 @@ Size TextLayer::sizeThatFits(Size maxSize) {
 void TextLayer::onDraw(DrawingContext& drawingContext) {
     Layer::onDraw(drawingContext);
 
+    auto respectDynamicType = getResources()->getRespectDynamicType();
     auto displayScale = getResources()->getDisplayScale();
-    auto layerSize = Size::make(getFrame().width(), getFrame().height());
-    auto& layout = getTextLayout(layerSize, *getResources());
-    auto offsetY = getTextVerticalOffset(layerSize, layout, displayScale);
-    drawingContext.concat(Matrix::makeScaleTranslate(1.0f / displayScale, 1.0f / displayScale, 0.0f, offsetY));
+    auto dynamicTypeScale = getResources()->getDynamicTypeScale();
+    auto& layout = getTextLayout(
+        Size::make(getFrame().width(), getFrame().height()), respectDynamicType, displayScale, dynamicTypeScale);
+    drawingContext.concat(Matrix::makeScaleTranslate(1.0f / displayScale, 1.0f / displayScale, 0.0f, 0.0f));
 
     if (hasTextShadow()) {
         // Draw all of the shadows first
-        drawTextVisualEntriesShadows(drawingContext, layout.getVisualEntries());
+        drawTextDecorationsShadows(drawingContext, layout.getDecorations());
         for (const auto& entry : layout.getEntries()) {
             if (entry.textBlob != nullptr) {
                 drawTextShadows(drawingContext, entry.textBlob);
@@ -103,7 +61,7 @@ void TextLayer::onDraw(DrawingContext& drawingContext) {
     }
 
     // Then draw all of the text things
-    drawTextVisualEntries(drawingContext, layout.getVisualEntries(), /* predraw */ true);
+    drawTextDecorations(drawingContext, layout.getDecorations(), /* predraw */ true);
 
     for (const auto& entry : layout.getEntries()) {
         if (entry.textBlob != nullptr) {
@@ -111,78 +69,12 @@ void TextLayer::onDraw(DrawingContext& drawingContext) {
         }
     }
 
-    drawTextVisualEntries(drawingContext, layout.getVisualEntries(), /* predraw */ false);
+    drawTextDecorations(drawingContext, layout.getDecorations(), /* predraw */ false);
 }
 
-void TextLayer::onBoundsChanged() {
-    Layer::onBoundsChanged();
-    setNeedsLayout();
-}
-
-void TextLayer::onChildInserted(Layer* childLayer, size_t index) {
-    Layer::onChildInserted(childLayer, index);
-    setNeedsLayout();
-}
-
-void TextLayer::onChildRemoved(Layer* childLayer) {
-    Layer::onChildRemoved(childLayer);
-    setNeedsLayout();
-}
-
-void TextLayer::onLayout() {
-    Layer::onLayout();
-    layoutInlineChildrenInLayer(*this);
-}
-
-void TextLayer::layoutInlineChildrenInLayer(Layer& childrenLayer) {
-    auto displayScale = getResources()->getDisplayScale();
-    auto layerSize = Size::make(getFrame().width(), getFrame().height());
-    auto& layout = getTextLayout(layerSize, *getResources());
-    auto offsetY = getTextVerticalOffset(layerSize, layout, displayScale);
-    auto childrenSize = childrenLayer.getChildrenSize();
-    struct InlineChildLayout {
-        Ref<Valdi::TextInlineAttachment> attachment;
-        Rect bounds;
-    };
-    std::vector<InlineChildLayout> childIndexToInlineChildLayouts(childrenSize);
-
-    for (const auto& attachment : layout.getAttachments()) {
-        auto inlineViewAttachment = Valdi::castOrNull<Valdi::TextInlineAttachment>(attachment.attachment);
-        if (inlineViewAttachment == nullptr) {
-            continue;
-        }
-
-        auto childIndex = inlineViewAttachment->getChildIndex();
-        if (childIndex >= childrenSize) {
-            continue;
-        }
-
-        childIndexToInlineChildLayouts[childIndex] = {inlineViewAttachment, attachment.bounds};
-    }
-
-    for (size_t childIndex = 0; childIndex < childrenSize; childIndex++) {
-        const auto& inlineChildLayout = childIndexToInlineChildLayouts[childIndex];
-        if (inlineChildLayout.attachment == nullptr) {
-            childrenLayer.getChild(childIndex)->setFrame(Rect::makeXYWH(0, 0, 0, 0));
-            continue;
-        }
-
-        auto bounds = inlineChildLayout.bounds;
-        childrenLayer.getChild(childIndex)
-            ->setFrame(Rect::makeXYWH(bounds.x() / displayScale,
-                                      (bounds.y() / displayScale) + offsetY,
-                                      bounds.width() / displayScale,
-                                      bounds.height() / displayScale));
-    }
-}
-
-void TextLayer::drawTextVisualEntriesShadows(DrawingContext& drawingContext,
-                                             const std::vector<TextLayoutVisualEntry>& visualEntries) {
-    for (const auto& visualEntry : visualEntries) {
-        if (visualEntry.kind == TextLayoutVisualEntryKindBackground) {
-            continue;
-        }
-
+void TextLayer::drawTextDecorationsShadows(DrawingContext& drawingContext,
+                                           const std::vector<TextLayoutDecorationEntry>& textDecorations) {
+    for (const auto& decoration : textDecorations) {
         auto resolvedPaint = _textPaint;
         resolvedPaint.getSkValue().setMaskFilter(
             SkMaskFilter::MakeBlur(SkBlurStyle::kNormal_SkBlurStyle, _textShadow.radius, false));
@@ -190,42 +82,31 @@ void TextLayer::drawTextVisualEntriesShadows(DrawingContext& drawingContext,
         resolvedPaint.setColor(_textShadow.color);
         resolvedPaint.setAlpha(_textShadow.opacity);
 
-        auto bounds = visualEntry.bounds;
+        auto bounds = decoration.bounds;
         bounds.offsetX(_textShadow.offsetX);
         bounds.offsetY(_textShadow.offsetY);
 
-        drawTextDecoration(drawingContext, resolvedPaint, visualEntry.style, visualEntry.customUnderlineStyle, bounds);
+        drawingContext.drawPaint(resolvedPaint, bounds);
     }
 }
 
-void TextLayer::drawTextVisualEntries(DrawingContext& drawingContext,
-                                      const std::vector<TextLayoutVisualEntry>& visualEntries,
-                                      bool predraw) {
-    for (const auto& visualEntry : visualEntries) {
-        if (visualEntry.predraw != predraw) {
+void TextLayer::drawTextDecorations(DrawingContext& drawingContext,
+                                    const std::vector<TextLayoutDecorationEntry>& textDecorations,
+                                    bool predraw) {
+    for (const auto& decoration : textDecorations) {
+        if (decoration.predraw != predraw) {
             continue;
         }
 
         auto resolvedPaint = _textPaint;
 
-        if (visualEntry.kind == TextLayoutVisualEntryKindBackground) {
-            if (!visualEntry.color) {
-                continue;
-            }
-            resolvedPaint.setColor(visualEntry.color.value());
-            if (!visualEntry.borderRadius.isEmpty()) {
-                auto path = visualEntry.borderRadius.getPath(visualEntry.bounds);
-                drawingContext.drawPaint(resolvedPaint, path);
-                continue;
-            }
-        } else if (_gradientWrapper.hasGradient()) {
+        if (_gradientWrapper.hasGradient()) {
             applyGradientToTextPaint(resolvedPaint);
-        } else if (visualEntry.color) {
-            resolvedPaint.setColor(visualEntry.color.value());
+        } else if (decoration.color) {
+            resolvedPaint.setColor(decoration.color.value());
         }
 
-        drawTextDecoration(
-            drawingContext, resolvedPaint, visualEntry.style, visualEntry.customUnderlineStyle, visualEntry.bounds);
+        drawingContext.drawPaint(resolvedPaint, decoration.bounds);
     }
 }
 
@@ -363,26 +244,6 @@ TextAlign TextLayer::getTextAlign() const {
     return _textAlign;
 }
 
-void TextLayer::setTextVerticalAlignment(TextVerticalAlignment textVerticalAlignment) {
-    if (_textVerticalAlignment != textVerticalAlignment) {
-        _textVerticalAlignment = textVerticalAlignment;
-        setNeedsDisplay();
-    }
-}
-
-TextVerticalAlignment TextLayer::getTextVerticalAlignment() const {
-    return _textVerticalAlignment;
-}
-
-Scalar TextLayer::getTextVerticalOffset(const Size& layerSize, const TextLayout& layout, Scalar displayScale) const {
-    if (_textVerticalAlignment == TextVerticalAlignmentCenter) {
-        auto layoutHeight = layout.getBounds().height() / displayScale;
-        return std::max<Scalar>((layerSize.height - layoutHeight) / 2.0f, 0.0f);
-    }
-
-    return 0.0f;
-}
-
 void TextLayer::setTextDecoration(TextDecoration textDecoration) {
     if (_textDecoration != textDecoration) {
         _textDecoration = textDecoration;
@@ -392,17 +253,6 @@ void TextLayer::setTextDecoration(TextDecoration textDecoration) {
 
 TextDecoration TextLayer::getTextDecoration() const {
     return _textDecoration;
-}
-
-void TextLayer::setCustomUnderlineStyle(std::optional<TextCustomUnderlineStyle> customUnderlineStyle) {
-    if (_customUnderlineStyle != customUnderlineStyle) {
-        _customUnderlineStyle = customUnderlineStyle;
-        setNeedsTextLayout();
-    }
-}
-
-const std::optional<TextCustomUnderlineStyle>& TextLayer::getCustomUnderlineStyle() const {
-    return _customUnderlineStyle;
 }
 
 void TextLayer::setTextOverflow(TextOverflow textOveflow) {
@@ -482,29 +332,9 @@ double TextLayer::getMinimumScaleFactor() const {
     return _minimumScaleFactor;
 }
 
-void TextLayer::setLineHeight(Scalar lineHeight) {
-    if (_lineHeight != lineHeight) {
-        _lineHeight = lineHeight;
-        setNeedsTextLayout();
-    }
-}
-
-Scalar TextLayer::getLineHeight() const {
-    return _lineHeight;
-}
-
-void TextLayer::setLineHeightAbsolute(Scalar lineHeightAbsolute) {
-    if (_usesLineHeightAbsolute != true || _lineHeightAbsolute != lineHeightAbsolute) {
-        _usesLineHeightAbsolute = true;
-        _lineHeightAbsolute = lineHeightAbsolute;
-        setNeedsTextLayout();
-    }
-}
-
-void TextLayer::resetLineHeightAbsolute() {
-    if (_usesLineHeightAbsolute) {
-        _usesLineHeightAbsolute = false;
-        _lineHeightAbsolute = 0.0f;
+void TextLayer::setLineHeightMultiple(Scalar lineHeightMultiple) {
+    if (_lineHeightMultiple != lineHeightMultiple) {
+        _lineHeightMultiple = lineHeightMultiple;
         setNeedsTextLayout();
     }
 }
@@ -520,13 +350,16 @@ Scalar TextLayer::getLetterSpacing() const {
     return _letterSpacing;
 }
 
+Scalar TextLayer::getLineHeightMultiple() const {
+    return _lineHeightMultiple;
+}
+
 void TextLayer::setNeedsTextLayout() {
     if (_textLayout != nullptr) {
         _textLayout = nullptr;
         if (_attributedTextOnTapGestureRecognizer != nullptr) {
             _attributedTextOnTapGestureRecognizer->setTextLayout(nullptr);
         }
-        setNeedsLayout();
         setNeedsDisplay();
     }
 }
@@ -541,40 +374,16 @@ static bool hasOnTapAttributeInTextLayout(const TextLayout& textLayout) {
     return false;
 }
 
-static bool textLayoutHasStaleInlineAttachmentSizes(const TextLayout& textLayout, Scalar displayScale) {
-    for (const auto& attachment : textLayout.getAttachments()) {
-        auto inlineViewAttachment = Valdi::castOrNull<Valdi::TextInlineAttachment>(attachment.attachment);
-        if (inlineViewAttachment == nullptr) {
-            continue;
-        }
-
-        auto currentSize = inlineViewAttachment->getSize();
-        auto currentReplacementSize = Size::make(currentSize.width * displayScale, currentSize.height * displayScale);
-        if (attachment.replacementSize != currentReplacementSize) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-TextLayout& TextLayer::getTextLayout(Size size, const Resources& resources) {
-    return getTextLayout(
-        size, resources.getRespectDynamicType(), resources.getDisplayScale(), resources.getDynamicTypeScale());
-}
-
 TextLayout& TextLayer::getTextLayout(Size size, bool respectDynamicType, Scalar displayScale, Scalar dynamicTypeScale) {
     // Align maxSize to pixel grid
     auto maxSize = Size::make(ceilf(size.width * displayScale), ceilf(size.height * displayScale));
 
-    if (_textLayout != nullptr &&
-        (_textLayout->getMaxSize() != maxSize || textLayoutHasStaleInlineAttachmentSizes(*_textLayout, displayScale))) {
+    if (_textLayout != nullptr && (_textLayout->getMaxSize() != maxSize)) {
         _textLayout = nullptr;
     }
 
     if (_textLayout == nullptr) {
         VALDI_TRACE("SnapDrawing.makeTextLayout");
-        auto resolvedLineHeight = resolveLineHeight(displayScale);
         _textLayout = TextLayer::makeTextLayout(maxSize,
                                                 _text,
                                                 _attributedText,
@@ -583,7 +392,7 @@ TextLayout& TextLayer::getTextLayout(Size size, bool respectDynamicType, Scalar 
                                                 _textDecoration,
                                                 _textOverflow,
                                                 _numberOfLines,
-                                                resolvedLineHeight,
+                                                _lineHeightMultiple,
                                                 _letterSpacing,
                                                 isRightToLeft(),
                                                 _adjustsFontSizeToFitWidth,
@@ -592,8 +401,7 @@ TextLayout& TextLayer::getTextLayout(Size size, bool respectDynamicType, Scalar 
                                                 /* includeTextBlob*/ true,
                                                 displayScale,
                                                 dynamicTypeScale,
-                                                getResources()->getFontManager(),
-                                                _customUnderlineStyle);
+                                                getResources()->getFontManager());
 
         if (hasOnTapAttributeInTextLayout(*_textLayout)) {
             addOnTapGestureRecognizer();
@@ -603,14 +411,6 @@ TextLayout& TextLayer::getTextLayout(Size size, bool respectDynamicType, Scalar 
     }
 
     return *_textLayout;
-}
-
-TextLayoutLineHeight TextLayer::resolveLineHeight(Scalar displayScale) const {
-    if (!_usesLineHeightAbsolute) {
-        return TextLayoutLineHeight::multiple(_lineHeight);
-    }
-
-    return TextLayoutLineHeight::absolute(_lineHeightAbsolute * displayScale);
 }
 
 void TextLayer::removeOnTapGestureRecognizer() {
@@ -644,7 +444,7 @@ Size TextLayer::measureText(Size maxSize,
                             TextDecoration textDecoration,
                             TextOverflow textOverflow,
                             int numberOfLines,
-                            TextLayoutLineHeight lineHeight,
+                            Scalar lineHeightMultiple,
                             Scalar letterSpacing,
                             bool isRightToLeft,
                             bool adjustsFontSizeToFitWidth,
@@ -652,8 +452,7 @@ Size TextLayer::measureText(Size maxSize,
                             bool respectDynamicType,
                             Scalar displayScale,
                             Scalar dynamicTypeScale,
-                            const Ref<FontManager>& fontManager,
-                            std::optional<TextCustomUnderlineStyle> customUnderlineStyle) {
+                            const Ref<FontManager>& fontManager) {
     auto textLayout = makeTextLayout(maxSize,
                                      text,
                                      attributedText,
@@ -662,7 +461,7 @@ Size TextLayer::measureText(Size maxSize,
                                      textDecoration,
                                      textOverflow,
                                      numberOfLines,
-                                     lineHeight,
+                                     lineHeightMultiple,
                                      letterSpacing,
                                      isRightToLeft,
                                      adjustsFontSizeToFitWidth,
@@ -671,8 +470,7 @@ Size TextLayer::measureText(Size maxSize,
                                      /* includeTextBlob*/ false,
                                      displayScale,
                                      dynamicTypeScale,
-                                     fontManager,
-                                     customUnderlineStyle);
+                                     fontManager);
 
     return textLayout->getBounds().size();
 }
@@ -685,7 +483,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                           TextDecoration textDecoration,
                                           TextOverflow textOverflow,
                                           int numberOfLines,
-                                          TextLayoutLineHeight lineHeight,
+                                          Scalar lineHeightMultiple,
                                           Scalar letterSpacing,
                                           bool isRightToLeft,
                                           bool adjustsFontSizeToFitWidth,
@@ -694,8 +492,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                           bool includeTextBlob,
                                           Scalar displayScale,
                                           Scalar dynamicTypeScale,
-                                          const Ref<FontManager>& fontManager,
-                                          std::optional<TextCustomUnderlineStyle> customUnderlineStyle) {
+                                          const Ref<FontManager>& fontManager) {
     if (!adjustsFontSizeToFitWidth || numberOfLines != 1) {
         return makeTextLayoutUnscaled(maxSize,
                                       text,
@@ -705,7 +502,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                       textDecoration,
                                       textOverflow,
                                       numberOfLines,
-                                      lineHeight,
+                                      lineHeightMultiple,
                                       letterSpacing,
                                       isRightToLeft,
                                       1.0,
@@ -713,8 +510,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                       includeTextBlob,
                                       displayScale,
                                       dynamicTypeScale,
-                                      fontManager,
-                                      customUnderlineStyle);
+                                      fontManager);
     }
 
     auto currentScale = 1.0;
@@ -729,7 +525,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                              textDecoration,
                                              textOverflow,
                                              numberOfLines,
-                                             lineHeight,
+                                             lineHeightMultiple,
                                              letterSpacing,
                                              isRightToLeft,
                                              currentScale,
@@ -737,8 +533,7 @@ Ref<TextLayout> TextLayer::makeTextLayout(Size maxSize,
                                              includeTextBlob,
                                              displayScale,
                                              dynamicTypeScale,
-                                             fontManager,
-                                             customUnderlineStyle);
+                                             fontManager);
 
         if (layout->fitsInMaxSize() || currentScale <= minimumScaleFactor) {
             return layout;
@@ -766,7 +561,7 @@ Ref<TextLayout> TextLayer::makeTextLayoutUnscaled(Size maxSize,
                                                   TextDecoration textDecoration,
                                                   TextOverflow textOverflow,
                                                   int numberOfLines,
-                                                  TextLayoutLineHeight lineHeight,
+                                                  Scalar lineHeightMultiple,
                                                   Scalar letterSpacing,
                                                   bool isRightToLeft,
                                                   double fontScale,
@@ -774,10 +569,8 @@ Ref<TextLayout> TextLayer::makeTextLayoutUnscaled(Size maxSize,
                                                   bool includeTextBlob,
                                                   Scalar displayScale,
                                                   Scalar dynamicTypeScale,
-                                                  const Ref<FontManager>& fontManager,
-                                                  std::optional<TextCustomUnderlineStyle> customUnderlineStyle) {
-    TextLayoutBuilder builder(
-        textAlign, textOverflow, maxSize, numberOfLines, fontManager, isRightToLeft, displayScale, false);
+                                                  const Ref<FontManager>& fontManager) {
+    TextLayoutBuilder builder(textAlign, textOverflow, maxSize, numberOfLines, fontManager, isRightToLeft);
     builder.setIncludeTextBlob(includeTextBlob);
 
     auto textFont = font;
@@ -800,47 +593,25 @@ Ref<TextLayout> TextLayer::makeTextLayoutUnscaled(Size maxSize,
             auto resolvedFontScale =
                 resolveFontScale(resolvedFont, fontScale, respectDynamicType, displayScale, dynamicTypeScale);
             auto resolvedTextDecoration = style.textDecoration ? style.textDecoration.value() : textDecoration;
-            std::optional<TextBackgroundStyle> backgroundStyle;
-            if (style.backgroundColor) {
-                backgroundStyle = TextBackgroundStyle{style.backgroundColor,
-                                                      style.backgroundPadding.value_or(TextBackgroundPadding()),
-                                                      style.backgroundBorderRadius.value_or(BorderRadius())};
-            }
-
-            Ref<Valdi::RefCountable> attachment = style.onTap;
-            std::optional<Size> replacementSize;
-            auto replacementVerticalAlignment = Valdi::InlineViewVerticalAlignment::Center;
-            if (style.inlineViewAttachment != nullptr) {
-                attachment = style.inlineViewAttachment;
-                auto inlineViewSize = style.inlineViewAttachment->getSize();
-                replacementSize = Size::make(inlineViewSize.width * displayScale, inlineViewSize.height * displayScale);
-                replacementVerticalAlignment = style.inlineViewAttachment->getVerticalAlignment();
-            }
 
             builder.append(content.toStringView(),
                            resolvedFont->withScale(resolvedFontScale),
-                           lineHeight,
+                           lineHeightMultiple,
                            letterSpacing,
                            resolvedTextDecoration,
-                           attachment,
-                           style.color,
-                           backgroundStyle,
-                           customUnderlineStyle,
-                           replacementSize,
-                           replacementVerticalAlignment);
+                           style.onTap,
+                           style.color);
         }
     } else if (!text.isEmpty() && textFont != nullptr) {
         auto resolvedFontScale =
             resolveFontScale(textFont, fontScale, respectDynamicType, displayScale, dynamicTypeScale);
         builder.append(text.toStringView(),
                        textFont->withScale(resolvedFontScale),
-                       lineHeight,
+                       lineHeightMultiple,
                        letterSpacing,
                        textDecoration,
                        nullptr,
-                       std::nullopt,
-                       std::nullopt,
-                       customUnderlineStyle);
+                       std::nullopt);
     }
 
     return builder.build();

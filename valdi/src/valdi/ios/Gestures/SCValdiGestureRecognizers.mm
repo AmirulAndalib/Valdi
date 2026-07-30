@@ -155,15 +155,6 @@ static void SCValdiHandleTouchEvent(UIView *view,
     [super reset];
 }
 
-- (BOOL)canBePreventedByGestureRecognizer:(UIGestureRecognizer *)preventingGestureRecognizer
-{
-    if (_cannotBePreventedByOtherGestureRecognizers) {
-        return NO;
-    }
-
-    return [super canBePreventedByGestureRecognizer:preventingGestureRecognizer];
-}
-
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
 {
     CGPoint location = [gestureRecognizer locationInView:self.view];

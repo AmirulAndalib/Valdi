@@ -9,6 +9,7 @@ import com.snap.valdi.views.ValdiTextView
 class ValdiTextViewAttributesBinder(
         private val context: Context
 ) : AttributesBinder<ValdiTextView> {
+
     override val viewClass: Class<ValdiTextView>
         get() = ValdiTextView::class.java
 

@@ -76,7 +76,6 @@
                                                                                     color:nil
                                                                                 textAlign:nil
                                                                                lineHeight:_lineHeight
-                                                                     lineHeightAbsolute:nil
                                                                            textDecoration:nil
                                                                             letterSpacing:nil
                                                                             numberOfLines:maxLines

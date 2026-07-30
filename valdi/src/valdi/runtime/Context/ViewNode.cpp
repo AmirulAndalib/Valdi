@@ -73,18 +73,6 @@ void setupYogaNode(YGNode* yogaNode, ViewNode* viewNode) {
     node->setDirtiedFunc(ygDirtiedCallback);
 }
 
-static auto getBackend(ViewNodeTree* tree) {
-    if (!tree) {
-        return RenderingBackendTypeUnset;
-    }
-    auto viewManagerContext = tree->getViewManagerContext();
-    if (viewManagerContext == nullptr) {
-        return RenderingBackendTypeUnset;
-    }
-
-    return viewManagerContext->getViewManager().getRenderingBackendType();
-}
-
 static facebook::yoga::Style& getYogaStyle(YGNodeRef node) {
     return facebook::yoga::resolveRef(node)->style();
 }
@@ -97,6 +85,18 @@ static const facebook::yoga::Node* resolveYogaNode(YGNodeConstRef node) {
     return facebook::yoga::resolveRef(node);
 }
 
+static auto getBackend(ViewNodeTree* tree) {
+    if (!tree) {
+        return RenderingBackendTypeUnset;
+    }
+    auto viewManagerContext = tree->getViewManagerContext();
+    if (viewManagerContext == nullptr) {
+        return RenderingBackendTypeUnset;
+    }
+
+    return viewManagerContext->getViewManager().getRenderingBackendType();
+}
+
 static inline float sanitizeYogaValue(float yogaValue) {
     if (std::isnan(yogaValue)) {
         return 0.0;
@@ -106,10 +106,11 @@ static inline float sanitizeYogaValue(float yogaValue) {
 }
 
 static Frame ygNodeGetFrame(YGNode* yogaNode, float offsetX) {
-    return Frame(sanitizeYogaValue(YGNodeLayoutGetLeft(yogaNode) + offsetX),
-                 sanitizeYogaValue(YGNodeLayoutGetTop(yogaNode)),
-                 sanitizeYogaValue(YGNodeLayoutGetWidth(yogaNode)),
-                 sanitizeYogaValue(YGNodeLayoutGetHeight(yogaNode)));
+    const auto& layout = resolveYogaNode(yogaNode)->getLayout();
+    return Frame(sanitizeYogaValue(layout.position(facebook::yoga::PhysicalEdge::Left) + offsetX),
+                 sanitizeYogaValue(layout.position(facebook::yoga::PhysicalEdge::Top)),
+                 sanitizeYogaValue(layout.dimension(facebook::yoga::Dimension::Width)),
+                 sanitizeYogaValue(layout.dimension(facebook::yoga::Dimension::Height)));
 }
 
 LazyLayoutData::~LazyLayoutData() {
@@ -118,10 +119,6 @@ LazyLayoutData::~LazyLayoutData() {
 
 void LazyLayoutData::destroyNode() {
     if (yogaNode != nullptr) {
-        facebook::yoga::resolveRef(yogaNode)->setDirtiedFunc(nullptr);
-        while (YGNodeGetChildCount(yogaNode) > 0) {
-            YGNodeRemoveChild(yogaNode, YGNodeGetChild(yogaNode, 0));
-        }
         destroyYogaNode(yogaNode);
         yogaNode = nullptr;
     }
@@ -161,10 +158,6 @@ constexpr size_t kHasChildWithAccessibilityId = 26;
 constexpr size_t kCanAlwaysScrollHorizontal = 27;
 constexpr size_t kCanAlwaysScrollVertical = 28;
 constexpr size_t kAccessibilityTreeNeedsUpdate = 29;
-constexpr size_t kParentManagesChildFrames = 30;
-constexpr size_t kManagesChildFrames = 31;
-constexpr size_t kIsMeasuring = 32;
-constexpr size_t kManagedChildrenLayoutNeedsCommit = 33;
 
 ViewNode::ViewNode(YGConfig* yogaConfig, AttributeIds& attributeIds, ILogger& logger)
     : _yogaNode(yogaConfig != nullptr ? Yoga::createNode(yogaConfig) : nullptr),
@@ -217,33 +210,6 @@ Ref<View> ViewNode::getViewAndDisablePooling() const {
 Value ViewNode::toPlaformRepresentation(bool wrapInPlatformReference) {
     return _viewNodeTree->getViewManagerContext()->getViewManager().createViewNodeWrapper(strongSmallRef(this),
                                                                                           wrapInPlatformReference);
-}
-
-void ViewNode::setStoredObject(const StringBox& key, const Value& value) {
-    if (value.isNullOrUndefined()) {
-        if (_storedObjects != nullptr) {
-            _storedObjects->erase(key);
-        }
-        return;
-    }
-
-    if (_storedObjects == nullptr) {
-        _storedObjects = makeShared<ValueMap>();
-    }
-    (*_storedObjects)[key] = value;
-}
-
-Value ViewNode::getStoredObject(const StringBox& key) const {
-    if (_storedObjects == nullptr) {
-        return Value::undefined();
-    }
-
-    auto it = _storedObjects->find(key);
-    if (it == _storedObjects->end()) {
-        return Value::undefined();
-    }
-
-    return it->second;
 }
 
 static void callViewCallbackIfNeeded(const Ref<ValueFunction>& valueFunction) {
@@ -1315,14 +1281,6 @@ const Frame& ViewNode::getCalculatedFrame() const {
     return _calculatedFrame;
 }
 
-Frame ViewNode::getMeasuredFrame() const {
-    auto parent = getParent();
-    if (parent != nullptr && parent->_flags[kIsMeasuring] && _yogaNode != nullptr) {
-        return ygNodeGetFrame(_yogaNode, parent->getRtlScrollOffsetX());
-    }
-    return getCalculatedFrame();
-}
-
 Frame ViewNode::getDirectionAgnosticFrame() const {
     auto frame = getCalculatedFrame();
 
@@ -1444,15 +1402,6 @@ void ViewNode::setViewFactory(ViewTransactionScope& viewTransactionScope, const 
     if (_viewFactory != viewFactory) {
         removeView(viewTransactionScope);
         _viewFactory = viewFactory;
-        auto previousManagesChildFrames = managesChildFrames();
-        _flags[kManagesChildFrames] = viewFactory != nullptr && viewFactory->managesChildFrames();
-        if (previousManagesChildFrames != managesChildFrames()) {
-            auto previousIsLazyLayout = isLazyLayout();
-            updateIsLazyLayout(viewTransactionScope);
-            if (previousIsLazyLayout == isLazyLayout()) {
-                reinsertChildrenInYogaContainer(viewTransactionScope);
-            }
-        }
 
         if (viewFactory != nullptr) {
             setIsLayout(viewFactory->getViewClassName() == AttributesManager::getLayoutPlaceholderClassName());
@@ -1464,7 +1413,6 @@ void ViewNode::setViewFactory(ViewTransactionScope& viewTransactionScope, const 
             if (_flags[kScrollAttributesBound]) {
                 getYogaStyle(getYogaNodeForInsertingChildren()).setOverflow(facebook::yoga::Overflow::Scroll);
             }
-            updateYogaMeasureFunc();
         } else {
             setIsLayout(true);
             _attributesApplier.setBoundAttributes(nullptr);
@@ -1526,9 +1474,8 @@ void ViewNode::removeFromParent(ViewTransactionScope& viewTransactionScope) {
         return;
     }
     auto parent = getParent();
-    auto previousParentManagedChildFrames = parentManagesChildFrames();
 
-    auto* owner = YGNodeGetOwner(_yogaNode);
+    auto* owner = resolveYogaNode(_yogaNode)->getOwner();
     if (owner != nullptr) {
         YGNodeRemoveChild(owner, _yogaNode);
     }
@@ -1539,14 +1486,10 @@ void ViewNode::removeFromParent(ViewTransactionScope& viewTransactionScope) {
     getCSSAttributesManager().setParent(nullptr);
     _parent.reset();
     setHasParent(false);
-    _flags[kParentManagesChildFrames] = false;
-    if (previousParentManagedChildFrames) {
-        getYogaStyle(_yogaNode).setPositionType(facebook::yoga::PositionType::Relative);
-    }
 }
 
 void ViewNode::appendChild(ViewTransactionScope& viewTransactionScope, const Ref<ViewNode>& child) {
-    insertChildAt(viewTransactionScope, child, getLiveChildCount());
+    insertChildAt(viewTransactionScope, child, getChildCount());
 }
 
 void ViewNode::insertChildAt(ViewTransactionScope& viewTransactionScope, const Ref<ViewNode>& child, size_t index) {
@@ -1556,14 +1499,14 @@ void ViewNode::insertChildAt(ViewTransactionScope& viewTransactionScope, const R
     child->removeFromParent(viewTransactionScope);
     child->_parent = weakRef(this);
     child->setHasParent(true);
-    child->_flags[kParentManagesChildFrames] = managesChildFrames();
 
     auto* yogaContainer = getYogaNodeForInsertingChildren();
-    if (static_cast<size_t>(YGNodeGetChildCount(yogaContainer)) < index) {
+    auto* yogaContainerNode = resolveYogaNode(yogaContainer);
+    if (yogaContainerNode->getChildCount() < index) {
         VALDI_ERROR(getLogger(),
                     "Cannot insert child at index {} into container with size {} (child had parent: {})",
                     index,
-                    YGNodeGetChildCount(yogaContainer),
+                    yogaContainerNode->getChildCount(),
                     childHadParent);
         VALDI_ERROR(getLogger(), "Root component path: {}", getViewNodeTree()->getContext()->getPath().toString());
         VALDI_ERROR(getLogger(), "Parent XML: {}", toXML());
@@ -1572,13 +1515,8 @@ void ViewNode::insertChildAt(ViewTransactionScope& viewTransactionScope, const R
         return;
     }
 
-    if (managesChildFrames()) {
-        getYogaStyle(child->_yogaNode).setPositionType(facebook::yoga::PositionType::Absolute);
-    } else {
-        resolveYogaNode(yogaContainer)->setMeasureFunc(nullptr);
-    }
-    YGNodeInsertChild(
-        yogaContainer, child->_yogaNode, static_cast<uint32_t>(resolveYogaInsertionIndexForLiveIndex(index)));
+    yogaContainerNode->setMeasureFunc(nullptr);
+    YGNodeInsertChild(yogaContainer, child->_yogaNode, index);
 
     child->getCSSAttributesManager().setParent(&getCSSAttributesManager());
 
@@ -1614,16 +1552,11 @@ bool ViewNode::invalidateMeasuredSize() {
         return _emittingViewNode->invalidateMeasuredSize();
     }
 
-    if (parentManagesChildFrames()) {
-        return getParent()->markLayoutDirty();
-    }
-
     if (_yogaNode == nullptr) {
         return false;
     }
 
     if (!facebook::yoga::resolveRef(_yogaNode)->hasMeasureFunc()) {
-        // If there is no custom measure func, there is no need to dirty our yoga node.
         return false;
     }
 
@@ -1652,29 +1585,19 @@ bool ViewNode::isLazyLayoutDirty() const {
 }
 
 Size ViewNode::onMeasure(float width, MeasureMode widthMode, float height, MeasureMode heightMode) {
-    _flags[kIsMeasuring] = true;
-
-    Size measuredSize;
-    if (managesChildFrames()) {
-        updateManagedChildrenLayout(width, widthMode, height, heightMode, /* forceLayout */ true);
-    }
-
     if (_lazyLayoutData != nullptr && _lazyLayoutData->onMeasureCallback != nullptr) {
         VALDI_TRACE("Valdi.onMeasureNode.external");
-        measuredSize = measureExternal(width, widthMode, height, heightMode);
+        return measureExternal(width, widthMode, height, heightMode);
     } else if (_attributesApplier.getBoundAttributes() != nullptr &&
                _attributesApplier.getBoundAttributes()->getMeasureDelegate() != nullptr) {
         VALDI_TRACE("Valdi.onMeasureNode.delegate");
-        measuredSize = _attributesApplier.getBoundAttributes()->getMeasureDelegate()->measure(
+        return _attributesApplier.getBoundAttributes()->getMeasureDelegate()->measure(
             *this, width, widthMode, height, heightMode);
     } else if (_lazyLayoutData != nullptr) {
-        measuredSize = Size(_lazyLayoutData->estimatedWidth, _lazyLayoutData->estimatedHeight);
+        return Size(_lazyLayoutData->estimatedWidth, _lazyLayoutData->estimatedHeight);
     } else {
-        measuredSize = Size();
+        return Size();
     }
-
-    _flags[kIsMeasuring] = false;
-    return measuredSize;
 }
 
 Ref<ViewNode> ViewNode::makePlaceholderViewNode(ViewTransactionScope& viewTransactionScope,
@@ -1725,10 +1648,6 @@ bool ViewNode::isMeasurerPlaceholder() const {
     return _emittingViewNode != nullptr;
 }
 
-ViewNode* ViewNode::getEmittingViewNode() const {
-    return _emittingViewNode.get();
-}
-
 void ViewNode::valueChanged(AttributeId attribute, const Value& value, bool shouldNotifySync) {
     _attributesApplier.updateAttributeWithoutUpdate(attribute, value);
 
@@ -1765,12 +1684,7 @@ void ViewNode::setIsLayout(bool isLayout) {
 }
 
 bool ViewNode::needsYogaMeasureFunc() const {
-    if (!hasParent()) {
-        // No measure func if we are the root.
-        return false;
-    }
-
-    if (!managesChildFrames() && resolveYogaNode(_yogaNode)->getChildCount() > 0) {
+    if (!hasParent() || resolveYogaNode(_yogaNode)->getChildCount() > 0) {
         // No measure func if we are the root or if we are a container
         return false;
     }
@@ -1785,37 +1699,16 @@ bool ViewNode::needsYogaMeasureFunc() const {
     }
 }
 
-bool ViewNode::updateManagedChildrenLayout(
-    float width, MeasureMode widthMode, float height, MeasureMode heightMode, bool forceLayout) {
-    auto* managedChildrenYogaNode = getDetachedYogaNode();
-    if (managedChildrenYogaNode == nullptr) {
-        return false;
-    }
-
-    auto updated = calculateLayoutOnNodeIfNeeded(managedChildrenYogaNode,
-                                                 width,
-                                                 widthMode,
-                                                 height,
-                                                 heightMode,
-                                                 _flags[kLayoutIsRightToLeft] ? LayoutDirectionRTL : LayoutDirectionLTR,
-                                                 forceLayout,
-                                                 /* isFromLazyLayout */ false);
-    if (updated) {
-        _flags[kManagedChildrenLayoutNeedsCommit] = true;
-    }
-    return updated;
-}
-
 void ViewNode::updateYogaMeasureFunc() {
     if (_yogaNode == nullptr) {
         return;
     }
 
-    auto* resolvedYogaNode = facebook::yoga::resolveRef(_yogaNode);
+    auto* node = facebook::yoga::resolveRef(_yogaNode);
     if (needsYogaMeasureFunc()) {
-        resolvedYogaNode->setMeasureFunc(ygMeasureYoga);
+        node->setMeasureFunc(ygMeasureYoga);
     } else {
-        resolvedYogaNode->setMeasureFunc(nullptr);
+        node->setMeasureFunc(nullptr);
     }
 }
 
@@ -1824,7 +1717,6 @@ bool ViewNode::isLazyLayout() const {
 }
 
 void ViewNode::setIsLazyLayout(ViewTransactionScope& viewTransactionScope, bool isLazyLayout) {
-    isLazyLayout = isLazyLayout && !managesChildFrames();
     if (_flags[kIsLazyLayoutFlag] == isLazyLayout) {
         return;
     }
@@ -1855,19 +1747,8 @@ void ViewNode::setPrefersLazyLayout(ViewTransactionScope& viewTransactionScope, 
 
 void ViewNode::updateIsLazyLayout(ViewTransactionScope& viewTransactionScope) {
     setIsLazyLayout(viewTransactionScope,
-                    !managesChildFrames() &&
-                        (_flags[kPrefersLazyLayoutFlag] ||
-                         (_lazyLayoutData != nullptr && _lazyLayoutData->onMeasureCallback != nullptr)));
-}
-
-void ViewNode::reinsertChildrenInYogaContainer(ViewTransactionScope& viewTransactionScope) {
-    auto allChildren = copyChildren();
-    for (const auto& childViewNode : allChildren) {
-        childViewNode->removeFromParent(viewTransactionScope);
-    }
-    for (const auto& childViewNode : allChildren) {
-        appendChild(viewTransactionScope, childViewNode);
-    }
+                    _flags[kPrefersLazyLayoutFlag] ||
+                        (_lazyLayoutData != nullptr && _lazyLayoutData->onMeasureCallback != nullptr));
 }
 
 LazyLayoutData& ViewNode::getOrCreateLazyLayoutData() {
@@ -1877,41 +1758,33 @@ LazyLayoutData& ViewNode::getOrCreateLazyLayoutData() {
     return *_lazyLayoutData;
 }
 
-YGNode* ViewNode::getOrCreateDetachedYogaNode() {
-    auto& lazyLayoutData = getOrCreateLazyLayoutData();
-    if (lazyLayoutData.yogaNode == nullptr) {
-        lazyLayoutData.yogaNode =
-            Yoga::createNode(const_cast<facebook::yoga::Config*>(facebook::yoga::resolveRef(_yogaNode)->getConfig()));
-        setupYogaNode(lazyLayoutData.yogaNode, this);
-    }
-    return lazyLayoutData.yogaNode;
-}
-
-YGNode* ViewNode::getDetachedYogaNode() const {
-    return _lazyLayoutData != nullptr ? _lazyLayoutData->yogaNode : nullptr;
-}
-
 YGNode* ViewNode::getLazyLayoutYogaNode() const {
     return _lazyLayoutData != nullptr ? _lazyLayoutData->yogaNode : nullptr;
 }
 
 const YGNode* ViewNode::getContainerYogaNode() const {
-    auto* detachedYogaNode = getDetachedYogaNode();
-    return detachedYogaNode != nullptr ? detachedYogaNode : _yogaNode;
+    if (_lazyLayoutData == nullptr || _lazyLayoutData->yogaNode == nullptr) {
+        return _yogaNode;
+    } else {
+        return _lazyLayoutData->yogaNode;
+    }
 }
 
 YGNode* ViewNode::getYogaNodeForInsertingChildren() {
-    if (!_flags[kIsLazyLayoutFlag] && !managesChildFrames()) {
+    if (!_flags[kIsLazyLayoutFlag]) {
         return _yogaNode;
     }
-    auto* detachedYogaNode = getOrCreateDetachedYogaNode();
-    if (_flags[kIsLazyLayoutFlag] && YGNodeGetChildCount(detachedYogaNode) == 0) {
+    auto& lazyLayoutData = getOrCreateLazyLayoutData();
+    if (lazyLayoutData.yogaNode == nullptr) {
+        lazyLayoutData.yogaNode =
+            Yoga::createNode(const_cast<facebook::yoga::Config*>(facebook::yoga::resolveRef(_yogaNode)->getConfig()));
+        setupYogaNode(lazyLayoutData.yogaNode, this);
         // First time we are inserting in this lazyLayout, schedule a lazyLayout pass since our node
         // will be already dirty and won't trigger the yoga dirtied callbacks.
         scheduleLazyLayout();
     }
 
-    return detachedYogaNode;
+    return lazyLayoutData.yogaNode;
 }
 
 size_t ViewNode::getChildCount() const {
@@ -1923,14 +1796,6 @@ size_t ViewNode::getChildCount() const {
     return resolveYogaNode(yogaNode)->getChildCount();
 }
 
-size_t ViewNode::getLiveChildCount() const {
-    return getChildCount();
-}
-
-size_t ViewNode::resolveYogaInsertionIndexForLiveIndex(size_t liveIndex) {
-    return liveIndex;
-}
-
 ViewNode* ViewNode::getChildAt(size_t index) const {
     const auto* yogaNode = getContainerYogaNode();
     SC_ASSERT_NOTNULL(yogaNode);
@@ -1938,14 +1803,6 @@ ViewNode* ViewNode::getChildAt(size_t index) const {
     auto* childYogaNode = resolveYogaNode(yogaNode)->getChild(index);
     auto* childViewNode = reinterpret_cast<ViewNode*>(Yoga::getAttachedViewNode(childYogaNode));
     return childViewNode;
-}
-
-bool ViewNode::managesChildFrames() const {
-    return _flags[kManagesChildFrames];
-}
-
-bool ViewNode::parentManagesChildFrames() const {
-    return _flags[kParentManagesChildFrames];
 }
 
 std::string ViewNode::getLayoutDebugDescription() const {
@@ -2479,7 +2336,7 @@ Size ViewNode::measureLayout(
     }
 }
 
-bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope, bool didPerformLayout) {
+void ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope, bool didPerformLayout) {
     ViewNodesFrameObserver* frameObserver = nullptr;
     if (_viewNodeTree != nullptr) {
         frameObserver = _viewNodeTree->getViewNodesFrameObserver();
@@ -2494,18 +2351,17 @@ bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope, bool d
     }
 
     VALDI_TRACE("Valdi.updateCalculatedFrames");
-    auto calculatedFrameDidChange = layoutFinished(viewTransactionScope,
-                                                   didPerformLayout,
-                                                   getViewOffsetX(),
-                                                   getViewOffsetY(),
-                                                   rtlOffsetX,
-                                                   nullptr,
-                                                   parentChildrenIndexer,
-                                                   frameObserver);
+    layoutFinished(viewTransactionScope,
+                   didPerformLayout,
+                   getViewOffsetX(),
+                   getViewOffsetY(),
+                   rtlOffsetX,
+                   nullptr,
+                   parentChildrenIndexer,
+                   frameObserver);
     if (frameObserver != nullptr) {
         frameObserver->flush();
     }
-    return calculatedFrameDidChange;
 }
 
 bool ViewNode::isInScrollMode() const {
@@ -2807,10 +2663,12 @@ void ViewNode::updateScrollState() {
             int anchorPosition = anchorNode->getScrollAnchorPosition();
 
             // Compute anchor's Y relative to this scroll node
-            float anchorY = sanitizeYogaValue(YGNodeLayoutGetTop(anchorNode->getYogaNode()));
+            float anchorY = sanitizeYogaValue(
+                resolveYogaNode(anchorNode->getYogaNode())->getLayout().position(facebook::yoga::PhysicalEdge::Top));
             for (auto* parent = anchorNode->getParent().get(); parent != nullptr && parent != this;
                  parent = parent->getParent().get()) {
-                anchorY += sanitizeYogaValue(YGNodeLayoutGetTop(parent->getYogaNode()));
+                anchorY += sanitizeYogaValue(
+                    resolveYogaNode(parent->getYogaNode())->getLayout().position(facebook::yoga::PhysicalEdge::Top));
             }
 
             // Pin anchor to the specified viewport edge
@@ -2896,7 +2754,7 @@ void ViewNode::updateScrollState() {
     }
 }
 
-bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope,
+void ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope,
                               bool didPerformLayout,
                               float viewOffsetX,
                               float viewOffsetY,
@@ -2953,21 +2811,8 @@ bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope,
         }
     }
 
-    if (managesChildFrames()) {
-        updateManagedChildrenLayout(_calculatedFrame.width,
-                                    MeasureModeExactly,
-                                    _calculatedFrame.height,
-                                    MeasureModeExactly,
-                                    calculatedSizeDidChange);
-        if (_flags[kManagedChildrenLayoutNeedsCommit]) {
-            _flags[kManagedChildrenLayoutNeedsCommit] = false;
-            didPerformLayoutForChildren = true;
-            shouldVisitChildren = true;
-        }
-    }
-
     if (!shouldVisitChildren) {
-        return calculatedFrameDidChange;
+        return;
     }
 
     float childrenViewOffsetX = 0.0f;
@@ -2995,20 +2840,15 @@ bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope,
     }
 
     auto* childrenIndexer = _childrenIndexer.get();
-    auto childCalculatedFrameDidChange = false;
     for (auto* childViewNode : *this) {
-        childCalculatedFrameDidChange |= childViewNode->layoutFinished(viewTransactionScope,
-                                                                       didPerformLayoutForChildren,
-                                                                       childrenViewOffsetX,
-                                                                       childrenViewOffsetY,
-                                                                       childrenRtlOffsetX,
-                                                                       resolvedAnimator,
-                                                                       childrenIndexer,
-                                                                       frameObserver);
-    }
-
-    if (childCalculatedFrameDidChange && managesChildFrames() && _view != nullptr) {
-        viewTransactionScope.transaction().invalidateViewLayout(_view);
+        childViewNode->layoutFinished(viewTransactionScope,
+                                      didPerformLayoutForChildren,
+                                      childrenViewOffsetX,
+                                      childrenViewOffsetY,
+                                      childrenRtlOffsetX,
+                                      resolvedAnimator,
+                                      childrenIndexer,
+                                      frameObserver);
     }
 
     syncScrollSpecsWithViewIfNeeded(viewTransactionScope);
@@ -3027,8 +2867,6 @@ bool ViewNode::layoutFinished(ViewTransactionScope& viewTransactionScope,
             frameObserver->onFrameChanged(_rawId, getDirectionAgnosticFrame());
         }
     }
-
-    return calculatedFrameDidChange;
 }
 
 bool ViewNode::updateViewFrameIfNeeded(ViewTransactionScope& viewTransactionScope, const Ref<Animator>& animator) {
@@ -3099,13 +2937,6 @@ void ViewNode::applyFrame(ViewTransactionScope& viewTransactionScope,
     if (!hasParent() || !hasView()) {
         // Root node doesn't need to call onViewFrameChanged.
         // Its frame is driven by native code.
-        return;
-    }
-
-    if (parentManagesChildFrames()) {
-        if (notifyAssetHandler && _assetHandler != nullptr) {
-            _assetHandler->onContainerSizeChanged(frame.width, frame.height);
-        }
         return;
     }
 
@@ -3537,8 +3368,9 @@ void ViewNode::setHorizontalScroll(bool horizontalScroll) {
         newDirection = facebook::yoga::FlexDirection::Column;
     }
 
-    if (getYogaStyle(getYogaNodeForInsertingChildren()).flexDirection() != newDirection) {
-        getYogaStyle(getYogaNodeForInsertingChildren()).setFlexDirection(newDirection);
+    auto* yogaNode = getYogaNodeForInsertingChildren();
+    if (getYogaStyle(yogaNode).flexDirection() != newDirection) {
+        getYogaStyle(yogaNode).setFlexDirection(newDirection);
         markLayoutDirty();
     }
 
@@ -4138,10 +3970,6 @@ void ygDirtiedCallback(YGNodeConstRef node) {
 
     if (viewNode->isLazyLayout()) {
         viewNode->scheduleLazyLayout();
-    }
-
-    if (viewNode->managesChildFrames() && node != viewNode->getYogaNode()) {
-        viewNode->invalidateMeasuredSize();
     }
 
     if (!viewNode->hasParent()) {

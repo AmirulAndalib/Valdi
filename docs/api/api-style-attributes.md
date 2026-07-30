@@ -646,9 +646,8 @@ const labelStyle = new Style<Label>({
   // Text layout
   numberOfLines: 2,        // number (0=unlimited)
   textAlign: 'left',       // 'left' | 'right' | 'center' | 'justified'
-  textDecoration: 'none',  // 'none' | 'strikethrough' | 'underline' | 'dashed-underline' | 'dotted-underline'
-  lineHeight: 24,          // number (points)
-  lineHeightMultiple: 1.2, // number (ratio)
+  textDecoration: 'none',  // 'none' | 'strikethrough' | 'underline'
+  lineHeight: 1.2,         // number (ratio)
   letterSpacing: 0,        // number (points)
   textOverflow: 'ellipsis',// 'ellipsis' | 'clip'
   
@@ -656,7 +655,7 @@ const labelStyle = new Style<Label>({
   adjustsFontSizeToFitWidth: false,  // boolean
   minimumScaleFactor: 0.5,           // number
   
-  // Note: value, selection, callbacks cannot be used in styles (dynamic)
+  // Note: value cannot be used in styles (dynamic)
 });
 ```
 
@@ -667,7 +666,6 @@ const labelStyle = new Style<Label>({
 - ✅ Text Layout Attributes
 - ✅ Auto-sizing Attributes
 - ❌ `value` (dynamic content, use inline)
-- ❌ `selection` (dynamic state)
 - ❌ Callbacks (functions)
 
 ---
@@ -744,13 +742,6 @@ const textViewStyle = new Style<TextView>({
   // TextView-specific attributes
   returnType: 'linereturn',  // 'linereturn' | TextFieldReturnKeyText
   textGravity: 'top',        // 'top' | 'center' | 'bottom'
-  numberOfLines: 2,          // number (0=unlimited)
-  textOverflow: 'ellipsis',  // 'ellipsis' | 'clip'
-  textDecoration: 'underline', // 'none' | 'strikethrough' | 'underline' | 'dashed-underline' | 'dotted-underline'
-  lineHeight: 24,
-  lineHeightMultiple: 1.2,
-  customUnderlineStyle: '1 1 1 -2',
-  selectable: true,        // boolean
   closesWhenReturnKeyPressed: false,  // typically false for multiline
   
   // Background effect
@@ -764,8 +755,6 @@ const textViewStyle = new Style<TextView>({
 - ✅ All TextField attributes
 - ✅ Return Type Configuration
 - ✅ Text Gravity Attributes
-- ✅ Text Rendering Attributes
-- ✅ Text Selection Attributes
 - ✅ Background Effect Attributes
 - ❌ `value`, `placeholder` (dynamic, use inline)
 - ❌ `focused` (programmatic only)
@@ -1136,7 +1125,6 @@ These properties cannot be included in styles and must be used inline:
 ### Text (Label, TextField, TextView)
 - Font: `font`, `color`, `textGradient`, `textShadow`
 - Layout: `numberOfLines`, `textAlign`, `textDecoration`, `lineHeight`, `letterSpacing`, `textOverflow`
-- Selection: `selectable` (Label, TextField, TextView)
 - Auto-size: `adjustsFontSizeToFitWidth`, `minimumScaleFactor`
 - Input: `placeholderColor`, `tintColor`, `contentType`, `returnKeyText`, `autocapitalization`, `autocorrection`
 
@@ -1298,3 +1286,4 @@ const mixedStyles = {
 - [The Style<> Guide](../docs/core-styling.md) - Usage patterns and best practices
 - [Quick Reference](api-quick-reference.md) - Common properties lookup
 - [Core Flexbox](../docs/core-flexbox.md) - Understanding flexbox layout
+

@@ -9,10 +9,7 @@
 
 #include "valdi/runtime/Interfaces/IViewManager.hpp"
 #include "valdi_core/cpp/Utils/FlatMap.hpp"
-#include "valdi_core/cpp/Utils/FlatSet.hpp"
 #include "valdi_core/cpp/Utils/Shared.hpp"
-
-#include <vector>
 
 namespace Valdi {
 
@@ -47,7 +44,6 @@ public:
     void setRegisterCustomAttributes(bool registerCustomAttributes);
     void setKeepAttributesHistory(bool keepAttributesHistory);
     void setAlwaysRenderInMainThread(bool alwaysRenderInMainThread);
-    void setManagesChildFramesForClass(const StringBox& className, bool managesChildFrames);
 
     void setAllowViewPooling(bool setAllowViewPooling);
     Valdi::Value createViewNodeWrapper(const Valdi::Ref<Valdi::ViewNode>& viewNode,
@@ -64,7 +60,6 @@ private:
     bool _keepAttributesHistory = false;
     bool _allowViewPooling = false;
     bool _alwaysRenderInMainThread = false;
-    FlatSet<StringBox> _managedChildFrameClasses;
 };
 
 } // namespace Valdi

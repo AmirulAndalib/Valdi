@@ -309,10 +309,6 @@ const Ref<Layer>& ScrollLayer::getContentLayer() const {
     return _contentLayer;
 }
 
-Layer& ScrollLayer::getChildInsertionLayer() {
-    return *_contentLayer;
-}
-
 bool ScrollLayer::getClipsToBoundsDefaultValue() const {
     return true;
 }

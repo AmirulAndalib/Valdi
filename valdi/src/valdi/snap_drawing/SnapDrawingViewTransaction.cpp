@@ -23,11 +23,10 @@
 #include "snap_drawing/cpp/Drawing/GraphicsContext/BitmapGraphicsContext.hpp"
 #include "valdi/snap_drawing/Animations/ValdiAnimator.hpp"
 
-#include "snap_drawing/cpp/Layers/Interfaces/IChildInsertionLayerProvider.hpp"
 #include "snap_drawing/cpp/Layers/Interfaces/ILoadedAssetLayer.hpp"
 #include "snap_drawing/cpp/Layers/LayerRoot.hpp"
 #include "snap_drawing/cpp/Layers/ScrollLayer.hpp"
-#include "valdi_core/cpp/Views/Measure.hpp"
+#include "valdi/runtime/Views/Measure.hpp"
 
 using namespace Valdi;
 
@@ -71,15 +70,13 @@ void SnapDrawingViewTransaction::insertChildView(const Ref<View>& view,
         return;
     }
 
-    auto* childInsertionLayerProvider = dynamic_cast<IChildInsertionLayerProvider*>(parent.get());
-    if (childInsertionLayerProvider != nullptr) {
-        childInsertionLayerProvider->getChildInsertionLayer().insertChild(child, static_cast<size_t>(index));
-        auto scrollView = Valdi::castOrNull<ScrollLayer>(parent);
-        if (scrollView != nullptr) {
-            auto viewNode = snap::drawing::valdiViewNodeFromLayer(*scrollView);
-            if (viewNode != nullptr) {
-                scrollView->setHorizontal(viewNode->isHorizontal());
-            }
+    auto scrollView = Valdi::castOrNull<ScrollLayer>(parent);
+
+    if (scrollView != nullptr) {
+        scrollView->getContentLayer()->insertChild(child, static_cast<size_t>(index));
+        auto viewNode = snap::drawing::valdiViewNodeFromLayer(*scrollView);
+        if (viewNode != nullptr) {
+            scrollView->setHorizontal(viewNode->isHorizontal());
         }
     } else {
         parent->insertChild(child, static_cast<size_t>(index));

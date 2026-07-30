@@ -11,7 +11,4 @@ interface ViewFactoryPrivate {
     @Keep
     fun bindAttributes(bindingContextHandle: Long)
 
-    @Keep
-    fun managesChildFrames(): Boolean
-
 }

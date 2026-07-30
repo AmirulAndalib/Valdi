@@ -73,7 +73,6 @@ extern const NSTimeInterval kSCValdiMinLongPressDuration;
 @interface SCValdiAttributedTextOnTapGestureRecognizer : SCValdiTapGestureRecognizer
 
 @property (weak, nonatomic) id<SCValdiAttributedTextOnTapGestureRecognizerFunctionProvider> functionProvider;
-@property (nonatomic, assign) BOOL cannotBePreventedByOtherGestureRecognizers;
 
 @end
 

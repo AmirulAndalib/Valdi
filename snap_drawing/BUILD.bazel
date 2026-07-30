@@ -140,7 +140,6 @@ cc_test(
     deps = [
         ":snap_drawing",
         ":test_utils",
-        "//valdi:valdi_snap_drawing",
         "@gtest//:gtest_main",
     ],
 )

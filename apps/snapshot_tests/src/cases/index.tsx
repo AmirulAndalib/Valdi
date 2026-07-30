@@ -27,7 +27,6 @@ import { TextLetterSpacing } from './TextLetterSpacing';
 import { TextMultiline } from './TextMultiline';
 import { TextShadow } from './TextShadow';
 import { TextCombined } from './TextCombined';
-import { InlineImageLayout } from './InlineImageLayout';
 
 export const testCases: SnapshotTestCase[] = [
   { name: 'BasicLayout', width: 200, height: 150, render: () => { <BasicLayout />; } },
@@ -52,5 +51,4 @@ export const testCases: SnapshotTestCase[] = [
   { name: 'TextMultiline', width: 250, height: 380, render: () => { <TextMultiline />; } },
   { name: 'TextShadow', width: 250, height: 300, render: () => { <TextShadow />; } },
   { name: 'TextCombined', width: 280, height: 420, render: () => { <TextCombined />; } },
-  { name: 'InlineImageLayout', width: 280, height: 350, render: () => { <InlineImageLayout />; } },
 ];

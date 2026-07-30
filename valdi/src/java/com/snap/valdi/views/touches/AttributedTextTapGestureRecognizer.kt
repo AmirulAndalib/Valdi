@@ -1,16 +1,16 @@
 package com.snap.valdi.views.touches
 
+import android.text.Spannable
 import android.view.MotionEvent
 import android.widget.TextView
-import com.snap.valdi.attributes.impl.richtext.ValdiProcessedText
-import com.snap.valdi.attributes.impl.gestures.TapContext
+import com.snap.valdi.attributes.impl.richtext.OnTapSpan
 
 class AttributedTextTapGestureRecognizer(view: TextView):
         AndroidDetectorGestureRecognizer(view, false) {
 
-    var processedText: ValdiProcessedText? = null
+    var spannable: Spannable? = null
 
-    private var tapContext: TapContext? = null
+    private var tappedSpan: OnTapSpan? = null
 
     override fun onSingleTapUp(event: MotionEvent): Boolean {
         if (processTap(event)) {
@@ -32,29 +32,32 @@ class AttributedTextTapGestureRecognizer(view: TextView):
     }
 
     override fun onProcess() {
-        tapContext?.onRecognized(this, state, x, y, pointerCount, pointerLocations)
+        tappedSpan?.onRecognized(this, state, x, y, pointerCount, pointerLocations)
     }
 
     override fun onReset(event: MotionEvent) {
         super.onReset(event)
 
-        tapContext = null
+        tappedSpan = null
     }
 
     private fun processTap(event: MotionEvent): Boolean {
-        tapContext = null
+        this.tappedSpan = null
 
         val textView = this.view as TextView
-        val processedText = this.processedText ?: return false
-        val spannable = processedText.spannable
+        val spannable = this.spannable ?: return false
 
         val offset = textView.getOffsetForPosition(event.x, event.y)
         if (offset < 0 || offset >= spannable.length) {
             return false
         }
 
-        val onTap = processedText.onTapAtIndex(offset) ?: return false
-        tapContext = TapContext(onTap.value, null)
+        val spans = spannable.getSpans(offset, offset, OnTapSpan::class.java)
+        if (spans.isNullOrEmpty()) {
+            return false
+        }
+
+        this.tappedSpan = spans.first()
 
         return true
     }

@@ -1,42 +1,35 @@
 package com.snap.valdi.attributes.impl
 
 import android.content.Context
+import android.graphics.Color
 import android.text.TextUtils
-import android.view.View
+import android.widget.TextView
 import com.snap.valdi.attributes.AttributesBinder
 import com.snap.valdi.attributes.AttributesBindingContext
 import com.snap.valdi.attributes.conversions.ColorConversions
 import com.snap.valdi.attributes.impl.animations.ValdiAnimator
-import com.snap.valdi.attributes.impl.fonts.FontManager
 import com.snap.valdi.attributes.impl.gradients.ValdiGradient
-import com.snap.valdi.attributes.impl.richtext.CustomUnderlineStyle
+import com.snap.valdi.attributes.impl.richtext.RichTextConverter
 import com.snap.valdi.attributes.impl.richtext.FontAttributes
 import com.snap.valdi.attributes.impl.richtext.TextViewHelper
 import com.snap.valdi.exceptions.AttributeError
-import com.snap.valdi.logger.Logger
+import com.snap.valdi.exceptions.ValdiException
 import com.snap.valdi.utils.CoordinateResolver
-import com.snap.valdi.views.ValdiTextBindableView
+import com.snap.valdi.views.ValdiTextHolder
 import com.snapchat.client.valdi_core.AttributeType
 import com.snapchat.client.valdi_core.CompositeAttributePart
 
 /**
- * Shared attribute-binding logic for Android text controls: `value`, `fontAttributes`,
- * `textShadow`, `textOverflow`, and `textGradient`.
- *
- * Concrete binders target a specific view type [T] and call [bindTextAttributes] from their own
- * `bindAttributes`. The view exposes its editor TextView and TextViewHelper through
- * [ValdiTextBindableView], so this logic is written once regardless of whether the view *is* the
- * TextView (host-app font views) or *wraps* one (ValdiTextViewBase).
+ * Binds attributes for the TextView's view class
  */
-abstract class AbstractTextViewAttributesBinder<T>(
-    context: Context,
-    protected val fontManager: FontManager,
-    protected val defaultAttributes: FontAttributes,
-    protected val logger: Logger,
-) : AttributesBinder<T> where T : View, T : ValdiTextBindableView {
+class TextViewAttributesBinder(
+        private val context: Context,
+        private val textConverter: RichTextConverter,
+        private val defaultAttributes: FontAttributes
+) : AttributesBinder<TextView> {
+    private val scaledDensity = context.resources.displayMetrics.scaledDensity
 
-    protected val coordinateResolver = CoordinateResolver(context)
-    protected var valueAttributeId = 0
+    private var valueAttributeId = 0
 
     companion object {
         val FONT_ATTRIBUTES_PARTS = arrayListOf(
@@ -45,18 +38,17 @@ abstract class AbstractTextViewAttributesBinder<T>(
             CompositeAttributePart("textAlign", AttributeType.STRING, true, false),
             CompositeAttributePart("font", AttributeType.STRING, true, true),
             CompositeAttributePart("lineHeight", AttributeType.DOUBLE, true, true),
-            CompositeAttributePart("lineHeightAbsolute", AttributeType.DOUBLE, true, true),
             CompositeAttributePart("numberOfLines", AttributeType.DOUBLE, true, true),
             CompositeAttributePart("letterSpacing", AttributeType.DOUBLE, true, true),
             CompositeAttributePart("adjustsFontSizeToFitWidth", AttributeType.BOOLEAN, true, false),
             CompositeAttributePart("minimumScaleFactor", AttributeType.DOUBLE, true, false),
-            CompositeAttributePart("customUnderlineStyle", AttributeType.STRING, true, false),
         )
     }
 
-    protected fun getTextViewHelper(view: T): TextViewHelper {
-        return view.getOrCreateTextViewHelper(fontManager, defaultAttributes, valueAttributeId, logger)
-    }
+    private val coordinateResolver = CoordinateResolver(context)
+
+    override val viewClass: Class<TextView>
+        get() = TextView::class.java
 
     fun preprocessFontAttributes(values: Any?): Any {
         val valuesArray = values as? Array<*> ?: throw AttributeError("Expecting array for spannable string")
@@ -66,71 +58,75 @@ abstract class AbstractTextViewAttributesBinder<T>(
         val textAlign = valuesArray[2] as? String
         val font = valuesArray[3] as? String
         val lineHeight = valuesArray[4] as? Double
-        val lineHeightAbsolute = valuesArray[5] as? Double
-        val numberOfLines = valuesArray[6] as? Double
-        val letterSpacing = valuesArray[7] as? Double
-        val adjustsFontSizeToFitWidth = valuesArray[8] as? Boolean
-        val minimumScaleFactor = valuesArray[9] as? Double
-        val customUnderlineStyle = when (val rawCustomUnderlineStyle = valuesArray[10]) {
-            is CustomUnderlineStyle -> rawCustomUnderlineStyle
-            is String -> CustomUnderlineStyle.parse(rawCustomUnderlineStyle)
-            else -> null
-        }
+        val numberOfLines = valuesArray[5] as? Double
+        val letterSpacing = valuesArray[6] as? Double
+        val adjustsFontSizeToFitWidth = valuesArray[7] as? Boolean
+        val minimumScaleFactor = valuesArray[8] as? Double
 
         val attributes = defaultAttributes.copy()
         if (color != null) {
             attributes.color = ColorConversions.fromRGBA(color)
         }
+
         if (textDecoration != null) {
             attributes.applyTextDecoration(textDecoration)
         }
+
         if (textAlign != null) {
             attributes.applyTextAlign(textAlign)
         }
+
         if (font != null) {
             attributes.applyFont(font)
         }
 
         attributes.lineHeight = lineHeight?.toFloat()
-        attributes.lineHeightAbsolute = lineHeightAbsolute?.toFloat()
         attributes.numberOfLines = numberOfLines?.toInt()
         attributes.letterSpacing = letterSpacing?.toFloat()
         attributes.adjustsFontSizeToFitWidth = adjustsFontSizeToFitWidth
         attributes.minimumScaleFactor = minimumScaleFactor?.toFloat()
-        attributes.customUnderlineStyle = customUnderlineStyle
+
         return attributes
     }
 
-    fun preprocessCustomUnderlineStyle(value: Any?): Any {
-        val styleString = value as? String ?: throw AttributeError("customUnderlineStyle must be a string")
-        return CustomUnderlineStyle.parse(styleString)
+    private fun getTextViewHelper(view: TextView): TextViewHelper {
+        if (view !is ValdiTextHolder) {
+            throw ValdiException("TextView class ${view.javaClass.name} does not implement ValdiTextHolder")
+        }
+        var helper = view.textViewHelper
+        if (helper == null) {
+            helper = TextViewHelper(view, textConverter, defaultAttributes, valueAttributeId)
+            view.textViewHelper = helper
+        }
+
+        return helper
     }
 
-    fun applyFontAttributes(view: T, value: Any?, animator: ValdiAnimator?) {
+    fun applyFontAttributes(view: TextView, value: Any?, animator: ValdiAnimator?) {
         getTextViewHelper(view).fontAttributes = value as? FontAttributes
     }
 
-    fun resetFontAttributes(view: T, animator: ValdiAnimator?) {
+    fun resetFontAttributes(view: TextView, animator: ValdiAnimator?) {
         getTextViewHelper(view).fontAttributes = null
     }
 
-    fun applyValue(view: T, value: Any?, animator: ValdiAnimator?) {
+    fun applyValue(view: TextView, value: Any?, animator: ValdiAnimator?) {
         getTextViewHelper(view).textValue = value
     }
 
-    fun resetValue(view: T, animator: ValdiAnimator?) {
+    fun resetValue(view: TextView, animator: ValdiAnimator?) {
         getTextViewHelper(view).textValue = null
     }
 
-    fun applyTextGradient(view: T, value: Array<Any>, animator: ValdiAnimator?) {
+    fun applyTextGradient(view: TextView, value: Array<Any>, animator: ValdiAnimator?) {
         getTextViewHelper(view).textGradient = ValdiGradient.fromGradientData(value)
     }
 
-    fun resetTextGradient(view: T, animator: ValdiAnimator?) {
+    fun resetTextGradient(view: TextView, animator: ValdiAnimator?) {
         getTextViewHelper(view).textGradient = null
     }
 
-    fun applyTextShadow(view: T, value: Any?, animator: ValdiAnimator?) {
+    fun applyTextShadow(view: TextView, value: Any?, animator: ValdiAnimator?) {
         if (value !is Array<*>) {
             resetTextShadow(view, animator)
             return
@@ -143,56 +139,63 @@ abstract class AbstractTextViewAttributesBinder<T>(
         var color = ColorConversions.fromRGBA(value[0] as? Long ?: 0)
         var radius = coordinateResolver.toPixel((value[1] as? Double ?: 0.0))
         val opacity = value[2] as? Double ?: 0.0
+
         val widthOffset = coordinateResolver.toPixel(value[3] as? Double ?: 0.0)
         val heightOffset = coordinateResolver.toPixel(value[4] as? Double ?: 0.0)
 
+        // When the radius is 0 on Android, the shadow doesn't render
+        // When the radius is 0 on iOS, if there's an offset, the shadow will still render
         if (radius == 0) {
-            if (widthOffset == 0 && heightOffset == 0) {
+            if (widthOffset.equals(0f) && heightOffset.equals(0f)) {
                 resetTextShadow(view, animator)
                 return
             }
+            // This is the pixel equivalent of epsilon so that we get some shadow instead of no
+            // shadow
             radius = 1
         }
 
         if (opacity < 1) {
-            val bitmask = 0x00ffffff
-            val shiftedOpacity = (opacity * 255).toInt() shl 24
-            val clearedAlpha = color and bitmask
+            // If the passed in opacity is less than 1, use it instead of the color's alpha
+            // for feature parity with iOS
+            // Fancy bit math because the Android APIs to do this don't go far enough back
+            // Color.valueOf was added in API 26 we support back to API 21
+            var bitmask = 0x00ffffff
+            // Shift up to opacity bits
+            var shiftedOpacity = (opacity * 255).toInt() shl 24
+            var clearedAlpha = color and bitmask
             color = shiftedOpacity or clearedAlpha
         }
 
-        view.bindingTextView.setShadowLayer(radius.toFloat(), widthOffset.toFloat(), heightOffset.toFloat(), color)
+        view.setShadowLayer(radius.toFloat(), widthOffset.toFloat(), heightOffset.toFloat(), color);
     }
 
-    fun resetTextShadow(view: T, animator: ValdiAnimator?) {
-        view.bindingTextView.setShadowLayer(0f, 0f, 0f, 0)
+    fun resetTextShadow(view: TextView, animator: ValdiAnimator?) {
+        view.setShadowLayer(0f, 0f, 0f, 0);
     }
 
-    fun applyTextOverflow(view: T, value: String, animator: ValdiAnimator?) {
-        view.bindingTextView.ellipsize = when (value) {
+    fun applyTextOverflow(view: TextView, value: String, animator: ValdiAnimator?) {
+        view.ellipsize = when (value) {
             "ellipsis" -> TextUtils.TruncateAt.END
             "clip" -> null
             else -> throw AttributeError("Invalid textOverflow value")
         }
     }
 
-    fun resetTextOverflow(view: T, animator: ValdiAnimator?) {
-        view.bindingTextView.ellipsize = TextUtils.TruncateAt.END
+    fun resetTextOverflow(view: TextView, animator: ValdiAnimator?) {
+        view.ellipsize = TextUtils.TruncateAt.END
     }
 
-    /**
-     * Binds the text attributes shared by all Valdi text controls. Subclasses call this from their
-     * [bindAttributes]; [valueAttributeId] is resolved here so [getTextViewHelper] can supply it.
-     */
-    protected fun bindTextAttributes(attributesBindingContext: AttributesBindingContext<T>) {
+    override fun bindAttributes(attributesBindingContext: AttributesBindingContext<TextView>) {
         attributesBindingContext.bindCompositeAttribute("fontAttributes", FONT_ATTRIBUTES_PARTS, this::applyFontAttributes, this::resetFontAttributes)
-        attributesBindingContext.registerPreprocessor("customUnderlineStyle", true, this::preprocessCustomUnderlineStyle)
         attributesBindingContext.registerPreprocessor("fontAttributes", true, this::preprocessFontAttributes)
 
         attributesBindingContext.bindTextAttribute("value", true, this::applyValue, this::resetValue)
         attributesBindingContext.bindUntypedAttribute("textShadow", false, this::applyTextShadow, this::resetTextShadow)
         attributesBindingContext.bindStringAttribute("textOverflow", true, this::applyTextOverflow, this::resetTextOverflow)
         attributesBindingContext.bindArrayAttribute("textGradient", false, this::applyTextGradient, this::resetTextGradient)
-        valueAttributeId = attributesBindingContext.getBoundAttributeId("value")
+
+        this.valueAttributeId = attributesBindingContext.getBoundAttributeId("value")
     }
+
 }

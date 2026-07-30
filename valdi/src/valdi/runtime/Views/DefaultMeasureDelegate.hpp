@@ -11,6 +11,8 @@
 
 namespace Valdi {
 
+class View;
+
 class DefaultMeasureDelegate : public MeasureDelegate {
 public:
     DefaultMeasureDelegate();

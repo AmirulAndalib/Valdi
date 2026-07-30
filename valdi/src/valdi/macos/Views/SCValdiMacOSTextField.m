@@ -18,32 +18,7 @@ static NSFont *SCValdiResolveFont(NSString *str) {
         return nil;
     }
 
-    NSString *fontName = components[0];
-    CGFloat fontSize = [components[1] doubleValue];
-    BOOL isItalic = [fontName hasSuffix:@"-italic"];
-    NSFont *font = nil;
-
-    if ([fontName isEqualToString:@"system"]) {
-        font = [NSFont systemFontOfSize:fontSize];
-    } else if ([fontName isEqualToString:@"system-medium"] || [fontName isEqualToString:@"system-medium-italic"]) {
-        font = [NSFont systemFontOfSize:fontSize weight:NSFontWeightMedium];
-    } else if ([fontName isEqualToString:@"system-semibold"] ||
-               [fontName isEqualToString:@"system-demi-bold"] ||
-               [fontName isEqualToString:@"system-semibold-italic"] ||
-               [fontName isEqualToString:@"system-demi-bold-italic"]) {
-        font = [NSFont systemFontOfSize:fontSize weight:NSFontWeightSemibold];
-    } else if ([fontName isEqualToString:@"system-bold"] || [fontName isEqualToString:@"system-bold-italic"]) {
-        font = [NSFont boldSystemFontOfSize:fontSize];
-    } else if ([fontName isEqualToString:@"system-italic"]) {
-        font = [NSFont systemFontOfSize:fontSize];
-    } else {
-        font = [NSFont fontWithName:fontName size:fontSize];
-    }
-
-    if (isItalic && font != nil) {
-        font = [[NSFontManager sharedFontManager] convertFont:font toHaveTrait:NSItalicFontMask] ?: font;
-    }
-    return font;
+    return [NSFont fontWithName:components[0] size:[components[1] doubleValue]];
 }
 
 static NSColor *SCValdiResolveColor(NSNumber *color) {

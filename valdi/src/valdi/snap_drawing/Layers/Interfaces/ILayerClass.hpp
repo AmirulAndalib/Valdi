@@ -31,8 +31,6 @@ public:
 
     const char* getIOSClassName() const;
     const char* getAndroidClassName() const;
-    virtual bool isFallback() const;
-    virtual bool managesChildFrames() const;
 
     const Ref<ILayerClass>& getParent() const;
 

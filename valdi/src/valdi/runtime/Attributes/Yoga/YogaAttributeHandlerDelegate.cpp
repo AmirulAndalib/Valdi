@@ -8,7 +8,7 @@
 #include "valdi/runtime/Attributes/Yoga/YogaAttributeHandlerDelegate.hpp"
 #include "valdi/runtime/Attributes/Yoga/YogaAttributes.hpp"
 #include "valdi/runtime/Context/ViewNode.hpp"
-#include "valdi_core/cpp/Views/Measure.hpp"
+#include "valdi/runtime/Views/Measure.hpp"
 
 #include "valdi_core/cpp/Attributes/AttributeUtils.hpp"
 
@@ -34,9 +34,6 @@ Result<Void> YogaAttributeHandlerDelegate::onApply(ViewTransactionScope& /*viewT
     }
 
     viewNode.markLayoutDirty();
-    if (viewNode.parentManagesChildFrames()) {
-        viewNode.invalidateMeasuredSize();
-    }
 
     return Void();
 }
@@ -54,9 +51,6 @@ void YogaAttributeHandlerDelegate::onReset(ViewTransactionScope& /*viewTransacti
     onReset(nodeRef, _yogaAttributes->_defaultYogaNode);
 
     viewNode.markLayoutDirty();
-    if (viewNode.parentManagesChildFrames()) {
-        viewNode.invalidateMeasuredSize();
-    }
 }
 
 float YogaAttributeHandlerDelegate::roundToPixelGrid(double value) const {

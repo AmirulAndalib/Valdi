@@ -16,26 +16,12 @@ object ValdiImageFactory {
     }
 
     @JvmStatic
-    fun fromResources(resources: Resources, resourceId: Int, svgRasterizer: ValdiSVGRasterizer): ValdiImage {
-        val resourceType = resources.getResourceTypeName(resourceId)
-        if (resourceType == "raw") {
-            return svgRasterizer.rasterizeLocalResource(resources, resourceId)
-        }
-
+    fun fromResources(resources: Resources, resourceId: Int): ValdiImage {
         return createImage(BitmapFactory.decodeResource(resources, resourceId))
     }
 
     @JvmStatic
     fun fromByteArray(byteArray: ByteArray): ValdiImage {
-        return fromByteArray(byteArray, 0, 0)
-    }
-
-    @JvmStatic
-    fun fromByteArray(byteArray: ByteArray, preferredWidth: Int, preferredHeight: Int): ValdiImage {
-        if (ValdiSVGRenderer.isSVG(byteArray)) {
-            return ValdiImageWithBitmap(ValdiSVGRenderer.rasterizeSVG(byteArray, preferredWidth, preferredHeight))
-        }
-
         return createImage(BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size))
     }
 
@@ -45,11 +31,7 @@ object ValdiImageFactory {
     }
 
     @JvmStatic
-    fun fromFilePath(filePath: String, displayScale: Float): ValdiImage {
-        if (filePath.endsWith(".svg", ignoreCase = true)) {
-            return createImage(ValdiSVGRenderer.rasterizeSVGFromFilePath(filePath, displayScale))
-        }
-
+    fun fromFilePath(filePath: String): ValdiImage {
         return createImage(BitmapFactory.decodeFile(filePath))
     }
 }

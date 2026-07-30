@@ -70,14 +70,6 @@ bool ViewFactory::isUserSpecified() const {
     return _isUserSpecified;
 }
 
-void ViewFactory::setManagesChildFrames(bool managesChildFrames) {
-    _managesChildFrames = managesChildFrames;
-}
-
-bool ViewFactory::managesChildFrames() const {
-    return _managesChildFrames;
-}
-
 VALDI_CLASS_IMPL(ViewFactory);
 
 } // namespace Valdi

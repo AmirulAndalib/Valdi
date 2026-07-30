@@ -11,8 +11,6 @@
 #import "valdi/ios/Text/SCValdiFont.h"
 
 NSTextAlignment SCValdiFontAttributesResolveTextAlignment(NSTextAlignment textAlignment, BOOL isRightToLeft);
-FOUNDATION_EXPORT NSAttributedStringKey const SCValdiLineHeightAttributeName;
-FOUNDATION_EXPORT NSAttributedStringKey const SCValdiLineHeightAbsoluteAttributeName;
 
 @class SCNValdiCoreCompositeAttributePart;
 
@@ -36,7 +34,5 @@ FOUNDATION_EXPORT NSAttributedStringKey const SCValdiLineHeightAbsoluteAttribute
                                                                traitCollection:(UITraitCollection*)traitCollection;
 
 - (NSTextAlignment)resolveTextAlignmentWithIsRightToLeft:(BOOL)isRightToLeft;
-
-+ (void)applyLineHeightInAttributes:(NSMutableDictionary<NSAttributedStringKey, id>*)attributes font:(UIFont*)font;
 
 @end

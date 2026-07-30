@@ -54,8 +54,6 @@ public:
 
     void setShader(const Shader& shader);
     void setMaskFilter(const MaskFilter& maskFilter);
-    void setStrokeDashPattern(Scalar onLength, Scalar offLength);
-    void setStrokeDotPattern(Scalar radius, Scalar advance);
 };
 
 } // namespace snap::drawing
