@@ -124,6 +124,14 @@ export function postInit(): void {
 
   const moduleLoader = global.moduleLoader as ModuleLoader;
   moduleLoader.onModuleRegistered('coreutils/src/unicode/UnicodeNative', () => {
+    // Web runtimes ship native TextEncoder/TextDecoder. Overwriting them with
+    // the Valdi wrapper recurses: the wrapper's encode() calls encodeUtf8 in
+    // web/UnicodeNative.ts, which does `new TextEncoder()` and hits the wrapper
+    // again. Leave the native impls alone when they exist (browsers, Node) and
+    // only install the polyfill on runtimes without them (Hermes without Intl).
+    if (typeof global.TextEncoder !== 'undefined' && typeof global.TextDecoder !== 'undefined') {
+      return;
+    }
     const textCoding = moduleLoader.load('coreutils/src/unicode/TextCoding', true);
     global.TextDecoder = textCoding.TextDecoder;
     global.TextEncoder = textCoding.TextEncoder;
