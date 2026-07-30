@@ -56,4 +56,9 @@ data class ValdiTweaks(
           * (e.g. "nl-" instead of "nl") for locales without a country component.
           */
          val useLocaleLanguageTag: Boolean = false,
+         /**
+          * When true, use direct TextViewMeasureDelegate using StaticLayout/TextPaint for text measurement
+          * instead of creating and measuring placeholder Android TextView instances.
+          */
+         val enableDirectTextViewMeasure: Boolean = false,
 )
