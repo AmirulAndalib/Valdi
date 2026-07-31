@@ -383,8 +383,7 @@ Result<std::optional<Point>> ViewNodeScrollState::notifyOnDragEnding(
     auto scrollEvent = makeScrollEvent(
         directionAgnosticContentOffset, directionAgnosticUnclampedContentOffset, directionAgnosticVelocity);
 
-    constexpr auto kMaxOnDragEndingDuration = std::chrono::milliseconds(100);
-    auto result = _onDragEndingCallback->callSyncWithDeadline(kMaxOnDragEndingDuration, &scrollEvent, 1);
+    auto result = _onDragEndingCallback->callSyncWithDeadline(kInputSyncCallDeadline, &scrollEvent, 1);
     if (!result) {
         return result.moveError();
     }
