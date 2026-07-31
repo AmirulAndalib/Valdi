@@ -21,7 +21,7 @@ load(
     "base_relative_dir",
 )
 load(":localizable_strings.bzl", "supported_langs_mapping")
-load(":valdi_paths.bzl", "get_ids_yaml_dts_path", "get_legacy_vue_srcs_dts_paths", "get_resources_dts_paths", "get_sql_dts_paths", "get_strings_dts_path", "infer_base_output_dir", "output_declaration_compiled_file_path_for_source_file", "output_declaration_file_path_for_source_file", "replace_prefix", "resolve_module_dir_and_name", "resolve_relative_project_path")
+load(":valdi_paths.bzl", "get_ids_yaml_dts_path", "get_legacy_vue_srcs_dts_paths", "get_resources_dts_paths", "get_sql_dts_paths", "get_sql_js_paths", "get_strings_dts_path", "infer_base_output_dir", "output_declaration_compiled_file_path_for_source_file", "output_declaration_file_path_for_source_file", "replace_prefix", "resolve_module_dir_and_name", "resolve_relative_project_path")
 load(":valdi_run_compiler.bzl", "generate_config", "resolve_compiler_executable", "run_valdi_compiler")
 load(":valdi_toolchain_type.bzl", "VALDI_TOOLCHAIN_TYPE")
 
@@ -876,6 +876,7 @@ def _get_files_output_paths(ctx, module_name, module_directory, localization_mod
     if enable_web:
         outputs += _get_srcs_js_paths(filtered_srcs + ctx.files.protodecl_srcs, module_name, module_directory, bool(ctx.files.res), bool(ctx.file.ids_yaml), bool(ctx.attr.strings_dir))
         outputs += _get_srcs_vue_paths(ctx.files.legacy_vue_srcs, module_name, module_directory)
+        outputs += get_sql_js_paths(ctx.attr.sql_db_names, ctx.files.sql_srcs, module_name, module_directory)
 
     outputs += get_legacy_vue_srcs_dts_paths(ctx.files.legacy_vue_srcs, module_name, module_directory)
 
