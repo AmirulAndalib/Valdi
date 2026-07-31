@@ -66,6 +66,45 @@
     XCTAssertNil(weakPromise, @"fulfilling a bridged promise did not break the peer retain cycle");
 }
 
+- (void)testCancelReleasesRegisteredCallbacks
+{
+    // Regression: cancel cleared _peer but not _callbacks, and
+    // _doOnCompleteWithCallbackUntyped never drains them once canceled. A callback that
+    // retains the promise then kept it alive forever.
+    __weak SCValdiResolvablePromise *weakPromise = nil;
+
+    @autoreleasepool {
+        SCValdiResolvablePromise *promise = [SCValdiResolvablePromise new];
+        weakPromise = promise;
+
+        auto peer = ValdiIOS::PromiseFromSCValdiPromise(promise, nullptr);
+        XCTAssertTrue(peer != nullptr);
+
+        [promise onCompleteWithCallbackBlock:^(id _Nullable value, NSError *_Nullable error) {
+            // Strongly captures the promise, reproducing the observed self-retain.
+            (void)promise;
+        }];
+
+        [promise cancel];
+    }
+
+    XCTAssertNil(weakPromise, @"canceling a promise did not release its registered callbacks");
+}
+
+- (void)testCancelDoesNotInvokeRegisteredCallbacks
+{
+    SCValdiResolvablePromise *promise = [SCValdiResolvablePromise new];
+
+    __block BOOL callbackInvoked = NO;
+    [promise onCompleteWithCallbackBlock:^(id _Nullable value, NSError *_Nullable error) {
+        callbackInvoked = YES;
+    }];
+
+    [promise cancel];
+
+    XCTAssertFalse(callbackInvoked, @"cancel should drop callbacks, not forward to them");
+}
+
 - (void)testSetPeerAfterFulfillIsNotStored
 {
     SCValdiResolvablePromise *promise = [SCValdiResolvablePromise new];

@@ -118,6 +118,10 @@
     _canceled = true;
     dispatch_block_t cancelBlock = _cancelBlock;
     _cancelBlock = nil;
+    // Drop the callbacks without invoking them, matching _doOnCompleteWithCallbackUntyped,
+    // which never forwards to a callback once canceled. Holding on to them would leak: a
+    // callback can retain this promise, and after cancel nothing ever drains _callbacks.
+    auto callbacks = std::move(_callbacks);
     auto peer = std::move(_peer);
 
     lock.unlock();
@@ -126,7 +130,8 @@
         cancelBlock();
     }
 
-    // Make sure we release the peer with the mutex unlocked
+    // Make sure we release the callbacks and the peer with the mutex unlocked
+    (void)callbacks;
     (void)peer;
 }
 
