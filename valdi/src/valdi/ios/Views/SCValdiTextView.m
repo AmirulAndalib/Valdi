@@ -722,12 +722,13 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
 
 - (BOOL)valdi_setFocused:(BOOL)focused
 {
-    if (focused) {
-        [_textView becomeFirstResponder];
-    } else {
-        [_textView resignFirstResponder];
+    // Re-entering UIKit's first responder machinery for a transition that already happened can
+    // stall the main thread: it enqueues more work on UIKeyboardTaskQueue while the main thread may
+    // already be blocked draining that same queue.
+    if (focused == _textView.isFirstResponder) {
+        return YES;
     }
-    return YES;
+    return focused ? [_textView becomeFirstResponder] : [_textView resignFirstResponder];
 }
 
 - (BOOL)valdi_setClosesWhenReturnKeyPressed:(BOOL)closesWhenReturnKeyPress

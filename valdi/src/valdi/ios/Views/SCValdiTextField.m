@@ -469,12 +469,13 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextField
 
 - (BOOL)valdi_setFocused:(BOOL)focused
 {
-    if (focused) {
-        [self becomeFirstResponder];
-    } else {
-        [self resignFirstResponder];
+    // Re-entering UIKit's first responder machinery for a transition that already happened can
+    // stall the main thread: it enqueues more work on UIKeyboardTaskQueue while the main thread may
+    // already be blocked draining that same queue.
+    if (focused == self.isFirstResponder) {
+        return YES;
     }
-    return YES;
+    return focused ? [self becomeFirstResponder] : [self resignFirstResponder];
 }
 
 - (BOOL)valdi_setTintColor:(UIColor *)color
@@ -927,8 +928,23 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextField
     if (_selectTextOnFocus) {
         // Without dispatch_async, `selectAll` only works every other call.
         // There are other parts in the app where we do this as well.
+        __weak __typeof(self) weakSelf = self;
         dispatch_async(dispatch_get_main_queue(), ^{
-            [textField selectAll:nil];
+            __typeof(self) strongSelf = weakSelf;
+            // The block runs a runloop turn later, so the premise that we just took focus may no
+            // longer hold. selectAll: goes through beginSelectionChange, which blocks the main
+            // thread on UIKeyboardTaskQueue, so skip it whenever it cannot change the selection.
+            if (strongSelf == nil || !strongSelf.isFirstResponder || strongSelf.text.length == 0) {
+                return;
+            }
+            UITextRange *selection = strongSelf.selectedTextRange;
+            BOOL alreadyFullySelected = selection != nil &&
+                [strongSelf comparePosition:selection.start toPosition:strongSelf.beginningOfDocument] == NSOrderedSame &&
+                [strongSelf comparePosition:selection.end toPosition:strongSelf.endOfDocument] == NSOrderedSame;
+            if (alreadyFullySelected) {
+                return;
+            }
+            [strongSelf selectAll:nil];
         });
     }
 }
