@@ -11,9 +11,9 @@ bzl test //valdi:test_snap_drawing //valdi:test_hermes --test_output=errors
 bzl test //valdi:test_layout --test_output=all --test_arg=--gtest_print_time=1
 
 if [[ $(uname) != Linux ]] ; then
-    bzl test //valdi:valdi_ios_objc_test
-    bzl test //valdi:valdi_ios_swift_test
-    bzl test //valdi:valdi_macos_objc_test
+    bzl test //valdi:valdi_ios_objc_test --test_output=errors
+    bzl test //valdi:valdi_ios_swift_test --test_output=errors
+    bzl test //valdi:valdi_macos_objc_test --test_output=errors
 
     # C++ runtime unit tests (Value, ValueUtils, JavaScriptTypes, etc.), engine-agnostic.
     # External counterpart of the internal ValdiBazelTestStep addition (#115098).
