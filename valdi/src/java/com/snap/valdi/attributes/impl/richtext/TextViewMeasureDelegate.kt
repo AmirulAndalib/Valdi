@@ -12,7 +12,9 @@ import com.snap.valdi.attributes.MeasureDelegate
 import com.snap.valdi.attributes.MeasuredSize
 import com.snap.valdi.attributes.ViewLayoutAttributes
 import com.snap.valdi.attributes.impl.fonts.FontDescriptor
+import com.snap.valdi.attributes.impl.fonts.FontManager
 import com.snap.valdi.attributes.impl.fonts.MissingFontsTracker
+import com.snap.valdi.logger.Logger
 import com.snap.valdi.utils.ValdiTextDirectionHeuristic
 import com.snap.valdi.views.TextViewUtils
 import com.snapchat.client.valdi.utils.CppObjectWrapper
@@ -23,6 +25,10 @@ import kotlin.math.ceil
  * attributes, replacing placeholder-TextView measurement. Stateless per measure and callable
  * from arbitrary threads, per the [MeasureDelegate] contract.
  *
+ * Attributed text is resolved through [ValdiProcessedText.parse] rather than a TextView-bound
+ * [TextViewHelper]: the point of this delegate is to measure without instantiating a view, and
+ * `parse` is the view-free half of that conversion.
+ *
  * Known limitation: `adjustsFontSizeToFitWidth`/`minimumScaleFactor` are ignored, so text that
  * auto-shrinks at render time is always measured at its base font size. The placeholder path
  * measured the first pass un-shrunken too; it only picked up a (stale) shrunken size when
@@ -30,8 +36,9 @@ import kotlin.math.ceil
  * upper bound on the shrunk rendering, so the measured box stays loose rather than clipping.
  */
 class TextViewMeasureDelegate(
-    private val textConverter: RichTextConverter,
+    private val fontManager: FontManager,
     private val defaultAttributes: FontAttributes,
+    private val logger: Logger,
 ) : MeasureDelegate {
 
     private val missingFontsTracker = object : MissingFontsTracker {
@@ -95,17 +102,19 @@ class TextViewMeasureDelegate(
             is CppObjectWrapper -> AttributedTextCpp(value)
             else -> return ""
         }
-        return textConverter.convert(
+        return ValdiProcessedText.parse(
+            fontManager = fontManager,
             attributedText = attributedText,
             startingAttributes = fontAttributes,
             missingFontsTracker = missingFontsTracker,
-            density = textConverter.fontManager.context.resources.displayMetrics.density,
-        )
+            logger = logger,
+            density = fontManager.context.resources.displayMetrics.density,
+        ).spannable
     }
 
     private fun buildPaint(fontAttributes: FontAttributes): TextPaint {
         val fontSizeValue = fontAttributes.resolvedFontSizeValue
-        val resources = textConverter.fontManager.context.resources
+        val resources = fontManager.context.resources
         val textSize = TypedValue.applyDimension(
             fontAttributes.resolveFontSizeUnit(),
             fontSizeValue,
@@ -114,7 +123,7 @@ class TextViewMeasureDelegate(
 
         return TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             this.textSize = textSize
-            typeface = fontAttributes.resolveTypeface(textConverter.fontManager, missingFontsTracker)
+            typeface = fontAttributes.resolveTypeface(fontManager, missingFontsTracker)
             color = fontAttributes.color
             isUnderlineText = fontAttributes.textDecoration == TextDecoration.UNDERLINE
             isStrikeThruText = fontAttributes.textDecoration == TextDecoration.STRIKETHROUGH

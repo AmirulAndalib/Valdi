@@ -10,6 +10,13 @@ cd "$(dirname "$0")/../.."
 bzl test //valdi:test_snap_drawing //valdi:test_hermes --test_output=errors
 bzl test //valdi:test_layout --test_output=all --test_arg=--gtest_print_time=1
 
+# test_svg passes but was not gated. Safe on Linux: it only deps :valdi_svg and
+# //snap_drawing:test_utils, so it avoids the runtime link that keeps test_runtime macOS-only
+# (see the block below). //valdi:test and //valdi:test_integration are deliberately absent: they
+# abort on a pre-existing assertion in JavaScriptRuntime.cpp ("The main thread must never dispatch
+# synchronously into a worker runtime") that reproduces on clean master.
+bzl test //valdi:test_svg --test_output=errors
+
 if [[ $(uname) != Linux ]] ; then
     bzl test //valdi:valdi_ios_objc_test --test_output=errors
     bzl test //valdi:valdi_ios_swift_test --test_output=errors
