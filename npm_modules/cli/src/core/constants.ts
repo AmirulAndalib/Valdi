@@ -76,13 +76,28 @@ export const COPY_CONFIG_PATH = path.join(CONFIG_DIR_PATH, 'copyconfig.json');
 
 export const ANDROID_BUILD_FLAGS = ['--copt=-DANDROID_WITH_JNI', '--repo_env=VALDI_PLATFORM_DEPENDENCIES=android'];
 
-function androidCpuFlags(cpu: string): readonly string[] {
-  return [`--fat_apk_cpu=${cpu}`, `--android_cpu=${cpu}`];
-}
+// The client_repo_* defines pick which .so goes into the AAR. They do not pick which
+// architecture aar_import then requests back out of it: that comes from the target
+// platform's @platforms//cpu: constraint, i.e. --android_platforms. --fat_apk_cpu and
+// --android_cpu are deprecated no-ops under platform-based Android, so without an
+// explicit --android_platforms the platform falls back to the host CPU. Building for an
+// arm64 device on an x86_64 host then asks an arm64-only AAR for x86_64 libs and fails
+// with "missing native libs for requested architecture". See Valdi#136.
+export const ANDROID_ARM64_BUILD_FLAGS = ['--define', 'client_repo_arm64=true'];
+export const ANDROID_ARMV7_BUILD_FLAGS = ['--define', 'client_repo_arm32=true'];
+export const ANDROID_X86_64_BUILD_FLAGS = ['--define', 'client_repo_x86_64=true'];
 
-export const ANDROID_ARM64_BUILD_FLAGS = ['--define', 'client_repo_arm64=true', ...androidCpuFlags('arm64-v8a')];
-export const ANDROID_ARMV7_BUILD_FLAGS = ['--define', 'client_repo_arm32=true', ...androidCpuFlags('armeabi-v7a')];
-export const ANDROID_X86_64_BUILD_FLAGS = ['--define', 'client_repo_x86_64=true', ...androidCpuFlags('x86_64')];
+const ANDROID_PLATFORMS: Readonly<Record<Architecture, string>> = {
+  [Architecture.ARM64]: '@snap_platforms//os:android_arm64',
+  [Architecture.ARMV7]: '@snap_platforms//os:android_arm32',
+  [Architecture.X86_64]: '@snap_platforms//os:android_x86_64',
+};
+
+// --android_platforms takes one comma separated list. Repeating the flag overrides
+// rather than accumulates, which would silently drop every architecture but the last.
+export function androidPlatformsFlag(architectures: readonly Architecture[]): string {
+  return `--android_platforms=${architectures.map(architecture => ANDROID_PLATFORMS[architecture]).join(',')}`;
+}
 
 export const ENABLE_RUNTIME_LOGS_BUILD_FLAGS = ['--@valdi//bzl/runtime_flags:enable_logging'];
 export const ENABLE_RUNTIME_TRACES_BUILD_FLAGS = ['--@valdi//bzl/runtime_flags:enable_tracing'];
