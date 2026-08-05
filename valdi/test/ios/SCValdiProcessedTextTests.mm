@@ -1429,18 +1429,23 @@ static NSTextStorage *SCValdiConfigureLayoutManagerForProcessedText(SCValdiProce
     };
     SCValdiProcessedText *processedText = SCValdiProcessedTextWithParts(std::move(parts), attributes, nil);
 
-    CGFloat baseLineHeight = font.pointSize * 1.45;
+    // A relative lineHeight is carried as lineHeightMultiple (a multiple of the natural line height),
+    // not as an absolute minimum/maximumLineHeight — see +[SCValdiFontAttributes
+    // applyLineHeightInAttributes:font:]. The point of this test is that updating the inline attachment
+    // does not mutate that line-height representation.
     NSParagraphStyle *initialParagraphStyle =
         [processedText.attributedString attribute:NSParagraphStyleAttributeName atIndex:0 effectiveRange:nil];
-    XCTAssertEqualWithAccuracy(initialParagraphStyle.minimumLineHeight, baseLineHeight, 0.001);
-    XCTAssertEqualWithAccuracy(initialParagraphStyle.maximumLineHeight, baseLineHeight, 0.001);
+    XCTAssertEqualWithAccuracy(initialParagraphStyle.lineHeightMultiple, 1.45, 0.001);
+    XCTAssertEqualWithAccuracy(initialParagraphStyle.minimumLineHeight, 0, 0.001);
+    XCTAssertEqualWithAccuracy(initialParagraphStyle.maximumLineHeight, 0, 0.001);
 
     attachmentSize = CGSizeMake(82, 26);
     XCTAssertTrue([processedText updateInlineAttachments]);
     NSParagraphStyle *updatedParagraphStyle =
         [processedText.attributedString attribute:NSParagraphStyleAttributeName atIndex:0 effectiveRange:nil];
-    XCTAssertEqualWithAccuracy(updatedParagraphStyle.minimumLineHeight, baseLineHeight, 0.001);
-    XCTAssertEqualWithAccuracy(updatedParagraphStyle.maximumLineHeight, baseLineHeight, 0.001);
+    XCTAssertEqualWithAccuracy(updatedParagraphStyle.lineHeightMultiple, 1.45, 0.001);
+    XCTAssertEqualWithAccuracy(updatedParagraphStyle.minimumLineHeight, 0, 0.001);
+    XCTAssertEqualWithAccuracy(updatedParagraphStyle.maximumLineHeight, 0, 0.001);
 }
 
 - (void)testApplyInlineTextChildFramesUsesContainerSubviewsByChildIndex

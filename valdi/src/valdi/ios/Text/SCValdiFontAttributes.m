@@ -98,26 +98,42 @@ NSTextAlignment SCValdiFontAttributesResolveTextAlignment(NSTextAlignment textAl
         return;
     }
 
-    CGFloat resolvedLineHeight = lineHeightAbsolute ? lineHeightAbsolute.doubleValue : font.pointSize * lineHeight.doubleValue;
-    if (resolvedLineHeight <= 0) {
-        return;
-    }
-
     NSParagraphStyle *paragraphStyle = ObjectAs(attributes[NSParagraphStyleAttributeName], NSParagraphStyle);
     NSMutableParagraphStyle *updatedParagraphStyle = paragraphStyle
         ? [paragraphStyle mutableCopy]
         : [[NSMutableParagraphStyle alloc] init];
+
+    if (!lineHeightAbsolute) {
+        // Relative lineHeight is a multiple of the font's natural line height, per the `lineHeight`
+        // contract ("a value of 2 will double the height of each line") and the C++/Android layout.
+        // NSParagraphStyle.lineHeightMultiple applies exactly that. It must NOT be resolved against
+        // font.pointSize and clamped with minimum/maximumLineHeight: pointSize is roughly 0.8x the
+        // natural line height, so any multiple below ~1.2 would clamp the line box under the glyphs
+        // and clip the text (SEARCH-48847 — Search captions use 0.8-0.97 multiples).
+        CGFloat multiple = lineHeight.doubleValue;
+        if (multiple <= 0) {
+            return;
+        }
+        updatedParagraphStyle.minimumLineHeight = 0;
+        updatedParagraphStyle.maximumLineHeight = 0;
+        updatedParagraphStyle.lineHeightMultiple = multiple;
+        attributes[NSParagraphStyleAttributeName] = [updatedParagraphStyle copy];
+        [attributes removeObjectForKey:NSBaselineOffsetAttributeName];
+        return;
+    }
+
+    // Absolute lineHeight is an explicit point value: pin the line box to it and center the text
+    // within, so a value smaller than the natural line height tightens symmetrically.
+    CGFloat resolvedLineHeight = lineHeightAbsolute.doubleValue;
+    if (resolvedLineHeight <= 0) {
+        return;
+    }
     updatedParagraphStyle.lineHeightMultiple = 0;
     updatedParagraphStyle.minimumLineHeight = resolvedLineHeight;
     updatedParagraphStyle.maximumLineHeight = resolvedLineHeight;
     attributes[NSParagraphStyleAttributeName] = [updatedParagraphStyle copy];
 
-    CGFloat baselineOffset;
-    if (lineHeightAbsolute || resolvedLineHeight >= font.lineHeight) {
-        baselineOffset = (resolvedLineHeight - font.lineHeight) / 2.0;
-    } else {
-        baselineOffset = resolvedLineHeight - font.lineHeight;
-    }
+    CGFloat baselineOffset = (resolvedLineHeight - font.lineHeight) / 2.0;
     if (fabs(baselineOffset) > SCValdiBaselineOffsetEpsilon) {
         attributes[NSBaselineOffsetAttributeName] = @(baselineOffset);
     } else {

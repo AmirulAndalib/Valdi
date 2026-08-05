@@ -106,10 +106,10 @@
     self.runtimeManager = nil;
 }
 
-- (void)testFontAttributesResolveLineHeightFromFontMetrics
+- (void)testRelativeLineHeightScalesNaturalLineHeightViaMultiple
 {
     UIFont *font = [UIFont systemFontOfSize:14];
-    CGFloat lineHeight = 18;
+    CGFloat multiple = 1.5;
     SCValdiFont *valdiFont = [[SCValdiFont alloc] initWithFont:font
                                                      textStyle:nil
                                                        maxSize:0
@@ -117,7 +117,7 @@
     SCValdiFontAttributes *fontAttributes = [NSAttributedString fontAttributesWithFont:valdiFont
                                                                                  color:nil
                                                                              textAlign:nil
-                                                                            lineHeight:@(lineHeight / font.pointSize)
+                                                                            lineHeight:@(multiple)
                                                                   lineHeightAbsolute:nil
                                                                         textDecoration:nil
                                                                          letterSpacing:nil
@@ -134,16 +134,24 @@
                                                          options:NSStringDrawingUsesLineFragmentOrigin
                                                          context:nil];
 
-    XCTAssertEqualWithAccuracy(paragraphStyle.minimumLineHeight, 18, 0.001);
-    XCTAssertEqualWithAccuracy(paragraphStyle.maximumLineHeight, 18, 0.001);
-    XCTAssertEqualWithAccuracy(baselineOffset.doubleValue, (lineHeight - font.lineHeight) / 2.0, 0.001);
-    XCTAssertEqualWithAccuracy(CGRectGetHeight(boundingRect), 18, 0.001);
+    // A relative lineHeight is a multiple of the font's natural line height (matching the C++ layout
+    // TextLayoutLineHeight::getLineMetrics, which scales the font's ascent/descent, and the pre-reland
+    // behavior). It is applied as lineHeightMultiple, not an absolute minimum/maximumLineHeight;
+    // resolving it against font.pointSize instead clamped the line box below the glyphs and clipped
+    // Search captions (SEARCH-48847).
+    XCTAssertEqualWithAccuracy(paragraphStyle.lineHeightMultiple, multiple, 0.001);
+    XCTAssertEqualWithAccuracy(paragraphStyle.minimumLineHeight, 0, 0.001);
+    XCTAssertEqualWithAccuracy(paragraphStyle.maximumLineHeight, 0, 0.001);
+    XCTAssertNil(baselineOffset);
+    XCTAssertEqualWithAccuracy(CGRectGetHeight(boundingRect), font.lineHeight * multiple, 0.5);
 }
 
-- (void)testFontAttributesApplyNegativeBaselineOffsetForCompressedLineHeight
+- (void)testRelativeLineHeightDoesNotCompressBelowNaturalWithoutBaselineOffset
 {
     UIFont *font = [UIFont systemFontOfSize:48 weight:UIFontWeightMedium];
-    CGFloat lineHeight = 48;
+    // The value coreui Search captions use — a sub-1 multiple. It must scale the natural line height
+    // (0.9x), never resolve to font.pointSize and add a negative baseline offset that clips the text.
+    CGFloat multiple = 0.9;
     SCValdiFont *valdiFont = [[SCValdiFont alloc] initWithFont:font
                                                      textStyle:nil
                                                        maxSize:0
@@ -151,7 +159,7 @@
     SCValdiFontAttributes *fontAttributes = [NSAttributedString fontAttributesWithFont:valdiFont
                                                                                  color:nil
                                                                              textAlign:nil
-                                                                            lineHeight:@(lineHeight / font.pointSize)
+                                                                            lineHeight:@(multiple)
                                                                   lineHeightAbsolute:nil
                                                                         textDecoration:nil
                                                                          letterSpacing:nil
@@ -160,10 +168,13 @@
 
     NSDictionary<NSAttributedStringKey, id> *attributes = [fontAttributes resolveAttributesWithIsRightToLeft:NO
                                                                                               traitCollection:nil];
+    NSParagraphStyle *paragraphStyle = attributes[NSParagraphStyleAttributeName];
     NSNumber *baselineOffset = attributes[NSBaselineOffsetAttributeName];
 
-    XCTAssertEqualWithAccuracy(baselineOffset.doubleValue, lineHeight - font.lineHeight, 0.001);
-    XCTAssertLessThan(baselineOffset.doubleValue, 0);
+    XCTAssertEqualWithAccuracy(paragraphStyle.lineHeightMultiple, multiple, 0.001);
+    XCTAssertEqualWithAccuracy(paragraphStyle.minimumLineHeight, 0, 0.001);
+    XCTAssertEqualWithAccuracy(paragraphStyle.maximumLineHeight, 0, 0.001);
+    XCTAssertNil(baselineOffset);
 }
 
 - (void)testFontAttributesCenterExplicitCompressedLineHeight
