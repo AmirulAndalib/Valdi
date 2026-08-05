@@ -252,11 +252,13 @@ void ViewNodeAttributesApplier::updateAttribute(ViewTransactionScope& viewTransa
 }
 
 void ViewNodeAttributesApplier::onApplyAttributeFailed(AttributeId id, const Error& error) {
+    // Asynchronously reported failures can arrive after the view factory was reset,
+    // leaving _boundAttributes null.
     VALDI_ERROR(_viewNode->getLogger(),
                 "{}, Could not apply attribute '{}' in class {}: {}",
                 _viewNode->getLoggerFormatPrefix(),
                 getAttributeName(id),
-                _boundAttributes->getClassName(),
+                _boundAttributes != nullptr ? _boundAttributes->getClassName() : StringBox::emptyString(),
                 error);
 }
 

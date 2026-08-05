@@ -1607,9 +1607,19 @@ void ValdiAndroid::NativeBridge::notifyApplyAttributeFailed(fbjni::alias_ref<fbj
         return;
     }
 
+    // Failures can be reported asynchronously (e.g. font load completions posted to the main
+    // thread). By then the node may be detached and its tree/logger already destroyed, so
+    // logging through the node would dereference freed memory.
+    auto* viewNodeTree = viewNode->getViewNodeTree();
+    if (viewNodeTree == nullptr) {
+        return;
+    }
+
     auto errorMessageCpp = ValdiAndroid::toInternedString(ValdiAndroid::JavaEnv(), errorMessage);
 
-    viewNode->notifyAttributeFailed(static_cast<Valdi::AttributeId>(attributeId), Valdi::Error(errorMessageCpp));
+    viewNodeTree->withLock([&]() {
+        viewNode->notifyAttributeFailed(static_cast<Valdi::AttributeId>(attributeId), Valdi::Error(errorMessageCpp));
+    });
 }
 
 jobject ValdiAndroid::NativeBridge::getValueForAttribute( // NOLINT
