@@ -7763,6 +7763,78 @@ TEST_P(RuntimeFixture, handlesFailureSafelyInSymbolication) {
         "Recoverable JS Error while performing action 'symbolicateError'\n[caused by]: I Am Broken"));
 }
 
+TEST_P(RuntimeFixture, convertJSErrorFallsBackToValueStringForEmptyMessage) {
+    auto finalError = Error("Invalid error");
+
+    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
+        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+            auto error = entry.jsContext.newError("", std::nullopt, entry.exceptionTracker);
+            if (!entry.exceptionTracker) {
+                return;
+            }
+            auto retainedError = JSValueRef::makeRetained(entry.jsContext, error.get());
+
+            finalError = convertJSErrorToValdiError(entry.jsContext, retainedError, nullptr);
+        });
+
+    ASSERT_FALSE(finalError.toStringBox().contains("Unable to build exception message"));
+    ASSERT_TRUE(finalError.toStringBox().hasPrefix("Error"));
+}
+
+TEST_P(RuntimeFixture, convertJSErrorFallsBackToValueStringWhenMessageGetterThrows) {
+    std::string symbolicateModuleBody = R"""(
+    module.exports.symbolicate = function(error) {
+        return { get message() { throw new Error('unreadable'); } };
+    };
+    )""";
+
+    wrapper.hotReload(STRING_LITERAL("valdi_core"), STRING_LITERAL("src/Symbolicator.js"), symbolicateModuleBody);
+
+    auto finalError = Error("Invalid error");
+
+    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
+        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+            auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
+            if (!entry.exceptionTracker) {
+                return;
+            }
+            auto retainedError = JSValueRef::makeRetained(entry.jsContext, error.get());
+
+            finalError = convertJSErrorToValdiError(entry.jsContext, retainedError, nullptr);
+        });
+
+    ASSERT_FALSE(finalError.toStringBox().contains("Unable to build exception message"));
+    ASSERT_TRUE(finalError.toStringBox().hasPrefix("[object Object]"));
+}
+
+TEST_P(RuntimeFixture, convertJSErrorReportsValueTypeWhenUnstringifiable) {
+    std::string symbolicateModuleBody = R"""(
+    module.exports.symbolicate = function(error) {
+        return {
+            get message() { throw new Error('unreadable'); },
+            toString: function() { throw new Error('unstringifiable'); }
+        };
+    };
+    )""";
+
+    wrapper.hotReload(STRING_LITERAL("valdi_core"), STRING_LITERAL("src/Symbolicator.js"), symbolicateModuleBody);
+
+    auto finalError = Error("Invalid error");
+
+    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
+        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+            auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
+            if (!entry.exceptionTracker) {
+                return;
+            }
+            auto retainedError = JSValueRef::makeRetained(entry.jsContext, error.get());
+
+            finalError = convertJSErrorToValdiError(entry.jsContext, retainedError, nullptr);
+        });
+
+    ASSERT_TRUE(finalError.toStringBox().hasPrefix("Unable to build exception message (thrown value type:"));
+}
+
 TEST_P(RuntimeFixture, supportsUncaughtExceptionHandler) {
     auto messageHandler = makeShared<MockRuntimeMessageHandler>();
     wrapper.runtime->setRuntimeMessageHandler(messageHandler);
