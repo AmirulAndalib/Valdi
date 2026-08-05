@@ -52,8 +52,8 @@ import {
 } from '../utils/linuxDistro';
 import { wrapInColor } from '../utils/logUtils';
 
-/** Discord support link for troubleshooting */
-const DISCORD_SUPPORT_URL = 'https://discord.gg/uJyNEeYX2U';
+/** GitHub Discussions link for troubleshooting help */
+const SUPPORT_URL = 'https://github.com/Snapchat/Valdi/discussions';
 
 /**
  * Command line parameters for the doctor command.
@@ -1371,8 +1371,8 @@ class ValdiDoctor {
       console.log();
       console.log(wrapInColor('Some issues need to be resolved before Valdi can work properly.', ANSI_COLORS.RED_COLOR));
       console.log();
-      console.log(wrapInColor('Still having trouble? Come get help on Discord:', ANSI_COLORS.BLUE_COLOR));
-      console.log(wrapInColor(DISCORD_SUPPORT_URL, ANSI_COLORS.BLUE_COLOR));
+      console.log(wrapInColor('Still having trouble? Ask for help in GitHub Discussions:', ANSI_COLORS.BLUE_COLOR));
+      console.log(wrapInColor(SUPPORT_URL, ANSI_COLORS.BLUE_COLOR));
       console.log(wrapInColor('Please paste the entire output of this command when asking for help.', ANSI_COLORS.YELLOW_COLOR));
     } else if (totalWarnCount > 0) {
       console.log();

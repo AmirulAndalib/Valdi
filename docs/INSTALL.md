@@ -164,7 +164,7 @@ If you encounter any issues during setup:
    - [Linux Setup Reference](./setup/linux_setup.md)
 
 4. **Get help:**
-   - Join our [Discord community](https://discord.gg/uJyNEeYX2U)
+   - Ask in [GitHub Discussions](https://github.com/Snapchat/Valdi/discussions)
    - Check [Troubleshooting Guide](./TROUBLESHOOTING.md)
 
 ## Next Steps
