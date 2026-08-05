@@ -177,6 +177,16 @@ void SnapDrawingViewTransaction::setViewLoadedAsset(const Ref<View>& view,
     auto loadedAssetLayer = dynamic_cast<ILoadedAssetLayer*>(layer.get());
     if (loadedAssetLayer != nullptr) {
         loadedAssetLayer->onLoadedAssetChanged(loadedAsset, shouldDrawFlipped);
+        return;
+    }
+
+    auto bridgeLayer = Valdi::castOrNull<BridgeLayer>(layer);
+    auto viewNode = bridgeLayer != nullptr ? valdiViewNodeFromLayer(*bridgeLayer) : nullptr;
+    auto bridgedView = bridgeLayer != nullptr ? bridgeLayer->getBridgedView() : nullptr;
+    if (viewNode != nullptr && bridgedView != nullptr) {
+        bridgedView->getViewTransaction(viewNode->getViewNodeTree())
+            .setViewLoadedAsset(bridgedView->getView(), loadedAsset, shouldDrawFlipped);
+        bridgeLayer->setNeedsDisplay();
     }
 }
 
