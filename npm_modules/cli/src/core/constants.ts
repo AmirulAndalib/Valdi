@@ -99,6 +99,28 @@ export function androidPlatformsFlag(architectures: readonly Architecture[]): st
   return `--android_platforms=${architectures.map(architecture => ANDROID_PLATFORMS[architecture]).join(',')}`;
 }
 
+// Converges the exec tool config across build and test flows so alternating
+// them does not recompile shared tools. Defined as `build:stable_exec` in the
+// generated .bazelrc; test inherits build configs. Applied centrally in
+// BazelClient, but only when the project's .bazelrc actually defines the
+// config, so projects bootstrapped by an older CLI (no such block) keep
+// building unchanged instead of hard-failing on an undefined --config. Raw
+// bazel keeps the default. See Valdi#137.
+export const STABLE_EXEC_BUILD_FLAGS = ['--config=stable_exec'];
+
+// The .bazelrc block that defines the config above. `bootstrap` writes it into
+// new projects via the template; `projectsync` appends it to an existing
+// project's .bazelrc so older projects gain the config (and then the CLI starts
+// passing --config=stable_exec for them). Keep the last line in sync with the
+// template's.
+export const STABLE_EXEC_BAZELRC_BLOCK = `# Alternating a Valdi test target and a web/npm target trims test-only options
+# differently, so their exec tool configs collide under one output path and
+# recompile thousands of shared tool actions. Opt-in config that the \`valdi\`
+# CLI passes to its build/test flows so they converge; raw \`bazel\` keeps the
+# default. Changing test flags (e.g. --test_output) repopulates it once.
+build:stable_exec --notrim_test_configuration
+`;
+
 export const ENABLE_RUNTIME_LOGS_BUILD_FLAGS = ['--@valdi//bzl/runtime_flags:enable_logging'];
 export const ENABLE_RUNTIME_TRACES_BUILD_FLAGS = ['--@valdi//bzl/runtime_flags:enable_tracing'];
 export const DEBUG_BUILD_FLAGS = ['--snap_flavor=platform_development'];
