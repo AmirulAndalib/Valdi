@@ -41,6 +41,10 @@ open class ValdiRootView: ValdiView, Disposable {
         /** Set from [ValdiTweaks.enableLayoutInvalidationRetry]. */
         @JvmStatic
         var enableLayoutInvalidationRetry: Boolean = false
+
+        /** Set from [ValdiTweaks.enableLayoutSpecsCaching]. */
+        @JvmStatic
+        var enableLayoutSpecsCaching: Boolean = false
     }
 
     enum class ScrollDirection(val value: Int) {
@@ -150,6 +154,10 @@ open class ValdiRootView: ValdiView, Disposable {
     private var contextReadyCallbacks: MutableList<(ValdiContext) -> Unit>? = null
     private var activeVisibility = View.INVISIBLE
     private var valdiUpdatesCount = 0
+    private var lastLayoutWidth = -1
+    private var lastLayoutHeight = -1
+    private var lastLayoutRTL = false
+    private var layoutSpecsDirty = true
     private val onNextDrawCallbackHandles = ArrayDeque<Long>()
     private var onNextDrawPreDrawListener: ViewTreeObserver.OnPreDrawListener? = null
     private var onNextDrawPreDrawObserver: ViewTreeObserver? = null
@@ -463,7 +471,15 @@ open class ValdiRootView: ValdiView, Disposable {
         if (context != null) {
             val width = r - l
             val height = b - t
-            context.setLayoutSpecs(width, height, isRTL())
+            val rtl = isRTL()
+            if (!enableLayoutSpecsCaching ||
+                width != lastLayoutWidth || height != lastLayoutHeight || rtl != lastLayoutRTL || layoutSpecsDirty) {
+                lastLayoutWidth = width
+                lastLayoutHeight = height
+                lastLayoutRTL = rtl
+                layoutSpecsDirty = false
+                context.setLayoutSpecs(width, height, rtl)
+            }
         }
         applyValdiLayout()
 
@@ -495,6 +511,12 @@ open class ValdiRootView: ValdiView, Disposable {
     }
 
     fun onValdiLayoutInvalidated() {
+        // A native layout invalidation always needs the next layout pass to push specs.
+        layoutSpecsDirty = true
+        requestLayoutWithRetry()
+    }
+
+    private fun requestLayoutWithRetry() {
         if (enableLayoutInvalidationRetry && (isLayoutRequested || isInLayout)) {
             // A requestLayout during an in-flight traversal can be dropped by ViewRootImpl, leaving
             // native's layout-specs latch stuck and pending view-tree updates unapplied. During the
@@ -540,6 +562,11 @@ open class ValdiRootView: ValdiView, Disposable {
     }
     internal fun valdiUpdatesEndedAsync(layoutDidBecomeDirty: Boolean) {
         valdiUpdatesCount--
+        // Only dirty the specs cache when native reports the layout actually changed; this reuses
+        // the retry scheduling below without forcing a redundant setLayoutSpecs on every async batch.
+        if (layoutDidBecomeDirty) {
+            layoutSpecsDirty = true
+        }
         if (valdiUpdatesCount == 0 && !isLayoutRequested) {
             // This is called outside of normal update cycle
             // so we can't directly call applyValdiLayout().
@@ -551,7 +578,7 @@ open class ValdiRootView: ValdiView, Disposable {
                     // Deliberately bypass the suppressing requestLayout() override: an update batch
                     // active by now would silently drop this request and nothing re-schedules it.
                     // Safe: this only schedules a traversal, it never lays out synchronously.
-                    onValdiLayoutInvalidated()
+                    requestLayoutWithRetry()
                 } else {
                     requestLayout()
                 }
@@ -654,6 +681,9 @@ open class ValdiRootView: ValdiView, Disposable {
     }
 
     internal fun contextIsReady(valdiContext: ValdiContext) {
+        // A recycled root view can be rebound to a new context at the same dimensions; force the
+        // next layout to push specs so the new context's native ViewNodeTree gets its bounds.
+        layoutSpecsDirty = true
         updateViewInflationState()
 
         if (contextReadyCallbacks != null) {

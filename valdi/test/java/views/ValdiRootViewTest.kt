@@ -169,6 +169,40 @@ class ValdiRootViewTest {
         assertFalse(rootView.isLayoutRequested)
     }
 
+    @Test
+    fun asyncBatchEnd_withCleanLayout_doesNotDirtyLayoutSpecsCache() {
+        val rootView = TestValdiRootView(getApplicationContext())
+        rootView.setPrivateField("layoutSpecsDirty", false)
+
+        rootView.invokeInternalMethod("valdiUpdatesBegan")
+        rootView.invokeInternalMethod("valdiUpdatesEndedAsync", false)
+
+        // layoutDidBecomeDirty == false: native layout did not change, so the specs cache stays
+        // clean and the next layout can skip the redundant setLayoutSpecs JNI call.
+        assertFalse(rootView.getPrivateField("layoutSpecsDirty") as Boolean)
+    }
+
+    @Test
+    fun asyncBatchEnd_withDirtyLayout_dirtiesLayoutSpecsCache() {
+        val rootView = TestValdiRootView(getApplicationContext())
+        rootView.setPrivateField("layoutSpecsDirty", false)
+
+        rootView.invokeInternalMethod("valdiUpdatesBegan")
+        rootView.invokeInternalMethod("valdiUpdatesEndedAsync", true)
+
+        assertTrue(rootView.getPrivateField("layoutSpecsDirty") as Boolean)
+    }
+
+    @Test
+    fun onValdiLayoutInvalidated_alwaysDirtiesLayoutSpecsCache() {
+        val rootView = TestValdiRootView(getApplicationContext())
+        rootView.setPrivateField("layoutSpecsDirty", false)
+
+        rootView.onValdiLayoutInvalidated()
+
+        assertTrue(rootView.getPrivateField("layoutSpecsDirty") as Boolean)
+    }
+
     // Internal members are name-mangled across module boundaries; match by prefix.
     private fun Any.invokeInternalMethod(namePrefix: String, vararg args: Any?) {
         val method = javaClass.superclass!!.declaredMethods.first {

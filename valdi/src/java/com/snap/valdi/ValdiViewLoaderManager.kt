@@ -213,6 +213,7 @@ class ValdiRuntimeManager(context: Context,
         ValdiLeakTracker.enabled = tweaks?.enableLeakTracker == true
         ViewUtils.enableTextAlignmentForRTL = tweaks?.enableTextAlignmentForRTL ?: true
         ValdiRootView.enableLayoutInvalidationRetry = tweaks?.enableLayoutInvalidationRetry ?: false
+        ValdiRootView.enableLayoutSpecsCaching = tweaks?.enableLayoutSpecsCaching ?: false
 
         viewManager = ValdiViewManager(context, logger,
             tweaks?.disableAnimations ?: false, viewRefSupport,
