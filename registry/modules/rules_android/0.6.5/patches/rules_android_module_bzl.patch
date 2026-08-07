@@ -1,0 +1,12 @@
+--- MODULE.bazel
++++ MODULE.bazel
+@@ -185,7 +185,7 @@
+ com_android_dex_extension = use_extension("//bzlmod_extensions:com_android_dex.bzl", "com_android_dex_extension")
+ use_repo(com_android_dex_extension, "com_android_dex")
+ 
+-android_sdk_repository_extension = use_extension("//rules/android_sdk_repository:rule.bzl", "android_sdk_repository_extension")
+-use_repo(android_sdk_repository_extension, "androidsdk")
++hermetic_android_sdk_extension = use_extension("//:bzl/hermetic_android_sdk.bzl", "hermetic_android_sdk_extension")
++use_repo(hermetic_android_sdk_extension, "androidsdk")
+ 
+ register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")

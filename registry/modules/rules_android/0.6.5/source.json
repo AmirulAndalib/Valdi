@@ -1,0 +1,10 @@
+{
+    "integrity": "sha256-WlGCx0go2lMWUiGYc5UmTUpc7owQwXF4oNXhI7vRYjw=",
+    "strip_prefix": "rules_android-0.6.5",
+    "url": "https://github.com/bazelbuild/rules_android/releases/download/v0.6.5/rules_android-v0.6.5.tar.gz",
+    "patches": {
+        "rules_android_hermetic_sdk.patch": "sha256-QZQgzlRbtHAZOxGzhSTbyfjYDeSitiJqtN0sH8VtCW0=",
+        "rules_android_module_bzl.patch": "sha256-Apzwk+ug/lweuiVRCovWNMioO/hd8/W1YSvojOmFglc="
+    },
+    "patch_strip": 0
+}
