@@ -40,6 +40,14 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Inflate a valdi view directly. It will add all the subviews and apply the styling that are specified in the
  document.
+
+ Lifecycle: the inflated context is set to auto-destroy when @c view deallocates (ARC drives its
+ lifetime). This is a convenience and is only reliable when the view is owned solely by the UIKit
+ hierarchy and released promptly on dismissal. If a host keeps the view alive past dismissal (a
+ strong property, a container/cache, an async-cleanup flow, or a retain cycle through the host), the
+ view never deallocates, auto-destroy never fires, and the context plus its whole view-node tree
+ leak for the process lifetime. In those cases call @c -[SCValdiContextProtocol destroy] explicitly
+ at your teardown point.
  */
 - (void)inflateView:(UIView<SCValdiRootViewProtocol>*)view
                owner:(id _Nullable)owner
@@ -55,6 +63,11 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Create a Valdi Context with the given componentPath, initial view model and component context.
  The backing component will asynchronously render.
+
+ Lifecycle: returns an auto-destroying context that calls @c destroy on its own dealloc. Hold it in
+ exactly one owner whose deallocation is deterministic; when that owner is released the context is
+ destroyed. If you cache it, share it, or its lifetime is otherwise uncertain, call @c destroy
+ explicitly instead of relying on the wrapper's dealloc.
  */
 - (id<SCValdiContextProtocol> _Nullable)createContextWithComponentPath:(NSString*)componentPath
                                                              viewModel:(id _Nullable)viewModel
@@ -64,6 +77,10 @@ NS_ASSUME_NONNULL_BEGIN
  Create a Valdi Context with the given view class, initial view model and component context.
  The view class MUST be inheriting SCValdiRootView
  The backing component will asynchronously render.
+
+ Lifecycle: same contract as @c createContextWithComponentPath:viewModel:componentContext: — the
+ returned context auto-destroys on its own dealloc; hold it in one deterministic owner, or call
+ @c destroy explicitly if its lifetime is uncertain (e.g. pooled/cached collection-view cells).
  */
 - (id<SCValdiContextProtocol> _Nullable)createContextWithViewClass:(Class)viewClass
                                                          viewModel:(id _Nullable)viewModel
@@ -72,6 +89,10 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  Load the view given the Valdi document name. The document should be
  in the app bundle under <bundleName>/<viewName>.valdi to load the document.
+
+ Lifecycle: the returned root view auto-destroys its context on dealloc (same convenience and same
+ caveats as @c inflateView:owner:viewModel:componentContext: — safe only when the view is owned
+ solely by the UIKit hierarchy; otherwise call @c destroy explicitly).
  */
 - (UIView<SCValdiRootViewProtocol>* _Nullable)loadViewWithComponentPath:(NSString*)componentPath
                                                                   owner:(id _Nullable)owner

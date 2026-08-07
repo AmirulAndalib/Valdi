@@ -71,12 +71,28 @@
 // TODO(simon): Remove once iOS stop using it
 @property (nonatomic, readonly) BOOL hasCompletedInitialRenderIncludingChildComponents;
 
+/// When YES, this context is destroyed automatically when its root view deallocates (see
+/// @c SCValdiRootView.dealloc). NOTE: this is the auto-destroy convenience, and it only fires if
+/// the root view actually deallocates. If anything keeps the root view (or its host view
+/// controller) alive past dismissal, auto-destroy never fires and the context leaks. Prefer an
+/// explicit @c -destroy for anything whose host lifetime you do not tightly control. See @c -destroy.
 @property (assign, nonatomic) BOOL rootValdiViewShouldDestroyContext;
 
 @property (assign, nonatomic) BOOL useLegacyMeasureBehavior;
 
 VALDI_NO_INIT
 
+/// Destroys the context: releases its ViewNodeTree and every native/render surface it pins, and
+/// tears down the associated TypeScript component.
+///
+/// IMPORTANT: the process-lifetime @c Valdi::Runtime holds a strong reference to every context until
+/// this is called, so a context is NOT reclaimed just by releasing the native views/objects that
+/// created it. iOS offers an auto-destroy convenience (root-view dealloc calls this), but that is
+/// coupled to the host view controller's dealloc and fails SILENTLY if that dealloc is delayed
+/// (root view stored in a strong property, host held by a container/cache/async-cleanup flow, or a
+/// retain cycle through the host). When the object holding your root view can outlive the screen,
+/// call @c -destroy explicitly at your teardown point instead of relying on ARC. Idempotent;
+/// main-thread affine.
 - (void)destroy;
 
 - (void)awakeIfNeeded;

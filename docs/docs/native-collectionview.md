@@ -72,6 +72,9 @@ runtime.createValdiContext(MyCellItemView.componentPath, viewModel, null, null) 
 
 This will asynchronously trigger the creation of your TypeScript component. There won't be any UI displayed yet, but the framework will still respond to the render calls and will store the render output. All those functions are thread safe and can be called in a background thread. On iOS, the component will be destroyed when the `ValdiContext` is deallocated. On Android, it will be destroyed when `destroy()` is explicitly called on the `ValdiContext` instance.
 
+> [!Warning]
+> "Destroyed when the `ValdiContext` is deallocated" (iOS) means the context lives as long as *any* reference to it does. In a reuse pool this is a common leak: if the pool, a cell, or a view model keeps the context alive across recycling — or holds more contexts than there are visible cells — the contexts and their view-node trees accumulate in the `Runtime`. Hold each context in exactly one place tied to a cell's lifetime, and call `destroy()` explicitly when you evict it from the pool rather than assuming deallocation will happen on its own.
+
 #### Populating the UI
 
 To populate the UI on your component, you need to provide a root view to the `ValdiContext` instance. You can create an empty `ValdiView` or `SCValdiView` in your `SCMyTableViewCell`, and set it as the root view to the context:

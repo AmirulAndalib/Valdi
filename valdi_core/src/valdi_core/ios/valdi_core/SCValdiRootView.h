@@ -29,6 +29,14 @@ NS_ASSUME_NONNULL_BEGIN
 View classes generated from valdi modules will use SCValdiRootView as the parent class.
 This header is also an "umbrella header" defining the imports necessary for those
 view classes.
+
+Lifecycle note: when created via the runtime's view-loading APIs, this view's @c dealloc destroys
+its Valdi context automatically. That auto-destroy only fires if the view actually deallocates, so
+it is reliable only when the view is owned solely by the UIKit hierarchy. If a host retains the view
+past dismissal (a strong property, a container/cache, or a retain cycle through the host), the
+context and its whole view-node tree leak for the process lifetime. When the host lifetime is not
+tightly controlled, call @c -[SCValdiContextProtocol destroy] explicitly at teardown rather than
+relying on this view's dealloc.
 */
 @interface SCValdiRootView : SCValdiView <SCValdiViewComponent, SCValdiRootViewProtocol>
 
