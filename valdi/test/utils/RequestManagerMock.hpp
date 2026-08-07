@@ -33,6 +33,7 @@ public:
     Result<snap::valdi_core::HTTPResponse> getResponse(const snap::valdi_core::HTTPRequest& request);
 
     void addMockedResponse(StringBox url, StringBox method, BytesView successBody);
+    void addMockedResponseForURLSuffix(StringBox urlSuffix, StringBox method, BytesView successBody);
 
     void addMockedResponse(const snap::valdi_core::HTTPRequest& request,
                            const snap::valdi_core::HTTPResponse& response);
@@ -51,6 +52,8 @@ public:
 private:
     Ref<DispatchQueue> _queue;
     std::vector<std::pair<snap::valdi_core::HTTPRequest, Result<snap::valdi_core::HTTPResponse>>> _mockedResponses;
+    std::vector<std::pair<snap::valdi_core::HTTPRequest, Result<snap::valdi_core::HTTPResponse>>>
+        _mockedSuffixResponses;
     [[maybe_unused]] ILogger& _logger;
     std::vector<Shared<RequestTask>> _tasks;
     bool _disabled = false;

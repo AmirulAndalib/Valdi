@@ -81,6 +81,16 @@ Result<snap::valdi_core::HTTPResponse> RequestManagerMock::getResponse(const sna
         }
     }
 
+    for (const auto& mockedResponse : _mockedSuffixResponses) {
+        const auto& expectedRequest = mockedResponse.first;
+
+        if (request.url.hasSuffix(expectedRequest.url) && expectedRequest.method == request.method) {
+            const auto& response = mockedResponse.second;
+
+            return response;
+        }
+    }
+
     return Valdi::Error(STRING_LITERAL("No mocked response for given request"));
 }
 
@@ -88,6 +98,19 @@ void RequestManagerMock::addMockedResponse(StringBox url, StringBox method, Byte
     auto request = snap::valdi_core::HTTPRequest(std::move(url), std::move(method), Value(), std::nullopt, 0);
     auto response = snap::valdi_core::HTTPResponse(200, Value(), {std::move(successBody)});
     addMockedResponse(request, response);
+}
+
+void RequestManagerMock::addMockedResponseForURLSuffix(StringBox urlSuffix, StringBox method, BytesView successBody) {
+    auto request = snap::valdi_core::HTTPRequest(std::move(urlSuffix), std::move(method), Value(), std::nullopt, 0);
+    auto response = snap::valdi_core::HTTPResponse(200, Value(), {std::move(successBody)});
+
+    auto weakThis = weak_from_this();
+    _queue->async([=]() {
+        auto strongThis = weakThis.lock();
+        if (strongThis != nullptr) {
+            strongThis->_mockedSuffixResponses.emplace_back(request, response);
+        }
+    });
 }
 
 void RequestManagerMock::addMockedResponse(const snap::valdi_core::HTTPRequest& request,
