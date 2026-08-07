@@ -70,6 +70,12 @@ public:
     void setAccessibilityEnabled(const bool accessibilityEnabled);
     bool getAccessibilityEnabled() const;
 
+    // Gates adding a managesChildFrames node's own padding to its measured size (see
+    // ViewNode::onMeasure). On by default; a host can disable it per renderer via config (COF) as a
+    // kill switch if the size change regresses a surface.
+    void setApplyManagedChildFramePadding(const bool applyManagedChildFramePadding);
+    bool getApplyManagedChildFramePadding() const;
+
     ViewPoolsStats getViewPoolsStats() const;
 
 private:
@@ -79,6 +85,7 @@ private:
     Ref<ViewPreloader> _viewPreloader;
     Ref<MainThreadManager> _mainThreadManager;
     bool _accessibilityEnabled;
+    bool _applyManagedChildFramePadding = true;
 };
 
 } // namespace Valdi

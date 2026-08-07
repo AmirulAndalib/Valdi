@@ -74,6 +74,14 @@ bool ViewManagerContext::getAccessibilityEnabled() const {
     return _accessibilityEnabled;
 }
 
+void ViewManagerContext::setApplyManagedChildFramePadding(const bool applyManagedChildFramePadding) {
+    _applyManagedChildFramePadding = applyManagedChildFramePadding;
+}
+
+bool ViewManagerContext::getApplyManagedChildFramePadding() const {
+    return _applyManagedChildFramePadding;
+}
+
 void ViewManagerContext::setPreloadingWorkQueue(const Ref<DispatchQueue>& preloadingWorkQueue) {
     if (_viewPreloader != nullptr) {
         _viewPreloader->setWorkQueue(preloadingWorkQueue);

@@ -117,6 +117,12 @@ bool ValdiRuntimeTweaks::enableRenderRequestContextFix() const {
     return _tweakValueProvider->getBool(configKey, true);
 }
 
+bool ValdiRuntimeTweaks::applyManagedChildFramePadding() const {
+    auto configKey =
+        StringCache::getGlobal().makeStringFromLiteral(std::string_view("VALDI_MANAGES_CHILD_FRAME_PADDING_ENABLED"));
+    return _tweakValueProvider->getBool(configKey, true);
+}
+
 bool ValdiRuntimeTweaks::disableHitTestSyncDeadline() const {
     return getConfigKey("VALDI_DISABLE_HIT_TEST_SYNC_DEADLINE");
 }

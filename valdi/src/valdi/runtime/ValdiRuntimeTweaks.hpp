@@ -33,6 +33,7 @@ public:
     bool enableScopedContextStackTraceCapture() const;
     bool disableJsLogging() const;
     bool enableRenderRequestContextFix() const;
+    bool applyManagedChildFramePadding() const;
     bool disableHitTestSyncDeadline() const;
     // True when VALDI_MAX_VIEW_OPERATIONS_PROCESSING_TIME > 0 (throttling enabled). Gates top-down move order in TS.
     bool useTopDownMoveOrder() const;

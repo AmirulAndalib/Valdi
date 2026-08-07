@@ -1664,24 +1664,59 @@ bool ViewNode::isLazyLayoutDirty() const {
 Size ViewNode::onMeasure(float width, MeasureMode widthMode, float height, MeasureMode heightMode) {
     _flags[kIsMeasuring] = true;
 
-    Size measuredSize;
     if (managesChildFrames()) {
         updateManagedChildrenLayout(width, widthMode, height, heightMode, /* forceLayout */ true);
     }
 
+    // Gated (on by default; a host can disable it per renderer via config as a kill switch): a
+    // managesChildFrames node routes its `padding` (a children-node attribute) to a detached container
+    // yoga node, so its own measuring yoga node has no padding — Yoga neither reserves it from the
+    // space it offers this node nor adds it back, and a padded label/pill collapses to its content
+    // size. When enabled, mirror Yoga's normal leaf behavior: reserve the padding from the space handed
+    // to the measurer (so text wraps in the inner width), then add it back to the measured content.
+    bool applyManagedChildFramePadding = true;
+    if (_viewNodeTree != nullptr) {
+        const auto& viewManagerContext = _viewNodeTree->getViewManagerContext();
+        if (viewManagerContext != nullptr) {
+            applyManagedChildFramePadding = viewManagerContext->getApplyManagedChildFramePadding();
+        }
+    }
+
+    float paddingWidth = 0;
+    float paddingHeight = 0;
+    if (managesChildFrames() && applyManagedChildFramePadding) {
+        auto* detachedYogaNode = getDetachedYogaNode();
+        if (detachedYogaNode != nullptr) {
+            const auto& containerLayout = resolveYogaNode(detachedYogaNode)->getLayout();
+            paddingWidth = containerLayout.padding(facebook::yoga::PhysicalEdge::Left) +
+                           containerLayout.padding(facebook::yoga::PhysicalEdge::Right);
+            paddingHeight = containerLayout.padding(facebook::yoga::PhysicalEdge::Top) +
+                            containerLayout.padding(facebook::yoga::PhysicalEdge::Bottom);
+        }
+    }
+
+    // Only reserve padding from a bounded dimension; an unspecified axis is already unconstrained.
+    float measureWidth = (widthMode != MeasureModeUnspecified && width > paddingWidth) ? width - paddingWidth : width;
+    float measureHeight =
+        (heightMode != MeasureModeUnspecified && height > paddingHeight) ? height - paddingHeight : height;
+
+    Size measuredSize;
     if (_lazyLayoutData != nullptr && _lazyLayoutData->onMeasureCallback != nullptr) {
         VALDI_TRACE("Valdi.onMeasureNode.external");
-        measuredSize = measureExternal(width, widthMode, height, heightMode);
+        measuredSize = measureExternal(measureWidth, widthMode, measureHeight, heightMode);
     } else if (_attributesApplier.getBoundAttributes() != nullptr &&
                _attributesApplier.getBoundAttributes()->getMeasureDelegate() != nullptr) {
         VALDI_TRACE("Valdi.onMeasureNode.delegate");
         measuredSize = _attributesApplier.getBoundAttributes()->getMeasureDelegate()->measure(
-            *this, width, widthMode, height, heightMode);
+            *this, measureWidth, widthMode, measureHeight, heightMode);
     } else if (_lazyLayoutData != nullptr) {
         measuredSize = Size(_lazyLayoutData->estimatedWidth, _lazyLayoutData->estimatedHeight);
     } else {
         measuredSize = Size();
     }
+
+    measuredSize.width += paddingWidth;
+    measuredSize.height += paddingHeight;
 
     _flags[kIsMeasuring] = false;
     return measuredSize;

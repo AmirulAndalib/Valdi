@@ -3271,6 +3271,89 @@ TEST(ViewNode, supportsOnMeasureCallback) {
     ASSERT_EQ(Frame(8, 8, 14, 14), child->getCalculatedFrame());
 }
 
+// A text label must size its own node to measured-content + horizontal padding. `padding` is a
+// children-node attribute, so on a node that managesChildFrames it is routed to the detached child
+// container rather than the node's own measuring yoga node -- and horizontal padding then stops
+// widening the node. PR #107 made the platform label view managesChildFrames, so a padded single-line
+// label lays out at ~text width and its pill renders cramped. The managesChildFrames flag governs
+// child-frame management; it must not change how the node's own padding widens it. This pins that
+// invariant against a plain label as the oracle.
+TEST(ViewNode, managesChildFramesLabelAppliesOwnHorizontalPadding) {
+    ViewNodeTestsDependencies utils;
+
+    // Control: a plain Label leaf. `padding` lands on its own measuring node, so Yoga widens it.
+    auto plainRoot = utils.createRootView();
+    auto plainLabel = utils.createNode("Label");
+    plainRoot->appendChild(utils.getViewTransactionScope(), plainLabel);
+    // flex-start so the label is sized to its content (+ padding), not stretched to the root width.
+    utils.setViewNodeAttribute(plainRoot, "alignItems", Value(STRING_LITERAL("flex-start")));
+    plainRoot->getAttributesApplier().flush(utils.getViewTransactionScope());
+    utils.setViewNodeAttribute(plainLabel, "value", Value(STRING_LITERAL("New")));
+    utils.setViewNodeAttribute(plainLabel, "paddingLeft", Value(8.0));
+    utils.setViewNodeAttribute(plainLabel, "paddingRight", Value(8.0));
+    plainLabel->getAttributesApplier().flush(utils.getViewTransactionScope());
+    plainRoot->performLayout(utils.getViewTransactionScope(), Size(200, 200), LayoutDirectionLTR);
+    plainRoot->updateVisibilityAndPerformUpdates(utils.getViewTransactionScope());
+    double plainWidth = plainLabel->getCalculatedFrame().width;
+
+    // Subject: the same Label, but managesChildFrames (as the iOS label view became under PR #107).
+    auto managedRoot = utils.createRootView();
+    auto managedLabel = utils.createNode("Label");
+    auto managedFactory = managedLabel->getViewFactory();
+    managedFactory->setManagesChildFrames(true);
+    managedLabel->setViewFactory(utils.getViewTransactionScope(), nullptr);
+    managedLabel->setViewFactory(utils.getViewTransactionScope(), managedFactory);
+    managedRoot->appendChild(utils.getViewTransactionScope(), managedLabel);
+    utils.setViewNodeAttribute(managedRoot, "alignItems", Value(STRING_LITERAL("flex-start")));
+    managedRoot->getAttributesApplier().flush(utils.getViewTransactionScope());
+    utils.setViewNodeAttribute(managedLabel, "value", Value(STRING_LITERAL("New")));
+    utils.setViewNodeAttribute(managedLabel, "paddingLeft", Value(8.0));
+    utils.setViewNodeAttribute(managedLabel, "paddingRight", Value(8.0));
+    managedLabel->getAttributesApplier().flush(utils.getViewTransactionScope());
+    managedRoot->performLayout(utils.getViewTransactionScope(), Size(200, 200), LayoutDirectionLTR);
+    managedRoot->updateVisibilityAndPerformUpdates(utils.getViewTransactionScope());
+    double managedWidth = managedLabel->getCalculatedFrame().width;
+
+    // The control proves the 8 + 8 padding widens a plain label. Text is unmeasured in this headless
+    // runtime, so the label's whole width is exactly its horizontal padding.
+    EXPECT_GE(plainWidth, 16.0) << "control label width " << plainWidth
+                                << " does not reflect paddingLeft 8 + paddingRight 8";
+    EXPECT_EQ(managedWidth, plainWidth)
+        << "managesChildFrames diverted horizontal padding off the label's own measuring node: "
+        << "managed label width " << managedWidth << " vs plain label width " << plainWidth
+        << "; the padding widens neither the node nor the pill drawn around it.";
+}
+
+// Companion to the width invariant above: on a managesChildFrames node the measuring yoga node has no
+// padding, so Yoga hands onMeasure the full outer width. The padding must be reserved from the width
+// offered to the measurer (so text wraps in the inner width) before it is added back, otherwise a
+// wrapping/constrained padded label lays its text out for the full width and clips inside its padding.
+TEST(ViewNode, managesChildFramesLabelReservesPaddingFromMeasuredWidth) {
+    ViewNodeTestsDependencies utils;
+
+    auto root = utils.createRootView();
+    auto label = createManagedChildFrameNode(utils);
+    root->appendChild(utils.getViewTransactionScope(), label);
+
+    double offeredWidth = -1.0;
+    label->setOnMeasureCallback(
+        utils.getViewTransactionScope(),
+        makeShared<ValueFunctionWithCallable>([&](const ValueFunctionCallContext& callContext) -> Value {
+            offeredWidth = callContext.getParameterAsDouble(0);
+            return Value(ValueArray::make({Value(10.0), Value(10.0)}));
+        }));
+    utils.setViewNodeAttribute(label, "paddingLeft", Value(8.0));
+    utils.setViewNodeAttribute(label, "paddingRight", Value(8.0));
+    label->getAttributesApplier().flush(utils.getViewTransactionScope());
+
+    // The label stretches to the 100pt root width, so it is measured under a bounded width of 100.
+    root->performLayout(utils.getViewTransactionScope(), Size(100, 200), LayoutDirectionLTR);
+    root->updateVisibilityAndPerformUpdates(utils.getViewTransactionScope());
+
+    EXPECT_EQ(offeredWidth, 84.0) << "measurer was offered width " << offeredWidth
+                                  << ", expected the inner width 100 - 8 - 8 = 84";
+}
+
 TEST(ViewNode, inlineTextAttachmentUsesYogaFrameOnlyWhileParentIsMeasuring) {
     ViewNodeTestsDependencies utils;
 

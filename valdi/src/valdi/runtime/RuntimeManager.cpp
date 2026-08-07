@@ -269,6 +269,11 @@ Ref<ViewManagerContext> RuntimeManager::createViewManagerContext(
 
     _viewManagerContexts.emplace_back(viewManagerContext);
 
+    // Seed the kill switch from the current tweaks so contexts created after the provider is set pick
+    // it up; the setTweakValueProvider loop handles contexts created before it arrives.
+    viewManagerContext->setApplyManagedChildFramePadding(
+        _runtimeTweaks != nullptr ? _runtimeTweaks->applyManagedChildFramePadding() : true);
+
     return viewManagerContext;
 }
 
@@ -587,9 +592,12 @@ void RuntimeManager::setTweakValueProvider(const Shared<ITweakValueProvider>& tw
 
     auto disableAnimationRemoveOnCompleteIos =
         runtimeTweaks != nullptr ? runtimeTweaks->disableAnimationRemoveOnCompleteIos() : false;
+    auto applyManagedChildFramePadding =
+        runtimeTweaks != nullptr ? runtimeTweaks->applyManagedChildFramePadding() : true;
     for (const auto& viewManagerContext : _viewManagerContexts) {
         viewManagerContext->getViewManager().setDisableAnimationRemoveOnCompleteIos(
             disableAnimationRemoveOnCompleteIos);
+        viewManagerContext->setApplyManagedChildFramePadding(applyManagedChildFramePadding);
     }
 
     for (const auto& runtime : runtimes) {
