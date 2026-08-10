@@ -56,11 +56,20 @@ pushd "$OPEN_SOURCE_DIR"
 # Catch changes that remove test coverage. A deleted test cannot fail, so nothing above notices it.
 ./tools/ci/check_test_coverage_delta.sh
 
-# Reroute global because we can't sudo anything
-mkdir -p ~/.npm-global/lib
-npm config set prefix '~/.npm-global'
-npm install -g npm@11
-PATH=~/.npm-global/bin:$PATH
+if [[ ! -w "$(npm prefix -g)" ]]; then
+    # When npm is managed by Nix (Viper) it's prefix directory will be
+    # the npm package path managed by Nix which is read-only.
+    if [[ -n "${CI:-}" ]]; then
+      # Set the global prefix path to a writable directory in the homedir.
+      echo "Setting npm prefix to ~/.npm-global"
+      mkdir -p ~/.npm-global/lib
+      npm config set prefix '~/.npm-global'
+      npm install -g npm@11
+      PATH=~/.npm-global/bin:$PATH
+    else
+      echo "warning: npm prefix location is not writeable $(npm prefix -g)"
+    fi
+fi
 
 # Optional: Setup git credentials for internal CI (not mirrored to external repos)
 if [ -f ./scripts/mirroring/git_init.sh ]; then
