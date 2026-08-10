@@ -128,18 +128,32 @@ static NSAttributedString *SCValdiBackgroundOnlyAttributedString(NSAttributedStr
     return backgroundOnlyAttributedString;
 }
 
+// contentSize includes the current textContainerInset, whose top carries the previously applied
+// gravity correction. Strip the current insets and re-add the base ones so the correction doesn't
+// compound across passes (an empty centered text view would otherwise settle above center).
+// contentSize can lag a just-written inset, so clamp the stripped height at zero to keep a stale
+// read from going negative and overshooting the correction.
+static CGFloat SCValdiTextViewContentHeightFromContentSize(UITextView *textView,
+                                                           CGFloat baseTopInset,
+                                                           CGFloat baseBottomInset)
+{
+    UIEdgeInsets currentInset = textView.textContainerInset;
+    CGFloat strippedContentHeight = textView.contentSize.height - currentInset.top - currentInset.bottom;
+    return MAX(0.0, strippedContentHeight) + baseTopInset + baseBottomInset;
+}
+
 static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
                                                       CGFloat baseTopInset,
                                                       CGFloat baseBottomInset)
 {
     if (textView.attributedText.length == 0) {
-        return textView.contentSize.height;
+        return SCValdiTextViewContentHeightFromContentSize(textView, baseTopInset, baseBottomInset);
     }
 
     [textView.layoutManager ensureLayoutForTextContainer:textView.textContainer];
     CGRect usedRect = [textView.layoutManager usedRectForTextContainer:textView.textContainer];
     if (CGRectIsEmpty(usedRect)) {
-        return textView.contentSize.height;
+        return SCValdiTextViewContentHeightFromContentSize(textView, baseTopInset, baseBottomInset);
     }
 
     return CGRectGetMaxY(usedRect) + baseTopInset + baseBottomInset;
