@@ -21,8 +21,7 @@ import java.util.TimeZone
 class ValdiDeviceModule(
         private val jsThreadDispatcher: JSThreadDispatcher,
         val context: Context,
-        private val forceDarkMode: Boolean,
-        private val useLocaleLanguageTag: Boolean = false
+        private val forceDarkMode: Boolean
 ) : ValdiBridgeModule(), ValdiBridgeObserverListener {
 
     var performHapticFeedbackFunction: ValdiFunction? = null
@@ -177,13 +176,7 @@ class ValdiDeviceModule(
         val list = marshaller.pushList(count)
         for (idx in 0..count - 1) {
             val locale = locales.get(idx)
-            val localeString = if (useLocaleLanguageTag) {
-                locale.toLanguageTag()
-            } else {
-                val language = locale.getLanguage()
-                val country = locale.getCountry()
-                "${language}-${country}"
-            }
+            val localeString = locale.toLanguageTag()
             marshaller.pushString(localeString)
             marshaller.setListItem(list, idx)
         }

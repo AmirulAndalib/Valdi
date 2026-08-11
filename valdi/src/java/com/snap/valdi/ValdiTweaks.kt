@@ -52,12 +52,6 @@ data class ValdiTweaks(
           */
          val editTextResetSelectionMatchesIos: Boolean = false,
          /**
-          * When true, use [Locale.toLanguageTag] for device locale strings instead of
-          * manually concatenating language and country codes. Fixes trailing-dash issues
-          * (e.g. "nl-" instead of "nl") for locales without a country component.
-          */
-         val useLocaleLanguageTag: Boolean = false,
-         /**
           * When true, use direct TextViewMeasureDelegate using StaticLayout/TextPaint for text measurement
           * instead of creating and measuring placeholder Android TextView instances.
           */
