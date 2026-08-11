@@ -558,9 +558,26 @@ NSURL *NSURLFromString(const Valdi::StringBox &urlString) {
                                                   nil));
 }
 
+// The domain is a de-facto contract: consumers (e.g. SCMediaTranscodingLogger) match on it to
+// classify Composer/JS failures.
+static NSString *const kValdiErrorDomain = @"com.snap.valdi";
+static NSString *const kValdiErrorStackTraceKey = @"SCValdiErrorStackTrace";
+
 NSError *NSErrorFromError(const Valdi::Error &error) {
-    NSString *errorMessage = NSStringFromSTDStringView(error.toString());
-    return [NSError errorWithDomain:@"com.snap.valdi" code:0 userInfo:@{NSLocalizedDescriptionKey: errorMessage}];
+    // Keep the full cause chain in the message and the JS stack in userInfo so both survive into
+    // downstream telemetry (NSError.description includes userInfo) instead of being dropped at the
+    // native boundary (CREATORS-40459).
+    auto flattenedError = error.flatten();
+    NSString *errorMessage = NSStringFromString(flattenedError.getMessage());
+    if (errorMessage.length == 0) {
+        errorMessage = NSStringFromSTDStringView(error.toString());
+    }
+    NSMutableDictionary<NSErrorUserInfoKey, id> *userInfo = [NSMutableDictionary dictionary];
+    userInfo[NSLocalizedDescriptionKey] = errorMessage;
+    if (!flattenedError.getStack().isEmpty()) {
+        userInfo[kValdiErrorStackTraceKey] = NSStringFromString(flattenedError.getStack());
+    }
+    return [NSError errorWithDomain:kValdiErrorDomain code:error.getErrorCode() userInfo:[userInfo copy]];
 }
 
 Valdi::Error ErrorFromNSError(NSError *error) {
