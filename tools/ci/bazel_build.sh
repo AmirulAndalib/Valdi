@@ -71,9 +71,11 @@ if [[ ! -w "$(npm prefix -g)" ]]; then
     fi
 fi
 
-# Optional: Setup git credentials for internal CI (not mirrored to external repos)
-if [ -f ./scripts/mirroring/git_init.sh ]; then
-    ./scripts/mirroring/git_init.sh
+# Optional: Setup git credentials for internal CI (not mirrored to external repos).
+# The mirroring scripts live in the internal-only composer_internal sibling directory,
+# which is absent in the public repo, so the guard no-ops there.
+if [ -f ../composer_internal/scripts/mirroring/git_init.sh ]; then
+    ../composer_internal/scripts/mirroring/git_init.sh
 fi
 
 ./tools/ci/install_cli.sh
