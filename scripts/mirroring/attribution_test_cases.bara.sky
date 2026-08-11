@@ -1,0 +1,103 @@
+# Starlark-level regression test for preserve_attribution() (attribution.bara.sky),
+# run via test_attribution.py through the real Copybara binary so it exercises
+# the actual Starlark dialect (e.g. split() requiring an explicit separator,
+# unlike Python) rather than a Python reimplementation that could hide dialect
+# bugs like the one this file guards against.
+#
+# `copybara info` loads this file and evaluates all top-level statements before
+# printing the (empty) workflow table, so a failed assertion's fail() aborts
+# loading with a non-zero exit and a visible error; if nothing fails, loading
+# completes and `copybara info` exits 0.
+
+load("attribution", "preserve_attribution")
+
+def _make_ctx(message, labels):
+    """Fake TransformationContext for testing preserve_attribution() in isolation.
+
+    labels maps label name -> list of values, mimicking find_all_labels().
+    Production find_all_labels() returns [] when cool-tool's squash-merge
+    collapses "Name: value" trailers onto a single line, even though the
+    label text is still present in ctx.message — that's the fallback path
+    these cases exercise.
+    """
+    captured = []
+
+    def find_all_labels(name):
+        return labels.get(name, [])
+
+    def set_message(new_message):
+        captured.append(new_message)
+
+    ctx = struct(
+        message = message,
+        find_all_labels = find_all_labels,
+        set_message = set_message,
+    )
+    return ctx, captured
+
+def _run_case(case, message, labels, expected_message):
+    ctx, captured = _make_ctx(message, labels)
+    preserve_attribution(ctx)
+    if not captured:
+        fail("[%s] preserve_attribution() never called ctx.set_message()" % case)
+    actual = captured[-1]
+    if actual != expected_message:
+        fail("[%s] expected message %r, got %r" % (case, expected_message, actual))
+
+# Case 1: the production incident (2026-07-08, pipeline 7fa07f85). cool-tool's
+# squash merge collapsed "Copybara-original-author:", "GitOrigin-RevId:" and
+# "ExternalPR:" onto a single line, so find_all_labels() found nothing for
+# either label. preserve_attribution() must fall back to parsing ctx.message
+# directly without crashing on Starlark's split(), which (unlike Python's)
+# requires an explicit separator.
+_run_case(
+    case = "collapsed_labels_fallback",
+    message = (
+        "Import AugustHagedal's change\n" +
+        "Copybara-original-author: AugustHagedal <aander23@student.aau.dk> " +
+        "GitOrigin-RevId: 87543972b94188605c5e82bdb6406229e37df57a " +
+        "ExternalPR: https://github.com/Snapchat/Valdi/pull/90"
+    ),
+    labels = {},
+    expected_message = "Closes https://github.com/Snapchat/Valdi/pull/90",
+)
+
+# Case 2: labels on their own lines (the common case) — find_all_labels()
+# finds them directly, so the fallback path is not exercised.
+_run_case(
+    case = "normal_labels",
+    message = "Import a change\nGitOrigin-RevId: abc123\nExternalPR: https://github.com/Snapchat/Valdi/pull/42",
+    labels = {
+        "GitOrigin-RevId": ["abc123"],
+        "ExternalPR": ["https://github.com/Snapchat/Valdi/pull/42"],
+    },
+    expected_message = "Closes https://github.com/Snapchat/Valdi/pull/42",
+)
+
+# Case 3: import commit with GitOrigin-RevId but no ExternalPR label — falls
+# back to the commit subject line.
+_run_case(
+    case = "git_origin_without_external_pr",
+    message = "Some external change subject\nGitOrigin-RevId: abc123",
+    labels = {"GitOrigin-RevId": ["abc123"]},
+    expected_message = "Some external change subject",
+)
+
+# Case 4: pure internal commit — no GitOrigin-RevId label or text at all.
+_run_case(
+    case = "pure_internal_commit",
+    message = "Fix a typo in the README",
+    labels = {},
+    expected_message = "Internal Change",
+)
+
+# Case 5: collapsed GitOrigin-RevId with no ExternalPR anywhere in the
+# message — fallback finds git_origin via substring match, external_prs
+# stays empty, so it should fall back to the subject line (not crash trying
+# to parse a nonexistent "ExternalPR:").
+_run_case(
+    case = "collapsed_git_origin_without_external_pr",
+    message = "Import a change\nGitOrigin-RevId: abc123 (squashed, no ExternalPR here)",
+    labels = {},
+    expected_message = "Import a change",
+)

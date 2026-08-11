@@ -86,6 +86,17 @@ public:
     virtual std::string getANRAttributionInfo() const {
         return {};
     }
+
+    /**
+     Whether the scheduler is far enough along in its lifecycle for unresponsiveness to be
+     reported as an ANR. Runtime bootstrap (JS context creation plus core bundle evaluation)
+     legitimately occupies the JS thread past the detection threshold on slow devices, so the
+     detector excludes that window from ANR accounting. Must be safe to call from any thread
+     while the JS thread is busy.
+     */
+    virtual bool isReadyForANRDetection() const {
+        return true;
+    }
 };
 
 } // namespace Valdi

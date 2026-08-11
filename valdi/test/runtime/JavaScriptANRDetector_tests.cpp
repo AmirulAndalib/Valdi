@@ -51,6 +51,10 @@ public:
         return _anrAttributionInfo;
     }
 
+    bool isReadyForANRDetection() const override {
+        return _readyForANRDetection;
+    }
+
     int getLastTaskId() {
         return _taskIdSequence;
     }
@@ -63,8 +67,13 @@ public:
         _anrAttributionInfo = std::move(anrAttributionInfo);
     }
 
+    void setReadyForANRDetection(bool ready) {
+        _readyForANRDetection = ready;
+    }
+
 private:
     std::atomic_bool _shouldSimulateANR = false;
+    std::atomic_bool _readyForANRDetection = true;
     std::atomic_int _taskIdSequence = 0;
     std::string _anrAttributionInfo;
 };
@@ -138,6 +147,32 @@ TEST(ANRDetector, detectsANRWhenTaskAreHanging) {
 
     ASSERT_EQ(static_cast<size_t>(1), anr->getCapturedStacktraces().size());
     ASSERT_EQ(STRING_LITERAL("A fake stacktrace"), anr->getCapturedStacktraces()[0].getStackTrace());
+    ASSERT_EQ("Detected unattributed ANR after 1.0 ms", anr->getMessage());
+}
+
+TEST(ANRDetector, doesNotDetectANRWhileSchedulerIsNotReadyForDetection) {
+    ANRDetectorTestHelper helper;
+
+    helper.taskScheduler->setShouldSimulateANR();
+    helper.taskScheduler->setReadyForANRDetection(false);
+
+    helper.anrDetector->onEnterForeground();
+    helper.anrDetector->start(std::chrono::milliseconds(1));
+
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+
+    ASSERT_FALSE(helper.getLastANR().has_value());
+
+    helper.taskScheduler->setReadyForANRDetection(true);
+
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+
+    auto anr = helper.getLastANR();
+    ASSERT_TRUE(anr.has_value());
     ASSERT_EQ("Detected unattributed ANR after 1.0 ms", anr->getMessage());
 }
 

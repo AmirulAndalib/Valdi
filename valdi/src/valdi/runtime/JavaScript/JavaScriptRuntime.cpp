@@ -358,6 +358,12 @@ void JavaScriptRuntime::doInitialize() {
             return;
         }
     })();
+
+    // onInitError() clears _running, so reaching here with it still set means the core bundles
+    // evaluated successfully and ANR accounting can begin.
+    if (_running) {
+        _bootstrapCompleted = true;
+    }
 }
 
 void JavaScriptRuntime::fullTeardown() {
@@ -3826,6 +3832,10 @@ StringBox JavaScriptRuntime::swapCurrentNativeCallName(StringBox name) {
     std::lock_guard<Mutex> lock(_nativeCallActivityMutex);
     std::swap(_currentNativeCallName, name);
     return name;
+}
+
+bool JavaScriptRuntime::isReadyForANRDetection() const {
+    return _bootstrapCompleted;
 }
 
 std::string JavaScriptRuntime::getANRAttributionInfo() const {

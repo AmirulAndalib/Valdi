@@ -1,0 +1,36 @@
+def preserve_attribution(ctx):
+    """Format outbound mirror commit messages and auto-close imported external PRs.
+
+    For commits imported from github.com/Snapchat/Valdi (have GitOrigin-RevId):
+    uses "Closes <PR URL>" so GitHub auto-closes the external PR when the commit
+    lands on main. Falls back to just the subject line if no ExternalPR label,
+    stripping internal metadata (PR template, cool-tool footer, etc.).
+    For pure internal commits: replace with 'Internal Change'.
+    """
+    git_origin = ctx.find_all_labels("GitOrigin-RevId")
+    external_prs = ctx.find_all_labels("ExternalPR")
+
+    # Fallback: cool-tool squash can collapse labels onto a single line,
+    # which breaks find_all_labels(). Search the raw message as a backup.
+    msg = ctx.message
+    if not git_origin and "GitOrigin-RevId:" in msg:
+        git_origin = ["fallback"]
+    if not external_prs and "ExternalPR:" in msg:
+        idx = msg.find("ExternalPR:")
+        if idx >= 0:
+            rest = msg[idx + len("ExternalPR:"):].strip()
+            # Starlark's split() requires an explicit separator (unlike Python's
+            # default whitespace-split), so isolate the first line, then the
+            # first space-delimited token on it, to grab just the PR URL.
+            parts = rest.split("\n")[0].split(" ")
+            if parts and parts[0]:
+                external_prs = [parts[0]]
+
+    if git_origin:
+        if external_prs:
+            ctx.set_message("Closes " + external_prs[0])
+        else:
+            subject = msg.splitlines()[0].strip() if msg.strip() else "External Change"
+            ctx.set_message(subject)
+    else:
+        ctx.set_message("Internal Change")

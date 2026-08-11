@@ -275,6 +275,7 @@ public:
     bool isInJsThread() final;
     Ref<Context> getLastDispatchedContext() const final;
     std::string getANRAttributionInfo() const final;
+    bool isReadyForANRDetection() const final;
 
     void performGc();
     JavaScriptContextMemoryStatistics dumpMemoryStatistics();
@@ -420,6 +421,9 @@ private:
     bool _symbolicating = false;
     bool _running = false;
     bool _enableDebugger;
+    // Set once doInitialize() finished evaluating the core bundles; read by the ANR detector to
+    // exclude the bootstrap window from ANR accounting.
+    std::atomic<bool> _bootstrapCompleted = false;
     // Used for unit testing only
     std::atomic<bool> _forceStackTraceCapture = false;
     int _daemonClientListenerIdSequence = 0;
