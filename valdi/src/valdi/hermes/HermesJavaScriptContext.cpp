@@ -11,11 +11,12 @@
 #include "valdi/hermes/HermesJavaScriptCompiler.hpp"
 #include "valdi/hermes/HermesUtils.hpp"
 
-#include "valdi/runtime/JavaScript/JavaScriptFunctionCallContext.hpp"
 #include "valdi/runtime/JavaScript/JSNativeClassData.hpp"
+#include "valdi/runtime/JavaScript/JavaScriptFunctionCallContext.hpp"
 #include "valdi/runtime/JavaScript/JavaScriptUtils.hpp"
 
 #include "valdi_core/cpp/Text/UTF16Utils.hpp"
+#include "valdi_core/cpp/Utils/Defer.hpp"
 #include "valdi_core/cpp/Utils/ReferenceInfo.hpp"
 #include "valdi_core/cpp/Utils/StaticString.hpp"
 #include "valdi_core/cpp/Utils/StringCache.hpp"
@@ -601,13 +602,8 @@ JSValueRef HermesJavaScriptContext::newNativeClass(const Ref<RefCountable>& clas
                               auto call,
                               std::string_view name) -> hermes::vm::Handle<hermes::vm::Callable> {
         auto functionName = newSymbolIDFromString(name);
-        auto result =
-            hermes::vm::FinalizableNativeFunction::createWithoutPrototype(*_runtime,
-                                                                          unsafeBridgeRetain(functionData.get()),
-                                                                          call,
-                                                                          &freeContext,
-                                                                          functionName.get(),
-                                                                          0);
+        auto result = hermes::vm::FinalizableNativeFunction::createWithoutPrototype(
+            *_runtime, unsafeBridgeRetain(functionData.get()), call, &freeContext, functionName.get(), 0);
         if (!checkException(result.getStatus(), exceptionTracker)) {
             return hermes::vm::Runtime::makeNullHandle<hermes::vm::Callable>();
         }
@@ -654,8 +650,7 @@ JSValueRef HermesJavaScriptContext::newNativeClass(const Ref<RefCountable>& clas
     auto constructorObject = hermes::vm::Handle<hermes::vm::JSObject>::vmcast(constructor);
     for (const auto& entry : classDefinition.getEntries()) {
         auto object = entry.isClassMember() ? constructorObject : prototype;
-        auto memberCallback =
-            entry.isClassMember() ? &callNativeClassStaticMember : &callNativeClassInstanceMember;
+        auto memberCallback = entry.isClassMember() ? &callNativeClassStaticMember : &callNativeClassInstanceMember;
         switch (entry.getKind()) {
             case JSClassEntryKind::Method: {
                 if (entry.getMethodCallback() == nullptr) {
@@ -704,13 +699,12 @@ JSValueRef HermesJavaScriptContext::newNativeClass(const Ref<RefCountable>& clas
                     functionData->callback = entry.getSetterCallback();
                     setter = createFunction(functionData, memberCallback, propertyName.toStringView());
                 }
-                if (!exceptionTracker ||
-                    !defineAccessorProperty(object,
-                                            propertyName.toStringView(),
-                                            getter,
-                                            setter,
-                                            entry.isEnumerable(),
-                                            entry.isConfigurable())) {
+                if (!exceptionTracker || !defineAccessorProperty(object,
+                                                                 propertyName.toStringView(),
+                                                                 getter,
+                                                                 setter,
+                                                                 entry.isEnumerable(),
+                                                                 entry.isConfigurable())) {
                     return newUndefined();
                 }
                 break;
@@ -740,9 +734,7 @@ JSValueRef HermesJavaScriptContext::newObjectFromNativeClass(const Ref<RefCounta
     }
 
     auto prototypeResult = hermes::vm::JSObject::getNamedOrIndexed(
-        clsObject,
-        *_runtime,
-        hermes::vm::Predefined::getSymbolID(hermes::vm::Predefined::prototype));
+        clsObject, *_runtime, hermes::vm::Predefined::getSymbolID(hermes::vm::Predefined::prototype));
     if (!checkException(prototypeResult.getStatus(), exceptionTracker)) {
         return newUndefined();
     }
@@ -1393,13 +1385,25 @@ void HermesJavaScriptContext::willEnterVM() {
     _enterVMCount++;
 }
 
+void HermesJavaScriptContext::requestExecutionTermination() {
+    IJavaScriptContext::requestExecutionTermination();
+    _runtime->triggerTimeoutAsyncBreak();
+}
+
 void HermesJavaScriptContext::willExitVM(JSExceptionTracker& exceptionTracker) {
     SC_ASSERT(_enterVMCount > 0);
-    --_enterVMCount;
-    if (_enterVMCount == 0) {
-        auto result = _runtime->drainJobs();
-        checkException(result, exceptionTracker);
+    if (_enterVMCount > 1) {
+        --_enterVMCount;
+        return;
     }
+
+    Valdi::Defer exitVM([this]() { --_enterVMCount; });
+    if (executionTerminationRequested()) {
+        return;
+    }
+
+    auto result = _runtime->drainJobs();
+    checkException(result, exceptionTracker);
 }
 
 void HermesJavaScriptContext::startDebugger(bool isWorker) {

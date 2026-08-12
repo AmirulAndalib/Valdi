@@ -15,6 +15,7 @@
 #include "valdi/quickjs/QuickJSUtils.hpp"
 #include "valdi_core/cpp/Constants.hpp"
 #include "valdi_core/cpp/Utils/ByteBuffer.hpp"
+#include "valdi_core/cpp/Utils/Defer.hpp"
 #include "valdi_core/cpp/Utils/Format.hpp"
 #include "valdi_core/cpp/Utils/StaticString.hpp"
 #include "valdi_core/cpp/Utils/StringCache.hpp"
@@ -79,7 +80,7 @@ constexpr double kMaxStackSizeRatio = 0.75;
 static int handleInterrupt(JSRuntime* rt, void* opaque) {
     auto& jsContext = *reinterpret_cast<QuickJSJavaScriptContext*>(opaque);
     if (jsContext.interruptRequested()) {
-        jsContext.onInterrupt();
+        return jsContext.onInterrupt() ? 1 : 0;
     }
     return 0;
 }
@@ -635,8 +636,8 @@ Valdi::JSValueRef QuickJSJavaScriptContext::newNativeClassFunction(
     const JSClassDefWithId* classDef,
     std::string_view name,
     Valdi::JSExceptionTracker& exceptionTracker) {
-    auto function = checkCallAndGetValue(
-        exceptionTracker, JS_NewObjectProtoClass(_context, _functionPrototype, classDef->classID));
+    auto function =
+        checkCallAndGetValue(exceptionTracker, JS_NewObjectProtoClass(_context, _functionPrototype, classDef->classID));
     if (!exceptionTracker) {
         return Valdi::JSValueRef();
     }
@@ -705,8 +706,7 @@ Valdi::JSValueRef QuickJSJavaScriptContext::newNativeClass(const Valdi::Ref<Vald
     };
 
     for (const auto& entry : classDefinition.getEntries()) {
-        auto object =
-            entry.isClassMember() ? fromValdiJSValue(constructor.get()) : fromValdiJSValue(prototype.get());
+        auto object = entry.isClassMember() ? fromValdiJSValue(constructor.get()) : fromValdiJSValue(prototype.get());
         auto* memberClassDef =
             entry.isClassMember() ? getNativeClassStaticMemberClassDef() : getNativeClassInstanceMemberClassDef();
         switch (entry.getKind()) {
@@ -718,15 +718,14 @@ Valdi::JSValueRef QuickJSJavaScriptContext::newNativeClass(const Valdi::Ref<Vald
                 const auto& propertyName = entry.getName();
                 auto functionData = Valdi::makeShared<NativeClassFunctionData>(nativeClass, propertyName);
                 functionData->callback = entry.getMethodCallback();
-                auto function = newNativeClassFunction(
-                    functionData, memberClassDef, propertyName.toStringView(), exceptionTracker);
-                if (!exceptionTracker ||
-                    !defineDataProperty(object,
-                                        propertyName.toStringView(),
-                                        JS_DupValue(_context, fromValdiJSValue(function.get())),
-                                        entry.isWritable(),
-                                        entry.isEnumerable(),
-                                        entry.isConfigurable())) {
+                auto function =
+                    newNativeClassFunction(functionData, memberClassDef, propertyName.toStringView(), exceptionTracker);
+                if (!exceptionTracker || !defineDataProperty(object,
+                                                             propertyName.toStringView(),
+                                                             JS_DupValue(_context, fromValdiJSValue(function.get())),
+                                                             entry.isWritable(),
+                                                             entry.isEnumerable(),
+                                                             entry.isConfigurable())) {
                     return Valdi::JSValueRef();
                 }
                 break;
@@ -753,18 +752,14 @@ Valdi::JSValueRef QuickJSJavaScriptContext::newNativeClass(const Valdi::Ref<Vald
                 if (entry.getGetterCallback() != nullptr) {
                     auto functionData = Valdi::makeShared<NativeClassFunctionData>(nativeClass, propertyName);
                     functionData->callback = entry.getGetterCallback();
-                    getter = newNativeClassFunction(functionData,
-                                                    memberClassDef,
-                                                    propertyName.toStringView(),
-                                                    exceptionTracker);
+                    getter = newNativeClassFunction(
+                        functionData, memberClassDef, propertyName.toStringView(), exceptionTracker);
                 }
                 if (exceptionTracker && entry.getSetterCallback() != nullptr) {
                     auto functionData = Valdi::makeShared<NativeClassFunctionData>(nativeClass, propertyName);
                     functionData->callback = entry.getSetterCallback();
-                    setter = newNativeClassFunction(functionData,
-                                                    memberClassDef,
-                                                    propertyName.toStringView(),
-                                                    exceptionTracker);
+                    setter = newNativeClassFunction(
+                        functionData, memberClassDef, propertyName.toStringView(), exceptionTracker);
                 }
                 if (!exceptionTracker) {
                     return Valdi::JSValueRef();
@@ -776,14 +771,13 @@ Valdi::JSValueRef QuickJSJavaScriptContext::newNativeClass(const Valdi::Ref<Vald
                     setter.empty() ? JS_UNDEFINED : JS_DupValue(_context, fromValdiJSValue(setter.get()));
                 auto propertyNameView = propertyName.toStringView();
                 auto atom = JS_NewAtomLen(_context, propertyNameView.data(), propertyNameView.size());
-                auto result =
-                    JS_DefinePropertyGetSet(_context,
-                                            object,
-                                            atom,
-                                            getterValue,
-                                            setterValue,
-                                            toQuickJSPropertyFlags(
-                                                false, entry.isEnumerable(), entry.isConfigurable()));
+                auto result = JS_DefinePropertyGetSet(
+                    _context,
+                    object,
+                    atom,
+                    getterValue,
+                    setterValue,
+                    toQuickJSPropertyFlags(false, entry.isEnumerable(), entry.isConfigurable()));
                 JS_FreeAtom(_context, atom);
                 if (!checkCall(exceptionTracker, result)) {
                     return Valdi::JSValueRef();
@@ -1462,6 +1456,10 @@ void QuickJSJavaScriptContext::willEnterVM() {
     }
 }
 
+void QuickJSJavaScriptContext::requestExecutionTermination() {
+    IJavaScriptContext::requestExecutionTermination();
+}
+
 struct StackLimits {
     void* startFrameAddress;
     size_t maxStackSize;
@@ -1532,22 +1530,29 @@ void QuickJSJavaScriptContext::notifyRejectedPromises() {
 void QuickJSJavaScriptContext::willExitVM(Valdi::JSExceptionTracker& exceptionTracker) {
     auto guard = _threadAccessChecker.guard();
     SC_ASSERT(_enterVmCount > 0);
-    --_enterVmCount;
-    if (_enterVmCount == 0) {
-        JSContext* context = nullptr;
+    if (_enterVmCount > 1) {
+        --_enterVmCount;
+        return;
+    }
 
-        for (;;) {
-            switch (JS_ExecutePendingJob(_runtime, &context)) {
-                case 0:
-                    notifyRejectedPromises();
-                    return;
-                case 1:
-                    continue;
-                case -1: {
-                    setExceptionToTracker(exceptionTracker);
-                    notifyRejectedPromises();
-                    return;
-                }
+    Valdi::Defer exitVM([this]() { --_enterVmCount; });
+    if (executionTerminationRequested()) {
+        return;
+    }
+
+    JSContext* context = nullptr;
+
+    for (;;) {
+        switch (JS_ExecutePendingJob(_runtime, &context)) {
+            case 0:
+                notifyRejectedPromises();
+                return;
+            case 1:
+                continue;
+            case -1: {
+                setExceptionToTracker(exceptionTracker);
+                notifyRejectedPromises();
+                return;
             }
         }
     }

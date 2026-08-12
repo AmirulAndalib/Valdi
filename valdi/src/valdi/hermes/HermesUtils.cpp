@@ -28,9 +28,7 @@ HermesNativeClassData::~HermesNativeClassData() = default;
 HermesNativeClassFunctionData::HermesNativeClassFunctionData(HermesJavaScriptContext& jsContext,
                                                              const Ref<JSNativeClassData>& nativeClass,
                                                              const StringBox& name)
-    : jsContext(jsContext),
-      nativeClass(nativeClass),
-      referenceInfo(nativeClass->makeMemberReferenceInfo(name)) {}
+    : jsContext(jsContext), nativeClass(nativeClass), referenceInfo(nativeClass->makeMemberReferenceInfo(name)) {}
 
 HermesNativeClassFunctionData::~HermesNativeClassFunctionData() = default;
 
@@ -44,8 +42,7 @@ void freeContext(void* context) {
     RefCountableAutoreleasePool::release(context);
 }
 
-RefCountable* getOwnNativeStateContext(hermes::vm::Runtime& runtime,
-                                       hermes::vm::Handle<hermes::vm::JSObject> object) {
+RefCountable* getOwnNativeStateContext(hermes::vm::Runtime& runtime, hermes::vm::Handle<hermes::vm::JSObject> object) {
     hermes::vm::NamedPropertyDescriptor descriptor;
     if (!hermes::vm::JSObject::getOwnNamedDescriptor(
             object,
@@ -86,6 +83,14 @@ static hermes::vm::ExecutionStatus onJsCallError(hermes::vm::Runtime& runtime,
     return runtime.setThrownValue(HermesJavaScriptContext::toHermesValue(exception.get()));
 }
 
+static inline bool handleInterrupt(IJavaScriptContext& jsContext, JSExceptionTracker& exceptionTracker) {
+    if (VALDI_UNLIKELY(jsContext.interruptRequested()) && jsContext.onInterrupt()) {
+        exceptionTracker.onError("JavaScript execution terminated");
+        return true;
+    }
+    return false;
+}
+
 hermes::vm::CallResult<hermes::vm::HermesValue> callTrampoline(void* context,
                                                                hermes::vm::Runtime& runtime,
                                                                hermes::vm::NativeArgs args) {
@@ -105,8 +110,8 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callTrampoline(void* context,
                                             functionData->function->getReferenceInfo());
     callContext.setThisValue(thisRef.get());
 
-    if (functionData->jsContext.interruptRequested()) {
-        functionData->jsContext.onInterrupt();
+    if (handleInterrupt(functionData->jsContext, exceptionTracker)) {
+        return onJsCallError(runtime, exceptionTracker);
     }
 
     auto result = (*functionData->function)(callContext);
@@ -118,8 +123,9 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callTrampoline(void* context,
     }
 }
 
-hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassInstanceMember(
-    void* context, hermes::vm::Runtime& runtime, hermes::vm::NativeArgs args) {
+hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassInstanceMember(void* context,
+                                                                              hermes::vm::Runtime& runtime,
+                                                                              hermes::vm::NativeArgs args) {
     auto functionData = unsafeBridge<HermesNativeClassFunctionData>(context);
     auto& jsContext = functionData->jsContext;
 
@@ -146,8 +152,8 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassInstanceMember(
         return runtime.raiseTypeError("Native class member called with an incompatible receiver");
     }
 
-    if (jsContext.interruptRequested()) {
-        jsContext.onInterrupt();
+    if (handleInterrupt(jsContext, exceptionTracker)) {
+        return onJsCallError(runtime, exceptionTracker);
     }
 
     auto result = functionData->callback(instanceData->getOpaque().get(), callContext);
@@ -157,8 +163,9 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassInstanceMember(
     return HermesJavaScriptContext::toHermesValue(result.get());
 }
 
-hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassStaticMember(
-    void* context, hermes::vm::Runtime& runtime, hermes::vm::NativeArgs args) {
+hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassStaticMember(void* context,
+                                                                            hermes::vm::Runtime& runtime,
+                                                                            hermes::vm::NativeArgs args) {
     auto functionData = unsafeBridge<HermesNativeClassFunctionData>(context);
     auto& jsContext = functionData->jsContext;
 
@@ -177,8 +184,8 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassStaticMember(
     auto thisValue = jsContext.toJSValueRef(args.getThisArg());
     callContext.setThisValue(thisValue.get());
 
-    if (jsContext.interruptRequested()) {
-        jsContext.onInterrupt();
+    if (handleInterrupt(jsContext, exceptionTracker)) {
+        return onJsCallError(runtime, exceptionTracker);
     }
 
     auto result = functionData->callback(functionData->nativeClass->getOpaque().get(), callContext);
@@ -230,8 +237,8 @@ hermes::vm::CallResult<hermes::vm::HermesValue> callNativeClassConstructor(void*
     auto thisValue = jsContext.toJSValueRef(args.getThisArg());
     callContext.setThisValue(thisValue.get());
 
-    if (jsContext.interruptRequested()) {
-        jsContext.onInterrupt();
+    if (handleInterrupt(jsContext, exceptionTracker)) {
+        return onJsCallError(runtime, exceptionTracker);
     }
 
     auto nativeOpaque = constructor(classData->nativeClass->getOpaque().get(), callContext);

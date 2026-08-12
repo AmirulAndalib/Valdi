@@ -5,8 +5,10 @@
 #include "valdi/runtime/JavaScript/JSFunctionWithCallable.hpp"
 #include "valdi_core/cpp/Utils/ByteBuffer.hpp"
 #include "valdi_core/cpp/Utils/StaticString.hpp"
+#include <chrono>
 #include <future>
 #include <gtest/gtest.h>
+#include <thread>
 
 using namespace Valdi;
 using namespace snap::valdi_core;
@@ -298,13 +300,11 @@ TEST_P(JSContextFixture, canCreateStringFromStaticString) {
     ASSERT_EQ(STRING_LITERAL("UTF8"), context.valueToString(utf8Value.get(), exceptionTracker));
 
     std::u16string utf16 = u"UTF16";
-    auto utf16Value =
-        context.newString(*StaticString::makeUTF16(utf16.data(), utf16.size()), exceptionTracker);
+    auto utf16Value = context.newString(*StaticString::makeUTF16(utf16.data(), utf16.size()), exceptionTracker);
     ASSERT_EQ(STRING_LITERAL("UTF16"), context.valueToString(utf16Value.get(), exceptionTracker));
 
     std::u32string utf32 = U"UTF32";
-    auto utf32Value =
-        context.newString(*StaticString::makeUTF32(utf32.data(), utf32.size()), exceptionTracker);
+    auto utf32Value = context.newString(*StaticString::makeUTF32(utf32.data(), utf32.size()), exceptionTracker);
     ASSERT_EQ(STRING_LITERAL("UTF32"), context.valueToString(utf32Value.get(), exceptionTracker));
     jsEntry.checkException();
 }
@@ -708,8 +708,7 @@ static JSValueRef getNativeCounterValue(RefCountable* opaque, JSFunctionNativeCa
     return callContext.getContext().newNumber(static_cast<NativeCounter*>(opaque)->value);
 }
 
-static JSValueRef setNativeCounterValue(RefCountable* opaque,
-                                        JSFunctionNativeCallContext& callContext) noexcept {
+static JSValueRef setNativeCounterValue(RefCountable* opaque, JSFunctionNativeCallContext& callContext) noexcept {
     static_cast<NativeCounter*>(opaque)->value = callContext.getParameterAsInt(0);
     return callContext.getContext().newUndefined();
 }
@@ -739,15 +738,12 @@ static JSClassDefinition makeNativeCounterClassDefinition(IJavaScriptContext& co
                                                           const StringBox& name,
                                                           JSClassConstructorCallback constructor) {
     JSClassDefinition definition(name, constructor);
-    definition
-        .appendInstanceEntry(JSClassEntry::method(STRING_LITERAL("add"), &addToNativeCounter))
+    definition.appendInstanceEntry(JSClassEntry::method(STRING_LITERAL("add"), &addToNativeCounter))
         .appendConstant(STRING_LITERAL("kind"), context.newStringUTF8("native-counter", exceptionTracker))
         .appendAccessor(STRING_LITERAL("value"), &getNativeCounterValue, &setNativeCounterValue)
         .appendClassEntry(JSClassEntry::method(STRING_LITERAL("twice"), &doubleNativeCounterValue))
-        .appendClassConstant(STRING_LITERAL("category"),
-                             context.newStringUTF8("counter-class", exceptionTracker))
-        .appendClassAccessor(
-            STRING_LITERAL("sharedValue"), &getNativeCounterStaticValue, &setNativeCounterStaticValue);
+        .appendClassConstant(STRING_LITERAL("category"), context.newStringUTF8("counter-class", exceptionTracker))
+        .appendClassAccessor(STRING_LITERAL("sharedValue"), &getNativeCounterStaticValue, &setNativeCounterStaticValue);
     return definition;
 }
 
@@ -758,8 +754,7 @@ struct NativeCounterTestValues {
     JSValueRef instance;
 };
 
-static NativeCounterTestValues setUpNativeCounterTest(JSEntry& jsEntry,
-                                                      JSClassConstructorCallback constructor) {
+static NativeCounterTestValues setUpNativeCounterTest(JSEntry& jsEntry, JSClassConstructorCallback constructor) {
     auto& context = jsEntry.context;
     auto& exceptionTracker = jsEntry.exceptionTracker;
     auto classOpaque = makeShared<NativeCounterClass>();
@@ -811,34 +806,34 @@ TEST_P(JSContextFixture, canCreateAndUseNativeClass) {
     ASSERT_TRUE(context.valueToBool(
         evaluateNativeCounterExpression(jsEntry, "nativeCounter.add === NativeCounter.prototype.add").get(),
         exceptionTracker));
-    ASSERT_EQ(10,
-              context.valueToInt(
-                  evaluateNativeCounterExpression(jsEntry, "nativeCounter.value").get(), exceptionTracker));
-    ASSERT_EQ(15,
-              context.valueToInt(
-                  evaluateNativeCounterExpression(jsEntry, "nativeCounter.add(5)").get(), exceptionTracker));
+    ASSERT_EQ(
+        10,
+        context.valueToInt(evaluateNativeCounterExpression(jsEntry, "nativeCounter.value").get(), exceptionTracker));
+    ASSERT_EQ(
+        15,
+        context.valueToInt(evaluateNativeCounterExpression(jsEntry, "nativeCounter.add(5)").get(), exceptionTracker));
 
     evaluateNativeCounterExpression(jsEntry, "nativeCounter.value = 20");
     ASSERT_EQ(20, values.instanceOpaque->value);
-    ASSERT_EQ(20,
-              context.valueToInt(
-                  evaluateNativeCounterExpression(jsEntry, "nativeCounter.value").get(), exceptionTracker));
-    ASSERT_EQ(STRING_LITERAL("native-counter"),
-              context.valueToString(
-                  evaluateNativeCounterExpression(jsEntry, "nativeCounter.kind").get(), exceptionTracker));
+    ASSERT_EQ(
+        20,
+        context.valueToInt(evaluateNativeCounterExpression(jsEntry, "nativeCounter.value").get(), exceptionTracker));
+    ASSERT_EQ(
+        STRING_LITERAL("native-counter"),
+        context.valueToString(evaluateNativeCounterExpression(jsEntry, "nativeCounter.kind").get(), exceptionTracker));
 
-    ASSERT_EQ(12,
-              context.valueToInt(
-                  evaluateNativeCounterExpression(jsEntry, "NativeCounter.twice(6)").get(), exceptionTracker));
+    ASSERT_EQ(
+        12,
+        context.valueToInt(evaluateNativeCounterExpression(jsEntry, "NativeCounter.twice(6)").get(), exceptionTracker));
     ASSERT_EQ(STRING_LITERAL("counter-class"),
-              context.valueToString(
-                  evaluateNativeCounterExpression(jsEntry, "NativeCounter.category").get(), exceptionTracker));
+              context.valueToString(evaluateNativeCounterExpression(jsEntry, "NativeCounter.category").get(),
+                                    exceptionTracker));
 
     evaluateNativeCounterExpression(jsEntry, "NativeCounter.sharedValue = 9");
     ASSERT_EQ(9, values.classOpaque->staticValue);
     ASSERT_EQ(9,
-              context.valueToInt(
-                  evaluateNativeCounterExpression(jsEntry, "NativeCounter.sharedValue").get(), exceptionTracker));
+              context.valueToInt(evaluateNativeCounterExpression(jsEntry, "NativeCounter.sharedValue").get(),
+                                 exceptionTracker));
 
     auto constructed =
         context.evaluate("globalThis.constructedNativeCounter = new NativeCounter(4); constructedNativeCounter",
@@ -874,36 +869,36 @@ TEST_P(JSContextFixture, nativeClassEntriesHaveExpectedDescriptors) {
     auto& exceptionTracker = jsEntry.exceptionTracker;
     setUpNativeCounterTest(jsEntry, nullptr);
 
+    ASSERT_FALSE(
+        context.valueToBool(evaluateNativeCounterExpression(
+                                jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').enumerable")
+                                .get(),
+                            exceptionTracker));
+    ASSERT_TRUE(
+        context.valueToBool(evaluateNativeCounterExpression(
+                                jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').writable")
+                                .get(),
+                            exceptionTracker));
+    ASSERT_TRUE(
+        context.valueToBool(evaluateNativeCounterExpression(
+                                jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').configurable")
+                                .get(),
+                            exceptionTracker));
+    ASSERT_FALSE(
+        context.valueToBool(evaluateNativeCounterExpression(
+                                jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'kind').writable")
+                                .get(),
+                            exceptionTracker));
     ASSERT_FALSE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').enumerable")
+        evaluateNativeCounterExpression(jsEntry,
+                                        "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'kind').configurable")
             .get(),
         exceptionTracker));
-    ASSERT_TRUE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').writable")
-            .get(),
-        exceptionTracker));
-    ASSERT_TRUE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'add').configurable")
-            .get(),
-        exceptionTracker));
-    ASSERT_FALSE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'kind').writable")
-            .get(),
-        exceptionTracker));
-    ASSERT_FALSE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'kind').configurable")
-            .get(),
-        exceptionTracker));
-    ASSERT_FALSE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'value').enumerable")
-            .get(),
-        exceptionTracker));
+    ASSERT_FALSE(
+        context.valueToBool(evaluateNativeCounterExpression(
+                                jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'value').enumerable")
+                                .get(),
+                            exceptionTracker));
     ASSERT_TRUE(context.valueToBool(
         evaluateNativeCounterExpression(
             jsEntry, "Object.getOwnPropertyDescriptor(NativeCounter.prototype, 'value').configurable")
@@ -962,6 +957,116 @@ TEST_P(JSContextFixture, nativeClassCallbacksDeliverInterrupts) {
     context.setListener(nullptr);
 }
 
+TEST_P(JSContextFixture, executionTerminationIsStickyAndDoesNotNotifyTheDiagnosticListener) {
+    MAIN_THREAD_INIT();
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    MockJavaScriptContextListener listener;
+    context.setListener(&listener);
+
+    ASSERT_FALSE(context.interruptRequested());
+    ASSERT_FALSE(context.executionTerminationRequested());
+
+    context.requestInterrupt();
+    ASSERT_TRUE(context.interruptRequested());
+    ASSERT_FALSE(context.onInterrupt());
+    ASSERT_EQ(1, listener.interruptCount);
+    ASSERT_FALSE(context.interruptRequested());
+
+    context.requestExecutionTermination();
+    ASSERT_TRUE(context.interruptRequested());
+    ASSERT_TRUE(context.executionTerminationRequested());
+    ASSERT_TRUE(context.onInterrupt());
+    ASSERT_EQ(1, listener.interruptCount);
+
+    ASSERT_TRUE(context.interruptRequested());
+    ASSERT_TRUE(context.onInterrupt());
+    ASSERT_EQ(1, listener.interruptCount);
+
+    context.setListener(nullptr);
+}
+
+TEST_P(JSContextFixture, executionTerminationInterruptsRunningJavaScript) {
+    if (isJSCore()) {
+        GTEST_SKIP() << "JavaScriptCore has no public API for interrupting pure JavaScript execution";
+    }
+
+    MAIN_THREAD_INIT();
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+
+    std::thread terminator([&context]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        context.requestExecutionTermination();
+    });
+
+    context.evaluate("while (true) {}", "execution-termination.js", exceptionTracker);
+    terminator.join();
+
+    ASSERT_FALSE(exceptionTracker);
+    exceptionTracker.clearError();
+}
+
+TEST_P(JSContextFixture, hermesExecutionTerminationInterruptsPrecompiledJavaScript) {
+    if (!isHermes()) {
+        GTEST_SKIP() << "This verifies Hermes serialized bytecode async-break checks";
+    }
+
+    MAIN_THREAD_INIT();
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+    auto moduleData = context.preCompile("while (true) {}", "precompiled-execution-termination.js", exceptionTracker);
+    jsEntry.checkException();
+    auto bytecode = getPreCompiledJsModuleData(moduleData);
+    ASSERT_TRUE(bytecode);
+
+    auto precompiledFunction =
+        context.evaluatePreCompiled(bytecode.value(), "precompiled-execution-termination.js", exceptionTracker);
+    jsEntry.checkException();
+
+    std::thread terminator([&context]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        context.requestExecutionTermination();
+    });
+
+    JSFunctionCallContext callContext(context, nullptr, 0, exceptionTracker);
+    context.callObjectAsFunction(precompiledFunction.get(), callContext);
+    terminator.join();
+
+    ASSERT_FALSE(exceptionTracker);
+    exceptionTracker.clearError();
+}
+
+TEST_P(JSContextFixture, javaScriptCoreExecutionTerminationInterruptsAtNativeCallBoundary) {
+    if (!isJSCore()) {
+        GTEST_SKIP() << "This verifies JavaScriptCore's best-effort native-call checkpoint";
+    }
+
+    MAIN_THREAD_INIT();
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+    setUpNativeCounterTest(jsEntry, &constructNativeCounter);
+
+    std::thread terminator([&context]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        context.requestExecutionTermination();
+    });
+
+    context.evaluate(
+        "while (true) { NativeCounter.twice(1); }", "native-boundary-execution-termination.js", exceptionTracker);
+    terminator.join();
+
+    ASSERT_FALSE(exceptionTracker);
+    exceptionTracker.clearError();
+}
+
 TEST_P(JSContextFixture, nativeClassRejectsInvalidUsage) {
     MAIN_THREAD_INIT();
     auto wrapper = createWrapper();
@@ -970,8 +1075,8 @@ TEST_P(JSContextFixture, nativeClassRejectsInvalidUsage) {
     auto& exceptionTracker = jsEntry.exceptionTracker;
     setUpNativeCounterTest(jsEntry, &constructNativeCounter);
 
-    auto otherDefinition = makeNativeCounterClassDefinition(
-        context, exceptionTracker, STRING_LITERAL("OtherNativeCounter"), nullptr);
+    auto otherDefinition =
+        makeNativeCounterClassDefinition(context, exceptionTracker, STRING_LITERAL("OtherNativeCounter"), nullptr);
     auto otherClassOpaque = makeShared<NativeCounterClass>();
     auto otherClass = context.newNativeClass(otherClassOpaque, otherDefinition, exceptionTracker);
     auto otherCounter = makeShared<NativeCounter>(3);
@@ -981,13 +1086,12 @@ TEST_P(JSContextFixture, nativeClassRejectsInvalidUsage) {
     context.setObjectProperty(global.get(), "otherNativeCounter", otherObject.get(), exceptionTracker);
     jsEntry.checkException();
 
-    ASSERT_TRUE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry,
-            "(() => { try { NativeCounter(); return false; } "
-            "catch (error) { return error instanceof Error; } })()")
-            .get(),
-        exceptionTracker));
+    ASSERT_TRUE(
+        context.valueToBool(evaluateNativeCounterExpression(jsEntry,
+                                                            "(() => { try { NativeCounter(); return false; } "
+                                                            "catch (error) { return error instanceof Error; } })()")
+                                .get(),
+                            exceptionTracker));
     // JavaScriptCore's native constructor callback does not expose new.target, so it cannot detect this case.
     if (!isJSCore()) {
         ASSERT_TRUE(context.valueToBool(
@@ -1005,13 +1109,12 @@ TEST_P(JSContextFixture, nativeClassRejectsInvalidUsage) {
             "catch (error) { return error instanceof Error; } })()")
             .get(),
         exceptionTracker));
-    ASSERT_TRUE(context.valueToBool(
-        evaluateNativeCounterExpression(
-            jsEntry,
-            "(() => { try { new OtherNativeCounter(); return false; } "
-            "catch (error) { return error instanceof Error; } })()")
-            .get(),
-        exceptionTracker));
+    ASSERT_TRUE(
+        context.valueToBool(evaluateNativeCounterExpression(jsEntry,
+                                                            "(() => { try { new OtherNativeCounter(); return false; } "
+                                                            "catch (error) { return error instanceof Error; } })()")
+                                .get(),
+                            exceptionTracker));
     jsEntry.checkException();
 }
 
@@ -1857,6 +1960,178 @@ TEST_P(JSContextFixture, supportsPromise) {
     jsEntry.checkException();
 
     ASSERT_EQ(Value().setMapValue("value", Value(2.0)), result);
+}
+
+TEST_P(JSContextFixture, drainsPromiseJobsWithoutReenteringPendingJobs) {
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    {
+        auto jsEntry = wrapper.makeJsEntry();
+        auto& context = jsEntry.context;
+        auto& exceptionTracker = jsEntry.exceptionTracker;
+        auto globalObject = context.getGlobalObject(exceptionTracker);
+        jsEntry.checkException();
+
+        auto reenterVM = context.newFunction(
+            makeShared<JSFunctionWithCallable>(ReferenceInfoBuilder().withObject(STRING_LITERAL("reenterVM")),
+                                               [&wrapper](auto& callContext) -> JSValueRef {
+                                                   auto nestedEntry = wrapper.makeJsEntry();
+                                                   nestedEntry.checkException();
+                                                   return callContext.getContext().newUndefined();
+                                               }),
+            exceptionTracker);
+        jsEntry.checkException();
+        context.setObjectProperty(globalObject.get(), "reenterVM", reenterVM.get(), exceptionTracker);
+        jsEntry.checkException();
+
+        context.evaluate(R""""(
+            (() => {
+                globalThis.microtaskEvents = [];
+                Promise.resolve().then(() => {
+                    globalThis.microtaskEvents.push('first:start');
+                    reenterVM();
+                    globalThis.microtaskEvents.push('first:end');
+                });
+                Promise.resolve().then(() => {
+                    globalThis.microtaskEvents.push('second');
+                });
+            })()
+        )"""",
+                         "nested-promise-jobs.js",
+                         exceptionTracker);
+        jsEntry.checkException();
+    }
+
+    auto result = wrapper.evaluateScript("globalThis.microtaskEvents");
+    auto expected = ValueArrayBuilder();
+    expected.append(Value(STRING_LITERAL("first:start")));
+    expected.append(Value(STRING_LITERAL("first:end")));
+    expected.append(Value(STRING_LITERAL("second")));
+    ASSERT_EQ(Value(expected.build()), result);
+}
+
+namespace {
+
+// Installs a global `reenterVM()` that synchronously re-enters the VM via a nested JSEntry.
+// The drain-ordering tests below use it to prove that a microtask which re-enters the VM does
+// not trigger a nested drain of still-pending promise jobs (regression guard for the willExitVM
+// deferred-decrement rework, which changes drain re-entrancy on every VM exit for QuickJS).
+void installReenterVM(JSContextWrapper& wrapper, JSEntry& jsEntry) {
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+    auto globalObject = context.getGlobalObject(exceptionTracker);
+    jsEntry.checkException();
+
+    auto reenterVM = context.newFunction(
+        makeShared<JSFunctionWithCallable>(ReferenceInfoBuilder().withObject(STRING_LITERAL("reenterVM")),
+                                           [&wrapper](auto& callContext) -> JSValueRef {
+                                               auto nestedEntry = wrapper.makeJsEntry();
+                                               nestedEntry.checkException();
+                                               return callContext.getContext().newUndefined();
+                                           }),
+        exceptionTracker);
+    jsEntry.checkException();
+    context.setObjectProperty(globalObject.get(), "reenterVM", reenterVM.get(), exceptionTracker);
+    jsEntry.checkException();
+}
+
+Value runMicrotaskOrderingScript(JSContextWrapper& wrapper, const std::string& script) {
+    {
+        auto jsEntry = wrapper.makeJsEntry();
+        installReenterVM(wrapper, jsEntry);
+        jsEntry.context.evaluate(script, "nested-promise-jobs.js", jsEntry.exceptionTracker);
+        jsEntry.checkException();
+    }
+    return wrapper.evaluateScript("globalThis.microtaskEvents");
+}
+
+} // namespace
+
+TEST_P(JSContextFixture, drainsPromiseJobsWhenMultipleJobsReenter) {
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    auto result = runMicrotaskOrderingScript(wrapper, R""""(
+        (() => {
+            globalThis.microtaskEvents = [];
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('a:start');
+                reenterVM();
+                globalThis.microtaskEvents.push('a:end');
+            });
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('b:start');
+                reenterVM();
+                globalThis.microtaskEvents.push('b:end');
+            });
+        })()
+    )"""");
+
+    auto expected = ValueArrayBuilder();
+    expected.append(Value(STRING_LITERAL("a:start")));
+    expected.append(Value(STRING_LITERAL("a:end")));
+    expected.append(Value(STRING_LITERAL("b:start")));
+    expected.append(Value(STRING_LITERAL("b:end")));
+    ASSERT_EQ(Value(expected.build()), result);
+}
+
+TEST_P(JSContextFixture, drainsPromiseJobsWithReentryInMiddleJob) {
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    auto result = runMicrotaskOrderingScript(wrapper, R""""(
+        (() => {
+            globalThis.microtaskEvents = [];
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('1');
+            });
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('2:start');
+                reenterVM();
+                globalThis.microtaskEvents.push('2:end');
+            });
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('3');
+            });
+        })()
+    )"""");
+
+    auto expected = ValueArrayBuilder();
+    expected.append(Value(STRING_LITERAL("1")));
+    expected.append(Value(STRING_LITERAL("2:start")));
+    expected.append(Value(STRING_LITERAL("2:end")));
+    expected.append(Value(STRING_LITERAL("3")));
+    ASSERT_EQ(Value(expected.build()), result);
+}
+
+TEST_P(JSContextFixture, drainsPromiseJobsQueuedDuringReentrantJob) {
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    auto result = runMicrotaskOrderingScript(wrapper, R""""(
+        (() => {
+            globalThis.microtaskEvents = [];
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('first:start');
+                Promise.resolve().then(() => {
+                    globalThis.microtaskEvents.push('nested-queued');
+                });
+                reenterVM();
+                globalThis.microtaskEvents.push('first:end');
+            });
+            Promise.resolve().then(() => {
+                globalThis.microtaskEvents.push('second');
+            });
+        })()
+    )"""");
+
+    auto expected = ValueArrayBuilder();
+    expected.append(Value(STRING_LITERAL("first:start")));
+    expected.append(Value(STRING_LITERAL("first:end")));
+    expected.append(Value(STRING_LITERAL("second")));
+    expected.append(Value(STRING_LITERAL("nested-queued")));
+    ASSERT_EQ(Value(expected.build()), result);
 }
 
 TEST_P(JSContextFixture, callsUnhandledPromiseCallbackWhenExceptionIsThrown) {
