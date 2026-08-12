@@ -195,6 +195,10 @@ jobs:
             task: build-compiler
           - name: Build & Export
             task: build-export
+          - name: Module Tests
+            task: test-modules
+          - name: Registry Validation
+            task: validate-registry
 
     steps:
       - name: Checkout code
@@ -251,6 +255,14 @@ jobs:
         env:
           OPEN_SOURCE_DIR: ${{ github.workspace }}
           PROJECT_ROOT: /tmp/valdi_app
+
+      - name: "Run: Module Tests"
+        if: matrix.task == 'test-modules'
+        run: bazel test //modules/... --test_output=errors
+
+      - name: "Run: Registry Validation"
+        if: matrix.task == 'validate-registry'
+        run: ./tools/ci/validate_registry.sh
 
   snapshot-tests:
     name: Snapshot Tests
