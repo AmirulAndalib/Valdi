@@ -1,0 +1,46 @@
+name: Compiler Unit Tests
+
+# The Valdi compiler's own unit suite (compiler/compiler/Compiler/Tests) is a
+# Swift Package Manager testTarget, invisible to Bazel (the SPM .build dir is
+# .bazelignore'd), so it runs in none of the bzl-changes.yml jobs. Those jobs
+# only exercise the compiler end-to-end (test_layout et al. codegen the testdata
+# modules); they never test compiler internals like annotation parsing,
+# interface flattening, or component binding. This workflow closes that gap.
+#
+# macOS-only: `swift test` needs a standalone Swift toolchain, which the macOS
+# runners already ship via Xcode. Path-filtered to compiler/** so the ~10x
+# macOS runner cost is only paid when compiler source actually changes.
+
+on:
+  pull_request:
+    paths:
+      - 'compiler/**'
+      - '.github/workflows/compiler-tests.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'compiler/**'
+      - '.github/workflows/compiler-tests.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiler-unit-tests:
+    name: Compiler Swift Unit Tests
+    runs-on: macos-26
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pin Xcode
+        uses: ./.github/actions/pin-xcode
+
+      # Same script internal cool runs (via run_tests.sh), so the suite is gated
+      # identically on both sides.
+      - name: Run compiler unit tests
+        run: ./tools/ci/compiler_tests.sh

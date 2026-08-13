@@ -30,6 +30,15 @@ if [[ $(uname) != Linux ]] ; then
     # //valdi:test_integration is intentionally NOT wired — separate pre-existing framework
     # failures (RuntimeFixture async-dispatch assert, remote-component mock fixtures).
     bzl test //valdi:test_runtime --test_output=errors
+
+    # The compiler's Swift unit suite runs as its own parallel job on external
+    # GitHub Actions (compiler-tests.yml). Gate it here too — but ONLY internally
+    # (skip on GitHub Actions to avoid duplicating that job) — so internal cool,
+    # which runs this aggregate rather than the workflow, catches compiler
+    # regressions before they mirror to the public repo.
+    if [[ "${GITHUB_ACTIONS:-}" != "true" ]] ; then
+        ./tools/ci/compiler_tests.sh
+    fi
 fi
 
 )
