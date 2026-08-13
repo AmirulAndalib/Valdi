@@ -897,6 +897,47 @@ void AssetsManager::endPauseUpdates() {
     }
 }
 
+void AssetsManager::retryFailedAssets() {
+    auto guard = lock();
+
+    // Capture before mutating _scheduledUpdates: if a pump is already pending, we only enqueue.
+    const bool needScheduleUpdates = _pauseUpdatesCount == 0 && _scheduledUpdates.empty();
+
+    bool anyReset = false;
+    for (const auto& it : _assets) {
+        const auto& managedAsset = it.second;
+        if (managedAsset->getState() != AssetStateFailedRetryable) {
+            continue;
+        }
+
+        managedAsset->setState(AssetStateInitial);
+
+        // Consumers already received the failure and are marked notified, so re-resolving alone would
+        // leave them untouched (getNextConsumerToUpdate skips notified consumers). Reset each failed
+        // consumer to its initial, un-notified state so the re-resolve re-loads and re-notifies it,
+        // exactly as a freshly added consumer would be handled.
+        for (size_t i = 0; i < managedAsset->getConsumersSize(); i++) {
+            const auto& consumer = managedAsset->getConsumer(i);
+            if (consumer->getState() == AssetConsumerStateFailed) {
+                consumer->setState(AssetConsumerStateInitial);
+                consumer->setNotified(false);
+            }
+        }
+
+        _scheduledUpdates.emplace_back(it.first);
+        anyReset = true;
+    }
+
+    if (anyReset && needScheduleUpdates) {
+        if (_mainThreadManager.currentThreadIsMainThread()) {
+            performUpdates(std::move(guard));
+        } else {
+            guard.unlock();
+            schedulePerformUpdates();
+        }
+    }
+}
+
 void AssetsManager::performUpdates(std::unique_lock<std::recursive_mutex>&& lock) {
     SC_ASSERT(_mainThreadManager.currentThreadIsMainThread());
     VALDI_TRACE("Valdi.performAssetsUpdates")

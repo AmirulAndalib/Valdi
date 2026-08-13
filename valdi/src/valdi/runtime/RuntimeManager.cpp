@@ -16,6 +16,8 @@
 #include <yoga/Yoga.h>
 
 #include "valdi/runtime/Resources/AssetLoaderManager.hpp"
+#include "valdi/runtime/Resources/AssetsManager.hpp"
+#include "valdi/runtime/Resources/ResourceManager.hpp"
 
 #include "valdi/runtime/JavaScript/JavaScriptANRDetector.hpp"
 
@@ -337,6 +339,16 @@ void RuntimeManager::applicationDidResume() {
     _anrDetector->onEnterForeground();
     startDebuggerServices();
     cancelDeferredGCTask();
+
+    // Assets that failed a remote load while backgrounded (e.g. a transient CDN/DNS outage) stay
+    // failed until a new consumer subscribes. Re-resolve them now that we are foreground and the
+    // network has likely recovered, so button icons and other static assets repaint without a relaunch.
+    for (const auto& runtime : getAllRuntimes()) {
+        const auto& assetsManager = runtime->getResourceManager().getAssetsManager();
+        if (assetsManager != nullptr) {
+            assetsManager->retryFailedAssets();
+        }
+    }
 }
 
 void RuntimeManager::applicationWillPause() {

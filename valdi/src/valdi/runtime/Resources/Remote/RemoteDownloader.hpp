@@ -20,6 +20,7 @@
 
 #include "valdi_core/cpp/Utils/Function.hpp"
 #include <atomic>
+#include <chrono>
 #include <mutex>
 
 namespace snap::valdi_core {
@@ -80,6 +81,11 @@ public:
 
     void removeItem(const StringBox& url);
 
+    // Base delay for the first retry; each subsequent retry doubles it. Defaults to
+    // kRetryBaseDelayMs; exposed so tests can collapse the backoff to near-zero instead of
+    // sleeping the real schedule.
+    void setRetryBaseDelayMs(int64_t retryBaseDelayMs);
+
 private:
     Ref<IDiskCache> _diskCache;
     mutable Mutex _mutex;
@@ -103,6 +109,18 @@ private:
 
     void remoteResponseReceived(const Shared<RemoteDownloaderTask>& task,
                                 Result<snap::valdi_core::HTTPResponse> responseResult);
+
+    // Transient remote failures (DNS/TCP transport errors, HTTP 5xx, HTTP 429) are retried on the
+    // work queue with exponential backoff up to kMaxRetries before failing the task. Permanent
+    // failures (4xx other than 429, empty body, SHA256 mismatch) fail immediately.
+    void failOrRetry(const Shared<RemoteDownloaderTask>& task, const Result<Value>& transformedResult, bool retryable);
+    std::chrono::steady_clock::duration retryDelayForTask(const Shared<RemoteDownloaderTask>& task) const;
+
+    static constexpr int kMaxRetries = 3;
+    static constexpr int64_t kRetryBaseDelayMs = 500;
+
+    int64_t _retryBaseDelayMs = kRetryBaseDelayMs;
+
     void handleSuccessRemoteDownload(const Shared<RemoteDownloaderTask>& task, const BytesView& downloadedPayload);
     void storeDownloadedItemInDiskCache(const Shared<RemoteDownloaderTask>& task, const BytesView& data);
     BytesView loadDownloadedItemFromDiskCache(const Shared<RemoteDownloaderTask>& task);

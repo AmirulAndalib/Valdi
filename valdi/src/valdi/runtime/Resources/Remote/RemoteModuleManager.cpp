@@ -391,4 +391,8 @@ void RemoteModuleManager::setDecompressionDisabled(bool decompressionDisabled) {
     _resourcesTransformer.setDecompressionDisabled(decompressionDisabled);
 }
 
+void RemoteModuleManager::setRemoteDownloadRetryBaseDelayMs(int64_t retryBaseDelayMs) {
+    _downloader->setRetryBaseDelayMs(retryBaseDelayMs);
+}
+
 } // namespace Valdi

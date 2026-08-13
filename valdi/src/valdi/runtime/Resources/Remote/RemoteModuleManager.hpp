@@ -95,6 +95,9 @@ public:
 
     void setDecompressionDisabled(bool decompressionDisabled);
 
+    // Forwards to the underlying RemoteDownloader; used by tests to shrink the retry backoff.
+    void setRemoteDownloadRetryBaseDelayMs(int64_t retryBaseDelayMs);
+
 private:
     Ref<IDiskCache> _diskCache;
     Ref<DispatchQueue> _workerQueue;

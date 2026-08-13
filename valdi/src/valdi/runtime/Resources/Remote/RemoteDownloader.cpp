@@ -31,10 +31,34 @@
 
 #include "utils/debugging/Assert.hpp"
 
+#include <chrono>
+#include <functional>
+#include <string_view>
+
 namespace Valdi {
 
 STRING_CONST(urlFilePath, "url")
 STRING_CONST(dataFilePath, "data")
+
+namespace {
+// Only HTTP statuses that indicate a transient, likely-to-succeed-on-retry condition for an
+// idempotent GET. Deliberately narrow: most 4xx are client errors and several 5xx (501 Not
+// Implemented, 505 HTTP Version Not Supported, ...) are permanent, so a status range would
+// waste the retry budget on failures that will never recover.
+bool isRetryableStatusCode(int32_t statusCode) {
+    switch (statusCode) {
+        case 408: // Request Timeout
+        case 429: // Too Many Requests
+        case 500: // Internal Server Error
+        case 502: // Bad Gateway
+        case 503: // Service Unavailable
+        case 504: // Gateway Timeout
+            return true;
+        default:
+            return false;
+    }
+}
+} // namespace
 
 class CachedBundleItem {
 public:
@@ -264,15 +288,17 @@ void RemoteDownloader::handleSuccessRemoteDownload(const Shared<RemoteDownloader
 void RemoteDownloader::remoteResponseReceived(const Shared<RemoteDownloaderTask>& task,
                                               Result<snap::valdi_core::HTTPResponse> responseResult) {
     if (!responseResult) {
-        loadCompleted(task, responseResult.error().rethrow("Remote load failed"), false);
+        // Transport-level failure (DNS resolution / TCP connect). Transient — retry.
+        failOrRetry(task, responseResult.error().rethrow("Remote load failed"), /*retryable=*/true);
         return;
     }
 
     auto response = responseResult.moveValue();
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-        loadCompleted(
-            task, Error(STRING_FORMAT("Remote load failed: Got HTTP status code {}", response.statusCode)), false);
+        const bool retryable = isRetryableStatusCode(response.statusCode);
+        failOrRetry(
+            task, Error(STRING_FORMAT("Remote load failed: Got HTTP status code {}", response.statusCode)), retryable);
         return;
     }
 
@@ -284,7 +310,7 @@ void RemoteDownloader::remoteResponseReceived(const Shared<RemoteDownloaderTask>
     }
 
     if (bodyBytes.empty()) {
-        loadCompleted(task, Error(STRING_LITERAL("Remote load failed: Got empty HTTP body")), false);
+        failOrRetry(task, Error(STRING_LITERAL("Remote load failed: Got empty HTTP body")), /*retryable=*/false);
         return;
     }
 
@@ -293,12 +319,12 @@ void RemoteDownloader::remoteResponseReceived(const Shared<RemoteDownloaderTask>
         auto calculatedHash = BytesUtils::sha256(bodyBytes)->toBytesView();
         bool hashMatches = expectedHash == calculatedHash;
         if (!hashMatches) {
-            loadCompleted(
+            failOrRetry(
                 task,
                 Error(STRING_FORMAT("Remote load failed: SHA256 integrity check failed. Expected '{}', got '{}'",
                                     expectedHash.asStringView(),
                                     calculatedHash.asStringView())),
-                false);
+                /*retryable=*/false);
             return;
         }
     }
@@ -342,6 +368,54 @@ void RemoteDownloader::loadRemote(const Shared<RemoteDownloaderTask>& task) {
         }));
 }
 
+std::chrono::steady_clock::duration RemoteDownloader::retryDelayForTask(
+    const Shared<RemoteDownloaderTask>& task) const {
+    const auto retryCount = task->getRetryCount();
+    const int64_t baseMs = _retryBaseDelayMs * (int64_t(1) << retryCount);
+
+    // De-correlate concurrent bundle downloads (each has a distinct URL) so a shared CDN blip does
+    // not produce a synchronized retry burst. Jitter is derived from the URL rather than a RNG.
+    const int64_t jitterRange = baseMs / 4;
+    int64_t jitterMs = 0;
+    if (jitterRange > 0) {
+        const auto h = std::hash<std::string_view>{}(task->getUrl().toStringView());
+        jitterMs = static_cast<int64_t>(h % static_cast<size_t>(jitterRange + 1));
+    }
+
+    return std::chrono::milliseconds(baseMs + jitterMs);
+}
+
+void RemoteDownloader::failOrRetry(const Shared<RemoteDownloaderTask>& task,
+                                   const Result<Value>& transformedResult,
+                                   bool retryable) {
+    if (retryable && task->getRetryCount() < kMaxRetries) {
+        const auto delay = retryDelayForTask(task);
+
+        VALDI_INFO(_logger,
+                   "Retrying load of {} at {} (retry {}/{}) after transient error: {}",
+                   task->getItemDescription(),
+                   task->getUrl(),
+                   task->getRetryCount() + 1,
+                   kMaxRetries,
+                   transformedResult.error());
+
+        task->incrementRetryCount();
+
+        auto weakThis = weak_from_this();
+        _workQueue->asyncAfter(
+            [weakThis, task]() {
+                auto strongThis = weakThis.lock();
+                if (strongThis != nullptr) {
+                    strongThis->loadRemote(task);
+                }
+            },
+            delay);
+        return;
+    }
+
+    loadCompleted(task, transformedResult, false);
+}
+
 void RemoteDownloader::doLoad(const Shared<RemoteDownloaderTask>& task) {
     if (task->getUrl().hasPrefix("file://")) {
         loadFileUrl(task);
@@ -350,6 +424,10 @@ void RemoteDownloader::doLoad(const Shared<RemoteDownloaderTask>& task) {
     } else if (!loadFromDiskCache(task)) {
         loadRemote(task);
     }
+}
+
+void RemoteDownloader::setRetryBaseDelayMs(int64_t retryBaseDelayMs) {
+    _retryBaseDelayMs = retryBaseDelayMs;
 }
 
 void RemoteDownloader::removeItem(const StringBox& url) {

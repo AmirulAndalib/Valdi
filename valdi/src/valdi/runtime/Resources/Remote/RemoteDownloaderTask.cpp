@@ -61,4 +61,12 @@ const IRemoteDownloaderItemHandler& RemoteDownloaderTask::getItemHandler() const
     return _itemHandler;
 }
 
+int RemoteDownloaderTask::getRetryCount() const {
+    return _retryCount;
+}
+
+void RemoteDownloaderTask::incrementRetryCount() {
+    _retryCount++;
+}
+
 } // namespace Valdi

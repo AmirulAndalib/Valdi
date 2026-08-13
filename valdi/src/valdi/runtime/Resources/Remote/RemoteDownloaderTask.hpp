@@ -42,6 +42,9 @@ public:
     snap::utils::time::Duration<std::chrono::steady_clock> getElapsedTime() const;
     const IRemoteDownloaderItemHandler& getItemHandler() const;
 
+    int getRetryCount() const;
+    void incrementRetryCount();
+
 private:
     StringBox _localFilename;
     StringBox _url;
@@ -49,6 +52,7 @@ private:
     const IRemoteDownloaderItemHandler& _itemHandler;
     std::vector<RemoteDownloaderRequest> _requests;
     snap::utils::time::StopWatch _sw;
+    int _retryCount = 0;
 };
 
 } // namespace Valdi

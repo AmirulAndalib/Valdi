@@ -151,6 +151,8 @@ struct AssetsManagerWrapper : public AssetsManagerListener {
         assetsManager->setListener(this);
 
         remoteModuleManager->setDecompressionDisabled(true);
+        // Collapse the remote-download retry backoff so failure-path tests don't sleep the real schedule.
+        remoteModuleManager->setRemoteDownloadRetryBaseDelayMs(0);
 
         requestManager = Valdi::makeShared<RequestManagerMock>(logger);
         requestManagerHolder.set(requestManager);
@@ -1063,6 +1065,92 @@ TEST(AssetsManager, retriesResolveOnNetworkFailure) {
 
     ASSERT_EQ(assetToLoad, loadedAsset2);
 
+    wrapper.tearDown();
+}
+
+TEST(AssetsManager, retriesTransientRemoteDownloadFailureBeforeGivingUp) {
+    AssetsManagerWrapper wrapper;
+
+    auto assetKey = wrapper.createAndRegisterRemoteAsset();
+
+    // Transport failure (mirrors a DNS/TCP outage against the CDN) — retryable.
+    wrapper.requestManager->setDisabled(true);
+
+    auto observer = makeShared<SyncAssetLoadObserver>();
+    auto asset = wrapper.assetsManager->getAsset(assetKey);
+
+    auto result = observer->load(wrapper.mainQueue, asset);
+    ASSERT_FALSE(result) << result.description();
+
+    // 1 initial attempt + kMaxRetries (3) retries for the single resources package download.
+    ASSERT_EQ(static_cast<size_t>(4), wrapper.requestManager->getAllPerformedTasks().size());
+
+    asset->removeLoadObserver(strongRef(observer.get()));
+    wrapper.tearDown();
+}
+
+TEST(AssetsManager, retryFailedAssetsRecoversExistingConsumerWithoutNewConsumer) {
+    AssetsManagerWrapper wrapper;
+
+    auto assetToLoad = makeShared<StandaloneLoadedAsset>(BytesView(), 0, 0);
+    auto assetKey = wrapper.createAndRegisterRemoteAsset();
+    wrapper.assetLoader->setAssetResponse(STRING_LITERAL("file:///resources-module.dir/remote"),
+                                          Ref<Valdi::LoadedAsset>(assetToLoad));
+
+    // Fail the initial remote fetch so the asset ends up FailedRetryable and its consumer is
+    // notified of the failure.
+    wrapper.requestManager->setDisabled(true);
+
+    auto observer = makeShared<SyncAssetLoadObserver>();
+    observer->setAllowMultipleResults(true);
+
+    auto asset = wrapper.assetsManager->getAsset(assetKey);
+
+    auto result = observer->load(wrapper.mainQueue, asset);
+    ASSERT_FALSE(result) << result.description();
+    ASSERT_EQ(static_cast<size_t>(1), observer->getResults().size());
+
+    // Network recovers and the app returns to foreground: retryFailedAssets() must re-resolve and
+    // re-notify the EXISTING consumer, with no new consumer added (the button icon repaints on its own).
+    wrapper.requestManager->setDisabled(false);
+    wrapper.assetsManager->retryFailedAssets();
+
+    wrapper.mainQueue->runUntilTrue([&]() { return observer->getResults().size() >= 2; });
+
+    auto results = observer->getResults();
+    ASSERT_EQ(static_cast<size_t>(2), results.size());
+    ASSERT_FALSE(results[0]);
+    ASSERT_TRUE(results[1]) << results[1].description();
+
+    auto loadedAsset = results[1].value().getTypedRef<LoadedAsset>();
+    ASSERT_TRUE(loadedAsset != nullptr) << results[1].description();
+    ASSERT_EQ(assetToLoad, loadedAsset);
+
+    asset->removeLoadObserver(strongRef(observer.get()));
+    wrapper.tearDown();
+}
+
+TEST(AssetsManager, retryFailedAssetsIsNoOpWhenNothingFailed) {
+    AssetsManagerWrapper wrapper;
+
+    auto assetToLoad = makeShared<StandaloneLoadedAsset>(BytesView(), 0, 0);
+    auto assetKey = wrapper.createAndRegisterLocalAsset(assetToLoad);
+
+    auto observer = makeShared<SyncAssetLoadObserver>();
+    observer->setAllowMultipleResults(true);
+
+    auto asset = wrapper.assetsManager->getAsset(assetKey);
+    auto result = observer->load(wrapper.mainQueue, asset);
+    ASSERT_TRUE(result) << result.description();
+    ASSERT_EQ(static_cast<size_t>(1), observer->getResults().size());
+
+    // A healthy asset must not be re-notified by a foreground retry sweep.
+    wrapper.assetsManager->retryFailedAssets();
+    wrapper.flushQueues();
+
+    ASSERT_EQ(static_cast<size_t>(1), observer->getResults().size());
+
+    asset->removeLoadObserver(strongRef(observer.get()));
     wrapper.tearDown();
 }
 

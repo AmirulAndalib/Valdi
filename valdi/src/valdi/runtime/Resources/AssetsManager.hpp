@@ -98,6 +98,12 @@ public:
 
     void flushUpdates();
 
+    // Reset every asset currently in AssetStateFailedRetryable back to AssetStateInitial and
+    // re-resolve it. A statically-mounted asset (e.g. a button icon) that failed a remote load
+    // otherwise stays failed for the whole session because only a new consumer clears the state;
+    // this gives an external trigger (app returning to foreground) a way to recover such assets.
+    void retryFailedAssets();
+
 private:
     Shared<IResourceLoader> _resourceLoader;
     Ref<RemoteModuleManager> _remoteModuleManager;
