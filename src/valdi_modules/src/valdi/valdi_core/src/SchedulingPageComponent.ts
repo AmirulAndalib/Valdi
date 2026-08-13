@@ -81,11 +81,22 @@ export abstract class SchedulingPageComponent<
       this.boundOnCreateCritical();
     });
 
-    this.scheduleWithStrategy(this.boundOnCreateNonCritical);
+    // Renderer completion callbacks aren't cancelled on destroy, so a deferred
+    // lifecycle callback can run after onDestroy — cleanup is already done, so
+    // registerDisposable() would throw and leak. Guard the lifecycle callback
+    // here rather than in scheduleWithStrategy, which is a public API where
+    // skipping on destroy isn't always the right call.
+    const guardWhileAlive = (callback: () => void) => () => {
+      if (!this.isDestroyed()) {
+        callback();
+      }
+    };
+
+    this.scheduleWithStrategy(guardWhileAlive(this.boundOnCreateNonCritical));
   }
 
   /**
-   * Schedule a callback with the current scheduling strategy
+   * Schedule a callback with the current scheduling strategy.
    * @param callback
    */
   scheduleWithStrategy(callback: () => void): void {
