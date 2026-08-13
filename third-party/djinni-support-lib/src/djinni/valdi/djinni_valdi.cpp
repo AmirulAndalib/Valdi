@@ -18,6 +18,8 @@
 
 #include "valdi_core/cpp/Utils/ValueTypedArray.hpp"
 
+#include <atomic>
+
 namespace djinni::valdi {
 
 using namespace Valdi;
@@ -26,6 +28,18 @@ std::unordered_map<ValdiProxyId, std::weak_ptr<ValdiProxyBase>> jsProxyCache;
 std::unordered_map<void*, CppProxyCacheEntry> cppProxyCache;
 std::mutex jsProxyCacheMutex;
 std::mutex cppProxyCacheMutex;
+
+namespace {
+std::atomic<bool> gGlobalOneWayCalls{false};
+} // namespace
+
+void setGlobalOneWayCalls(bool enabled) noexcept {
+    gGlobalOneWayCalls.store(enabled, std::memory_order_relaxed);
+}
+
+bool globalOneWayCallsEnabled() noexcept {
+    return gGlobalOneWayCalls.load(std::memory_order_relaxed);
+}
 
 void checkForNull(void* ptr, const char* context) {
     if (!ptr) {

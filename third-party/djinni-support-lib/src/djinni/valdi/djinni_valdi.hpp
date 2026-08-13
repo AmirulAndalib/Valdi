@@ -35,6 +35,7 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -469,6 +470,10 @@ extern std::unordered_map<void*, CppProxyCacheEntry> cppProxyCache;
 extern std::mutex jsProxyCacheMutex;
 extern std::mutex cppProxyCacheMutex;
 
+// Set once from the Composer layer after COF resolves; read on the hot path (COMPOSER-6103).
+void setGlobalOneWayCalls(bool enabled) noexcept;
+bool globalOneWayCallsEnabled() noexcept;
+
 class ValdiProxyBase {
 protected:
     Valdi::Ref<Valdi::ValueTypedProxyObject> _js;
@@ -476,7 +481,9 @@ protected:
 
 public:
     ValdiProxyBase(Valdi::Ref<Valdi::ValueTypedProxyObject> js)
-        : _js(js), _methods(_js->getTypedObject()->getPropertiesSize()) {}
+        : _js(js), _methods(_js->getTypedObject()->getPropertiesSize()) {
+        buildOneWayMethodMap();
+    }
     virtual ~ValdiProxyBase() {
         std::lock_guard lk(jsProxyCacheMutex);
         jsProxyCache.erase(_js->getId());
@@ -491,6 +498,11 @@ public:
         if (_methods[i] == nullptr) {
             _methods[i] = _js->getTypedObject()->getProperty(i).getFunctionRef();
         }
+        // Void-only so a return value is never dropped (COMPOSER-6103).
+        if (globalOneWayCallsEnabled() && i < _isVoidMethod.size() && _isVoidMethod[i]) {
+            std::ignore = _methods[i]->call(Valdi::ValueFunctionFlagsNone, parameters);
+            return Valdi::Value::undefined();
+        }
         constexpr auto flags = static_cast<Valdi::ValueFunctionFlags>(Valdi::ValueFunctionFlagsCallSync |
                                                                       Valdi::ValueFunctionFlagsPropagatesError);
         auto res = _methods[i]->call(flags, parameters);
@@ -499,6 +511,23 @@ public:
         } else {
             // Throw JS Error as C++ exception
             throw JsException(res.moveError());
+        }
+    }
+
+private:
+    // Empty when the proxy's schema is unavailable, which keeps every method on the synchronous path (COMPOSER-6103).
+    std::vector<bool> _isVoidMethod;
+
+    void buildOneWayMethodMap() {
+        const auto& classSchema = _js->getTypedObject()->getSchema();
+        if (classSchema == nullptr) {
+            return;
+        }
+        const size_t count = classSchema->getPropertiesSize();
+        _isVoidMethod.resize(count, false);
+        for (size_t i = 0; i < count; ++i) {
+            const auto* function = classSchema->getProperty(i).schema.getFunction();
+            _isVoidMethod[i] = function != nullptr && function->getReturnValue().isVoid();
         }
     }
 };
