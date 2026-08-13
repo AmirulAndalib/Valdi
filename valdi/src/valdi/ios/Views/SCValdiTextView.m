@@ -432,6 +432,7 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
                                  fontManager:_fontManager
                                         text:_textValue
                                  placeholder:_placeholder.text
+                      backgroundEffectPadding:_effectsLayoutManager.backgroundPadding
                               traitCollection:self.valdiContext.traitCollection];
 }
 
@@ -1454,20 +1455,29 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
                       fontManager:(id<SCValdiFontManagerProtocol>)fontManager
                              text:(id)text
                       placeholder:(NSString *)placeholder
+          backgroundEffectPadding:(CGFloat)backgroundEffectPadding
                   traitCollection:(UITraitCollection *)traitCollection
 {
-    CGSize textSize = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+    const CGFloat horizontalPadding = MAX(backgroundEffectPadding, 0.0) * 2.0;
+    const CGFloat verticalPadding = MAX(backgroundEffectPadding, 0.0);
+    CGSize availableSize = maxSize;
+    if (backgroundEffectPadding > 0.0) {
+        availableSize.width = MAX(availableSize.width - horizontalPadding, 0.0);
+        availableSize.height = MAX(availableSize.height - verticalPadding, 0.0);
+    }
+
+    CGSize textSize = [SCValdiTextLayout measureSizeWithMaxSize:availableSize
                                                  fontAttributes:fontAttributes
                                                     fontManager:fontManager
                                                            text:text
                                                 traitCollection:traitCollection];
-    CGSize placeholderSize = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+    CGSize placeholderSize = [SCValdiTextLayout measureSizeWithMaxSize:availableSize
                                                          fontAttributes:fontAttributes
                                                             fontManager:fontManager
                                                                    text:placeholder
                                                         traitCollection:traitCollection];
-    return CGSizeMake(MAX(textSize.width, placeholderSize.width),
-                      MAX(textSize.height, placeholderSize.height));
+    return CGSizeMake(MAX(textSize.width, placeholderSize.width) + horizontalPadding,
+                      MAX(textSize.height, placeholderSize.height) + verticalPadding);
 }
 
 + (CGSize)valdi_onMeasureWithAttributes:(id<SCValdiViewLayoutAttributes>)attributes
@@ -1481,12 +1491,14 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
     }
     id text = [attributes valueForAttributeName:@"value"];
     NSString *placeholder = ObjectAs([attributes valueForAttributeName:@"placeholder"], NSString);
+    CGFloat backgroundEffectPadding = [attributes doubleValueForAttributeName:@"backgroundEffectPadding"];
 
     return [SCValdiTextView measureSizeWithMaxSize:maxSize
                                     fontAttributes:fontAttributes
                                        fontManager:fontManager
                                               text:text
                                        placeholder:placeholder
+                           backgroundEffectPadding:backgroundEffectPadding
                                    traitCollection:traitCollection];
 }
 
@@ -1831,7 +1843,7 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
         }];
 
     [attributesBinder bindAttribute:@"backgroundEffectPadding"
-        invalidateLayoutOnChange:NO
+        invalidateLayoutOnChange:YES
         withDoubleBlock:^BOOL(SCValdiTextView *textView, double attributeValue, id<SCValdiAnimatorProtocol> animator) {
             return [textView valdi_setBackgroundEffectPadding:attributeValue];
         }
@@ -1953,6 +1965,12 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
     }
 
     [self notifyTextValueDidChange];
+
+    if ([self _needAttributedString]) {
+        // A self-sized text view otherwise keeps its stale width until the JS round-trip lands, 
+        // re-wrapping the just-typed text for a few frames
+        [self invalidateLayout];
+    }
 }
 
 - (void)textViewDidBeginEditing:(UITextView *)textView
