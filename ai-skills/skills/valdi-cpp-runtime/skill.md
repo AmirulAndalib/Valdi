@@ -45,6 +45,24 @@ Valdi's runtime and layout engine are implemented in C++ for cross-platform perf
 - **Don't modify generated code** - change the .djinni file instead
 - Generated files typically in `generated-src/` directories
 
+### Native Bindings Exposed to JS
+
+The runtime exposes selected native (C++) classes and functions to the JS engine so
+TypeScript can call into performance-critical native code directly.
+
+- **`Base64` namespace** (`coreutils/src/Base64.ts`) is a good example of a
+  native-backed binding: the TS surface (`fromByteArray(uint8, { urlSafe })`,
+  `toByteArray(b64)`, `byteLength(b64)`) delegates to native encode/decode
+  (`Base64Native`) rather than doing the work in JS. Use this shape when a hot codec
+  or transform belongs in native code but needs a clean JS entry point.
+- **`WeakRef`** is supported by the runtime (recently added). JS-side weak references
+  hold their referent without preventing garbage collection — useful for caches and
+  back-references that must not keep objects alive.
+
+**V8 caveat:** some native class bindings (e.g. `Base64` and `Unicode`) are wired for
+QuickJS and may **throw on the V8 runtime**. Don't assume a native binding is present
+on every JS engine — guard or feature-check when the same code can run under V8.
+
 ### Performance
 
 - This is performance-critical code

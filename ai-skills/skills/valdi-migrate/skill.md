@@ -119,6 +119,7 @@ const cardStyle = new Style<View>({ backgroundColor: '#fff', borderRadius: 8 });
 | `Row` | `Row` | `flexDirection: 'row'` | `<view flexDirection="row">` |
 | `Stack` | `Box` with `align` | `position: absolute` | `<view>` + children with `position="absolute"` |
 | `Modifier.padding(16.dp)` | `Modifier.padding(16.dp)` | `style={{padding:16}}` | `padding={16}` on any element |
+| `Wrap(spacing:)` / spacers | `Arrangement.spacedBy(8.dp)` | CSS `gap` | `gap` / `rowGap` / `columnGap` (newly available via Yoga; margins still common in practice) |
 | `Navigator.push` | `navController.navigate("route")` | `navigate()` / `router.push` | `navigationController.push(Page, vm, ctx)` |
 | `Navigator.pop` | `navController.popBackStack()` | `goBack()` / `router.back` | `navigationController.pop()` |
 | `showModalBottomSheet` | `ModalBottomSheet` / `Dialog` | `<Modal>` | `navigationController.present(Page, vm, ctx)` |
@@ -126,7 +127,7 @@ const cardStyle = new Style<View>({ backgroundColor: '#fff', borderRadius: 8 });
 | `SharedPreferences` | `SharedPreferences` / `DataStore` | `AsyncStorage` / `localStorage` | `PersistentStore` (valdi persistence) |
 | `http.get()` / `dio` | `viewModelScope.launch { api.get() }` | `fetch()` / `axios` | `HTTPClient.get()` (valdi_http) |
 | `Lottie` | `LottieAnimation` | `<Lottie>` | `<animatedimage>` |
-| `BackdropFilter` | `BlurMaskFilter` | CSS `backdrop-filter` | `<blur>` (iOS only) |
+| `BackdropFilter` | `BlurMaskFilter` | CSS `backdrop-filter` | `<blur>` (iOS); `<glass>` for Liquid Glass (iOS 26+; falls back to a blur on older iOS, plain view on Android). Tint with `glassTintColor`, not `backgroundColor` |
 
 ## Key import paths
 

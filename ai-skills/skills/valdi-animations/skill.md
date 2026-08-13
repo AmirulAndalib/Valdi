@@ -125,6 +125,55 @@ this.animate({ stiffness: 500, damping: 40 }, () => {
 });
 ```
 
+## Animating text and attributed text
+
+The imperative `animate()` / `setStateAnimated()` API above does not drive per-character or per-word text reveals. For those, use the **text-animation surface**: an `AttributedText` chunk carries an `animationTransform`, and a `<textanimationgroup>` container coordinates one shared timeline across all of its descendant `<label>` / `<textview>` elements.
+
+`animationTransform` fields (`valdi_tsx/src/AttributedText.d.ts`, `AttributedTextAnimationTransform`):
+
+| Field | Meaning |
+|-------|---------|
+| `translationY` | Initial vertical offset (logical px); animates back to the normal position |
+| `scale` | Initial scale; animates back to 1 |
+| `opacity` | Initial opacity; animates back to 1 |
+| `duration` | Seconds for each part to reach its normal appearance |
+| `timeOffsetBetweenParts` | Delay (seconds) staggered between consecutive parts (0 = all at once) |
+| `partPattern` | Native regex; each non-overlapping match becomes a separately animated part (unmatched text stays static). Omit to animate the whole chunk as one part |
+| `key` | Stable animation identity; preserves progress across view-pool recycling. Change it to restart the animation |
+
+```tsx
+import { AttributedTextBuilder } from 'valdi_core/src/utils/AttributedTextBuilder';
+
+// ✅ Build attributed text with a per-chunk animation transform
+private animatedText(text: string) {
+  return new AttributedTextBuilder()
+    .append(text, {
+      animationTransform: {
+        duration: 0.45,
+        key: `run-${this.state.runId}`,   // change key to replay
+        opacity: 0,
+        translationY: 8,
+        timeOffsetBetweenParts: 0.08,      // stagger each part
+      },
+    })
+    .build();
+}
+
+// ✅ <textanimationgroup> runs ONE shared timeline across every descendant
+//    label/textview, even nested ones
+onRender(): void {
+  <textanimationgroup>
+    <label value={this.animatedText('First line joins the timeline.')} />
+    <view>
+      <label value={this.animatedText('So does this nested one.')} />
+    </view>
+    <textview value={this.animatedText('And the textview animates last.')} />
+  </textanimationgroup>;
+}
+```
+
+`<textanimationgroup>` is a container (`CommonView` + `ContainerTemplateElement`) with no animation-specific attributes of its own — its only job is to group descendants onto a single coordinated timeline. Without it, each animated chunk runs on its own timeline.
+
 ## Common patterns
 
 ### Show/hide with fade

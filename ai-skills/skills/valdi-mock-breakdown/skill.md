@@ -96,7 +96,7 @@ Common widgets in `widgets/`:
 | Tappable row | `onTap` on `<view>` |
 | Scrollable list | `<scroll>` wrapping children |
 | Fixed header + scrolling body | Outer `<view>` with header + `<scroll flexGrow={1}>` body |
-| Spacer between items | margin on children (no `gap` property) |
+| Spacer between items | margin on children, or `gap` on the parent (newly available via Yoga) |
 
 ---
 
@@ -186,12 +186,12 @@ class MyComponent extends StatefulComponent<VM, State> {
 - Prefer `padding` and `margin` shorthand: `padding: '16 20'` (vertical horizontal)
 - Colors: use hex strings `'#RRGGBB'` or `'#RRGGBBAA'`
 - Layout: Yoga flexbox — `flexDirection`, `justifyContent`, `alignItems`, `flexGrow`
-- No `gap` property — use margin on children instead
+- `gap`/`rowGap`/`columnGap` now exist (Yoga layout props on View/Layout); margin on children still works and remains the common convention in practice
 - No `fontSize` — use `font` string on labels
 - Overflow: only `'visible'` or `'scroll'` (NOT `'hidden'`)
 - **`opacity` must be a number**, not a string: `opacity: 0.3` (NOT `'0.3'`)
 - **`flexGrow` must be a number**, not a string: `flexGrow: 1` (NOT `'1'`)
-- **Only two font weights**: `system` (regular) and `system-bold` (bold). `system-semibold`, `system-medium`, etc. silently fall back to regular at runtime.
+- **Font weights**: `system`, `system-medium`, `system-semibold`, `system-bold`, plus italic variants (`system-italic`, `system-medium-italic`, …). Prefer the `SystemFont` helpers (`systemSemiboldFont(16)`). Only `system-light` does not exist.
 - **ScrollView has no `flexDirection`** — `<scroll>` always scrolls vertically, do not set flexDirection on it
 - `boxShadow` format: `'xOffset yOffset blur color'` e.g. `'0 2 8 rgba(0,0,0,0.12)'`
 
@@ -204,7 +204,7 @@ class MyComponent extends StatefulComponent<VM, State> {
 - No `flex: 1` — use `flexGrow: 1` (number, not string).
 - `flexGrow` must be a number, not a string.
 - `Shape` is not exported — use `ShapeView` from NativeTemplateElements.
-- `font: 'system-semibold'` doesn't work — use `system-bold` or `system`.
+- `font` weights `system` / `system-medium` / `system-semibold` / `system-bold` (+ italic variants) all work; only `system-light` is absent.
 - `overflow: 'hidden'` doesn't exist — only `'visible'` or `'scroll'`.
 - `flexDirection` on `<scroll>` doesn't exist — ScrollView always scrolls vertically.
 

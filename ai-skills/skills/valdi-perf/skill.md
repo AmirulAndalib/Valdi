@@ -167,6 +167,41 @@ onRender(): void {
 }
 ```
 
+## Renderer memoization with `remember`
+
+`remember(factory, ...keys)` (from `valdi_core/src/Remember.ts`)
+caches the result of `factory()` across renders and only recomputes it when one of
+the trailing keys changes; otherwise it returns the cached value. Reach for it when
+a value is expensive to derive inside `onRender()` but depends on just a few inputs.
+
+```typescript
+import { remember } from 'valdi_core/src/Remember';
+
+// ❌ Rebuilds the index every render
+onRender(): void {
+  const index = buildIndex(this.viewModel.items);
+  <SearchResults index={index} />;
+}
+
+// ✅ Rebuilt only when `items` changes; cached otherwise
+onRender(): void {
+  const index = remember(() => buildIndex(this.viewModel.items), this.viewModel.items);
+  <SearchResults index={index} />;
+}
+```
+
+How it relates to the other primitives here:
+- **vs. pre-computing derived viewModels in `onViewModelUpdate`** — same goal (recompute
+  only on real input changes), but `remember` keeps the derivation inline in `onRender()`
+  keyed by its dependencies, instead of hoisting it into a lifecycle method plus a guarded
+  field. Use `remember` for render-local values; keep the `onViewModelUpdate` pattern when
+  the result is a child viewModel whose *reference identity* must stay stable to avoid
+  re-rendering the child.
+- **vs. `createReusableCallback`** — `createReusableCallback` stabilises a *function's*
+  identity across renders; `remember` caches a computed *value*.
+- **vs. `cacheObservable`** — `cacheObservable` shares one subscription across a producer
+  chain; `remember` is synchronous, render-scoped memoization with no Observable involved.
+
 ## Style Objects at Module Level
 
 `new Style<T>({...})` interns style objects — the same property values always produce
@@ -268,6 +303,30 @@ A service is declared by a `WorkerServiceEntryPoint` subclass annotated with
 Always call `dispose()` on the returned client; the service otherwise stays in
 memory.
 
+**Structured messaging with `MessageChannel` (recent).** For richer
+host↔worker communication than one-shot request/response, the runtime installs the
+web-standard, native-backed `MessageChannel` / `MessagePort` globals. `new
+MessageChannel()` gives a linked `port1` / `port2` pair; hand one port to the worker
+and keep the other. Each port has `postMessage<T>(data, transfer?)` and an `onmessage`
+handler; messages queue in FIFO order until the receiving port is started (assigning
+`onmessage` or calling `start()`). Ports are themselves transferable — pass them in
+the `transfer` array to move a channel across an existing port. Reach for this when a
+feature needs multiple independent, long-lived message streams to a worker rather than
+the single promise-based call surface above.
+
+```typescript
+const channel = new MessageChannel();
+channel.port1.onmessage = (event) => this.handle(event.data);
+worker.postMessage({ cmd: 'attach' }, [channel.port2]);  // transfer port2 to the worker
+```
+
+**Idle workers are now torn down aggressively.** The runtime reclaims
+resources by terminating idle Worker Services, so a worker may be gone between uses and
+re-spun on the next call. Factor the (re)spin-up cost into the offloading tradeoff:
+infrequent, bursty work now pays a cold-start penalty each time, weakening the case for
+a worker versus keeping cheap work on the host thread. Steady, frequent workloads keep
+the worker warm and still win.
+
 ## Deferring construction until it's needed
 
 Three Valdi-supported ways to push work past startup, from a single field to
@@ -347,6 +406,27 @@ users never hit it.
 **Skip when:** the module is needed on the initial render path (dynamic import
 adds an async tick) or the module is tiny (savings are negligible).
 
+### Whole modules, synchronously: `lazyImport` (recently added)
+
+When you want to defer a module's parse/init cost but can't afford the async tick
+of `import()`, use `lazyImport` from `valdi_core/src/LazyImport`.
+It returns a `LazyImport<TModule>` whose `.get` synchronously requires the module on
+first access and caches it thereafter — no `await`, no render-path tick.
+
+```typescript
+import { lazyImport } from 'valdi_core/src/LazyImport';
+
+// Pass the current module's `require` so the relative path resolves from here.
+const heavy = lazyImport<typeof import('./HeavyUtil')>(require, './HeavyUtil');
+
+// First `.get` parses + initialises the module; later reads are cached.
+heavy.get.doWork();
+```
+
+**Prefer over `import()`** when the consumer is synchronous (can't await) but the
+module is still only needed conditionally. **Prefer `import()`** when you genuinely
+want the module off the startup bundle / loaded asynchronously.
+
 ## Excessive `setState` calls
 
 `setState` runs synchronously: each call merges state and immediately
@@ -418,3 +498,36 @@ class FriendSearcher {
 Smell: a `switchMap` whose inner observable does HTTP or expensive computation
 with no caching upstream. Each switch tears down the previous subscription
 and starts a fresh producer chain.
+
+## Native sticky headers (experimental)
+
+Sticky headers implemented in JS lag the scroll: the scroll offset round-trips to
+the JS thread, the header position is recomputed, and the update lands a frame or
+more behind the gesture. Native sticky headers reposition the header in the native
+scroll pass — the same VSYNC as the scroll gesture — eliminating that round-trip.
+
+Enable it on the `<scroll>` element and tag the descendant that should pin:
+
+```typescript
+// ✅ Repositioning happens natively, in sync with the gesture
+<scroll nativeStickyEnabled={true}>
+  <layout>
+    <view stickyPosition="top">...header...</view>
+    ...section content...
+  </layout>
+</scroll>
+```
+
+- `nativeStickyEnabled` (default `false`) — turns on native repositioning for the
+  scroll view.
+- `stickyPosition` (`'none' | 'top'`, default `'none'`) — tags a descendant as a
+  sticky header within the nearest `nativeStickyEnabled` scroll view.
+- `nativeStickyCover` (default `0`) — pixels of visual overhang above sticky headers,
+  extending the effective header height so a bar rendered above the header does not
+  overlap the next section's header.
+- `nativeStickyOffset` (default `0`) — pixels below the viewport top where headers
+  pin (matches CSS `position: sticky; top: N`); use when a floating page header has a
+  visual footprint extending below its Yoga bounds.
+
+All four attributes are `@experimental` (may change). Prefer this over a JS-side
+sticky implementation on scroll-heavy screens where header lag is visible.

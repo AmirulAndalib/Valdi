@@ -188,11 +188,19 @@ onRender() {
 
 ### Font weights
 
-Only two system font weights are available:
-- `'system 16'` — regular weight
-- `'system-bold 16'` — bold weight
+The system font now exposes medium, semibold,
+and italic variants in addition to regular and bold:
 
-**No other weights exist.** `system-semibold`, `system-light`, `system-medium` etc. will cause build errors. If you need semibold, use `system-bold` instead.
+- `'system 16'` / `systemFont(16)` — regular
+- `'system-medium 16'` / `systemMediumFont(16)` — medium
+- `'system-semibold 16'` / `systemSemiboldFont(16)` — semibold
+- `'system-bold 16'` / `systemBoldFont(16)` — bold
+- italic variants: `'system-italic'`, `'system-medium-italic'`, `'system-semibold-italic'`,
+  `'system-bold-italic'` (helpers: `systemItalicFont`, `systemMediumItalicFont`, …)
+
+Prefer the helper functions from `valdi_core/src/SystemFont` over raw strings. **`system-light`
+still does not exist** — there is no light weight. (Older guidance said only `system` and
+`system-bold` were available and to substitute `system-bold` for semibold — that is no longer true.)
 
 ### ScrollView restrictions
 
@@ -253,16 +261,19 @@ new Style<View>({
 
 // ❌ WRONG - These don't exist in Valdi
 new Style<View>({
-  gap: 10,                  // ❌ Use margin on children
   paddingHorizontal: 20,    // ❌ Use padding: '0 20'
   paddingVertical: 10,      // ❌ Use padding: '10 0'
   paddingInline: 15,        // ❌ Doesn't exist
 })
 
-// ❌ WRONG - gap property doesn't exist on View
-new Style<View>({ flexDirection: 'row', gap: '8' })
-// ✅ CORRECT - use margin on child elements instead
-// In JSX: <view marginRight={8}> or margin="0 8 0 0"
+// ✅ Flexbox gap — NOW SUPPORTED (Yoga upgrade)
+// gap / rowGap / columnGap are valid on any layout element (View, Layout, …),
+// both as a JSX attribute and inside a Style object.
+new Style<View>({ flexDirection: 'row', gap: 8 })   // ✅ works
+// In JSX: <view flexDirection="row" gap={8}>
+// NOTE: most existing composer_modules code still spaces children with margin
+// (`marginRight={8}` / `margin="0 8 0 0"`) — `gap` is newly available, not yet
+// the prevailing convention, so match the surrounding file.
 ```
 
 ### Layout: Flexbox (Yoga)
@@ -276,6 +287,9 @@ new Style<View>({
   alignItems: 'center',          // 'flex-start' | 'center' | 'flex-end' | 'stretch' | 'baseline'
   alignContent: 'flex-start',    // For multi-line flex containers
   flexWrap: 'wrap',              // 'wrap' | 'nowrap' | 'wrap-reverse'
+  gap: 8,                        // spacing between children, both axes (Yoga)
+  rowGap: 8,                     // spacing between flex rows
+  columnGap: 8,                  // spacing between flex columns
   
   // Child properties
   flexGrow: 1,                   // Grow to fill space (NOTE: use flexGrow, not flex)
@@ -361,6 +375,28 @@ const layoutStyle = new Style<Layout>({ padding: 10 });
 > 
 > **📖 Best practices**: See `/docs/docs/core-styling.md` for styling patterns and examples
 
+## Recently added elements & attributes
+
+New framework surface landed via public Valdi imports (PRs #98, #107, and the Liquid
+Glass work). Signatures live in `valdi_tsx/src/NativeTemplateElements.d.ts`.
+
+- **`<glass>` (GlassView)** — Apple "Liquid Glass" material, **iOS 26+ only**. Attrs:
+  `glassStyle` (`'regular' | 'clear'`), `glassTintColor`, `interactive`, `glassAppearance`
+  (`'light' | 'dark'`). Android and iOS < 26 fall back automatically (plain view / blur —
+  no caller change, no crash), mirroring `<blur>`. Tint with `glassTintColor`, **not**
+  `backgroundColor` (an opaque background muddies the glass).
+- **`<textanimationgroup>` (TextAnimationGroup)** — container that gives its descendant
+  text/attributed-text a single shared animation timeline. See the `valdi-animations` skill.
+- **Native sticky headers (experimental)** — `<scroll>` gains `nativeStickyEnabled` /
+  `nativeStickyCover` / `nativeStickyOffset`; tag a descendant with `stickyPosition="top"`.
+  Repositions in the native scroll pass (skips the laggy JS round-trip). See `valdi-perf`.
+- **Text elements** — `<label>` and `<textview>` are now containers and gained
+  `selectable`, `selection`, `onSelectionChange`, `lineHeightAbsolute`, `customUnderlineStyle`,
+  and iOS `onTextSelectionMenu` / `onTextSelectionMenuAction`. `<textfield>` gained
+  `adjustsFontSizeToFitWidth` + `minimumScaleFactor`. `<textview>` also gained `numberOfLines`
+  and `textOverflow`. `textDecoration` now also accepts `'dashed-underline'` and
+  `'dotted-underline'` (in addition to `'none' | 'strikethrough' | 'underline'`).
+
 ## @ExportModel ViewModel Restrictions
 
 Interfaces annotated with `@ViewModel @ExportModel` are exported to native code. The Valdi compiler can only export **primitive types** (`string`, `number`, `boolean`) and other `@ExportModel`-annotated interfaces. Custom type aliases (e.g. `type Direction = 'UP' | 'DOWN'`) are **not supported** in exported ViewModels.
@@ -392,7 +428,7 @@ interface GameState {
 5. **Suggesting scheduleRender()** - Deprecated, use StatefulComponent + setState()
 6. **Using addEventListener** - Use element callbacks like onTap, onPress, onChange
 7. **Using setInterval/setTimeout directly** - Use this.setTimeoutDisposable()
-8. **Using CSS properties that don't exist** - No gap, paddingHorizontal, paddingVertical; use margin on children for gap
+8. **Using CSS properties that don't exist** - No paddingHorizontal, paddingVertical, paddingInline. (`gap`/`rowGap`/`columnGap` DO now exist (Yoga upgrade), though margins remain the common way children are spaced in existing code.)
 9. **Using `flex: 1`** - `flex` doesn't exist on `View`; use `flexGrow: 1` instead
 10. **Using `fontSize` on Label** - Labels use `font: 'system 20'` (string), not `fontSize`
 11. **Typing SIGIcon values as `string`** - `SIGIcon.cameraStroke` etc. return `Asset`, not `string`; use `import { Asset } from 'valdi_core/src/Asset'` for ViewModel fields that store icon references
@@ -400,7 +436,7 @@ interface GameState {
 13. **Using type aliases in `@ExportModel` ViewModels** - Only primitives and other `@ExportModel` types are allowed
 14. **Importing `Shape` instead of `ShapeView`** - `Shape` is not exported; use `import { ShapeView } from 'valdi_tsx/src/NativeTemplateElements'` and `new Style<ShapeView>({...})`
 15. **Using per-side border properties** - No `borderRight`, `borderRightWidth`, etc. Only `borderWidth`, `borderColor`, `borderRadius` exist. Use a thin `<view>` as a divider instead.
-16. **Using `font: 'system-semibold 16'`** - Only `system` (regular) and `system-bold` are reliably available. Use `system-bold` for semibold.
+16. **Assuming only `system`/`system-bold` exist** - `system-medium`, `system-semibold`, and italic variants are available too (prefer the `SystemFont` helpers). Only `system-light` is still absent.
 17. **ViewModel/Context name collisions** - When a module has multiple components, each exported `ViewModel` and `ComponentContext` must have a unique name (e.g. `WeatherCardViewModel` not just `ViewModel`), or the compiler will emit conflicting platform types.
 18. **Using `flexDirection` on ScrollView** - ScrollView doesn't support flexDirection; it scrolls vertically by default
 

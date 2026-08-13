@@ -214,9 +214,12 @@ opacity: '0.3'        // WRONG — TypeScript error
 overflow: 'visible'   // CORRECT
 overflow: 'hidden'    // WRONG — only 'visible' or 'scroll'
 
-// Only system, system-bold, system-italic font weights
+// Font weights: system, system-medium, system-semibold,
+// system-bold, + italic variants all render. Prefer the SystemFont helpers.
 font: 'system-bold 16'         // CORRECT
-font: 'system-semibold 16'     // WRONG — falls back to regular at runtime
+font: 'system-semibold 16'     // CORRECT (systemSemiboldFont(16))
+font: 'system-medium 14'       // CORRECT (systemMediumFont(14))
+font: 'system-light 14'        // WRONG — system-light does not exist
 
 // flexGrow is a number
 flexGrow: 1           // CORRECT
@@ -245,9 +248,9 @@ import { Image } from 'valdi_tsx/src/NativeTemplateElements';
 // CORRECT: <image> is a JSX intrinsic, not an importable class
 // Use Style<View> for image container styles
 
-// WRONG: gap property (doesn't exist on View)
-new Style<View>({ flexDirection: 'row', gap: '8' })
-// CORRECT: use margin on child elements instead
+// OK: gap / rowGap / columnGap now exist on View/Layout (Yoga layout props)
+new Style<View>({ flexDirection: 'row', gap: 8 })
+// margins still work and remain the common convention:
 // In JSX: <view marginRight={8}> or margin="0 8 0 0"
 
 // WRONG: icon typed as string
@@ -432,7 +435,7 @@ The pixel diff misses small semantic differences (e.g., gray icon vs blue badge)
 
 **`overflow: 'hidden'` error** -- Only `'visible'` or `'scroll'` supported.
 
-**`font: 'system-semibold'` renders as regular** -- Only `system`, `system-bold`, `system-italic` work natively.
+**Font weights** -- `system`, `system-medium`, `system-semibold`, and `system-bold` (plus italic variants) all render; prefer the `SystemFont` helpers (`systemSemiboldFont(16)`). Only `system-light` does not exist.
 
 **Pixel diff shows stretched layout** -- Missing 390px phone frame in PreviewRoot.
 
