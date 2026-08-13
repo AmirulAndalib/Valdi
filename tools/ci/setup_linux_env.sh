@@ -108,6 +108,28 @@ if ! sudo apt-get install -y libtinfo5 2>/dev/null; then
     rm "$DEB"
 fi
 
+# watchman: the hot-reload smoke's file watcher. Not in Ubuntu apt, so pull the
+# prebuilt linux release. Installed here (vs only the external hotreload job) so
+# internal cool Linux — which sources this script, then runs run_tests.sh, whose
+# internal-only branch calls hotreload_smoke.sh — has it too. Bump WATCHMAN_VERSION
+# to a tag that publishes a *-linux.zip (https://github.com/facebook/watchman/releases).
+if ! command -v watchman >/dev/null 2>&1; then
+    echo "--- Installing watchman ---"
+    WATCHMAN_VERSION=v2026.04.20.00
+    WATCHMAN_ZIP="watchman-${WATCHMAN_VERSION}-linux.zip"
+    curl -fsSLO "https://github.com/facebook/watchman/releases/download/${WATCHMAN_VERSION}/${WATCHMAN_ZIP}"
+    unzip -q "$WATCHMAN_ZIP"
+    WATCHMAN_DIR="watchman-${WATCHMAN_VERSION}-linux"
+    sudo mkdir -p /usr/local/bin /usr/local/lib /usr/local/var/run/watchman
+    sudo cp "$WATCHMAN_DIR/bin/"* /usr/local/bin/
+    sudo cp -r "$WATCHMAN_DIR/lib/"* /usr/local/lib/
+    sudo chmod 755 /usr/local/bin/watchman
+    sudo chmod 2777 /usr/local/var/run/watchman
+    sudo ldconfig
+    rm -rf "$WATCHMAN_ZIP" "$WATCHMAN_DIR"
+    watchman --version
+fi
+
 # ---------------------------------------------------------------------------
 # 3. Install Bazel / Bazelisk
 #

@@ -199,6 +199,8 @@ jobs:
             task: test-modules
           - name: Registry Validation
             task: validate-registry
+          - name: Hotreload Smoke
+            task: hotreload-smoke
 
     steps:
       - name: Checkout code
@@ -220,6 +222,7 @@ jobs:
           cache_key: ${{ matrix.task }}
 
       - name: Setup Linux environment
+        # Also installs watchman (needed by the hotreload smoke); see setup_linux_env.sh.
         run: source ./tools/ci/setup_linux_env.sh
 
       - name: Setup environment and install Valdi CLI
@@ -263,6 +266,10 @@ jobs:
       - name: "Run: Registry Validation"
         if: matrix.task == 'validate-registry'
         run: ./tools/ci/validate_registry.sh
+
+      - name: "Run: Hotreload Smoke"
+        if: matrix.task == 'hotreload-smoke'
+        run: ./tools/ci/hotreload_smoke.sh
 
   snapshot-tests:
     name: Snapshot Tests

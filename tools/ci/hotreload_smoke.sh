@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Hot-reload smoke test.
+#
+# Proves the compiler's --monitor mode recompiles when a watched source file
+# changes: build a valdi_hotreload target, start it, edit a .tsx, and confirm a
+# recompilation pass fires. This exercises the CLI hotreload path + the
+# compiler's file watcher (watchman) + the AutoRecompiler, none of which any
+# other CI job covers.
+#
+# Scope: compiler-side recompile only. A true app-applied reload is macOS-only
+# (the Linux standalone runtime hard-disables the reloader), so this does not
+# assert an app received the update — only that the recompile pass ran.
+#
+# Requires: watchman on PATH, a Swift toolchain (built from source on Linux via
+# use_local_compiler, which Copybara flips on for the public repo).
+set -uo pipefail
+
+TARGET="${HOTRELOAD_TARGET:-//apps/helloworld:hello_world_hotreload}"
+EDIT_FILE="${HOTRELOAD_EDIT_FILE:-apps/helloworld/src/valdi/hello_world/src/HelloWorldApp.tsx}"
+UP_TIMEOUT="${HOTRELOAD_UP_TIMEOUT:-360}"
+RECOMPILE_TIMEOUT="${HOTRELOAD_RECOMPILE_TIMEOUT:-120}"
+# Extra bazel build flags. Empty on the public repo (Copybara defaults
+# use_local_compiler=true there); set to --//bzl/valdi:use_local_compiler=true
+# to run against the internal monorepo checkout, which otherwise reaches for the
+# GCS-gated prebuilt compiler.
+BUILD_FLAGS="${HOTRELOAD_BUILD_FLAGS:-}"
+
+log() { echo "[hotreload-smoke] $*"; }
+
+if ! command -v watchman >/dev/null 2>&1; then
+  log "FAILED: watchman not on PATH (required by the compiler's file watcher)"
+  exit 1
+fi
+
+# The internal monorepo runners expose the Bazel wrapper as `bzl` (plain `bazel`
+# is not on PATH there); the public GitHub Actions runner has `bazel`. Pick
+# whichever is present so the script works in both, run_tests.sh (internal) and
+# the standalone hotreload-smoke job (external).
+if command -v bzl >/dev/null 2>&1; then
+  BAZEL=bzl
+elif command -v bazel >/dev/null 2>&1; then
+  BAZEL=bazel
+elif command -v bazelisk >/dev/null 2>&1; then
+  BAZEL=bazelisk
+else
+  log "FAILED: no bzl/bazel/bazelisk on PATH"
+  exit 1
+fi
+
+log "Building $TARGET"
+# shellcheck disable=SC2086
+"$BAZEL" build $BUILD_FLAGS "$TARGET" || { log "FAILED: could not build $TARGET"; exit 1; }
+
+# shellcheck disable=SC2086
+SCRIPT="$("$BAZEL" cquery --output=files $BUILD_FLAGS "$TARGET" 2>/dev/null | head -n1)"
+if [ -z "$SCRIPT" ] || [ ! -f "$SCRIPT" ]; then
+  log "FAILED: could not resolve the built hotreloader script for $TARGET"
+  exit 1
+fi
+log "Hotreloader script: $SCRIPT"
+
+if [ ! -f "$EDIT_FILE" ]; then
+  log "FAILED: edit target $EDIT_FILE does not exist"
+  exit 1
+fi
+
+LOG="$(mktemp)"
+BACKUP="$(mktemp)"
+# Guard the backup: without it, a failed cp (no set -e here) would leave BACKUP
+# as the empty mktemp file, and the cleanup trap would then overwrite the real
+# source with that 0-byte file.
+cp "$EDIT_FILE" "$BACKUP" || { log "FAILED: could not back up $EDIT_FILE"; exit 1; }
+
+# run_hotreloader.sh uses paths relative to the workspace root and $PWD, so it
+# must run from here (the CLI runs it with cwd = workspace root).
+bash "$SCRIPT" > "$LOG" 2>&1 &
+HRPID=$!
+
+cleanup() {
+  kill "$HRPID" 2>/dev/null || true
+  pkill -f local_valdi_compiler 2>/dev/null || true
+  pkill -f run_hotreloader 2>/dev/null || true
+  # No global watchman teardown: watch-del-all / shutdown-server would wipe every
+  # other project's watches and kill a shared daemon when this runs on a dev box.
+  # Killing the reloader above is enough; a leftover watch on the workspace is benign.
+  if [ -s "$BACKUP" ]; then
+    cp "$BACKUP" "$EDIT_FILE" 2>/dev/null || true
+  fi
+  rm -f "$BACKUP" "$LOG"
+}
+trap cleanup EXIT
+
+log "Waiting up to ${UP_TIMEOUT}s for the reloader to come up..."
+UP=0
+for ((i=1; i<=UP_TIMEOUT; i++)); do
+  if grep -qE "Reloader listening on port|waiting for file changes" "$LOG"; then UP=1; break; fi
+  if ! kill -0 "$HRPID" 2>/dev/null; then log "reloader exited before it was ready"; break; fi
+  sleep 1
+done
+if [ "$UP" != 1 ]; then
+  log "FAILED: reloader never became ready in ${UP_TIMEOUT}s"
+  echo "--- last 40 log lines ---"; tail -40 "$LOG"
+  exit 1
+fi
+log "Reloader up after ${i}s."
+
+# A real content change (not a no-op touch) so watchman reliably fires.
+printf '\n// hotreload smoke marker %s\n' "$$" >> "$EDIT_FILE"
+log "Edited $EDIT_FILE; waiting up to ${RECOMPILE_TIMEOUT}s for a recompilation pass..."
+
+RECOMPILED=0
+for ((i=1; i<=RECOMPILE_TIMEOUT; i++)); do
+  if grep -qE "Files changed - starting recompilation pass" "$LOG"; then RECOMPILED=1; break; fi
+  if ! kill -0 "$HRPID" 2>/dev/null; then log "reloader died during the recompile wait"; break; fi
+  sleep 1
+done
+if [ "$RECOMPILED" != 1 ]; then
+  log "FAILED: no recompilation pass within ${RECOMPILE_TIMEOUT}s of the edit"
+  echo "--- last 40 log lines ---"; tail -40 "$LOG"
+  exit 1
+fi
+
+log "PASS: file change triggered a recompilation pass."
+exit 0

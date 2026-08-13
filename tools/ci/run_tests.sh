@@ -17,6 +17,23 @@ bzl test //valdi:test_layout --test_output=all --test_arg=--gtest_print_time=1
 # synchronously into a worker runtime") that reproduces on clean master.
 bzl test //valdi:test_svg --test_output=errors
 
+# The hot-reload smoke runs as its own parallel job on external GitHub Actions
+# (the hotreload-smoke matrix leg). Gate it here too — but ONLY internally (skip
+# on GitHub Actions to avoid duplicating that job) and only on Linux (it needs
+# watchman, installed by setup_linux_env.sh) — so internal cool Linux catches
+# reloader / compiler-monitor breakage before it mirrors to the public repo.
+#
+# Force the from-source reloader (use_local_compiler=true). Copybara flips this
+# on for the public mirror, so external CI already builds it from source; the
+# internal monorepo defaults it off and would otherwise run the GCS-prebuilt
+# reloader binary. That prebuilt (pinned, older) binary hangs on startup in
+# --usb mode here — it prints "Started listening for ADB devices" and never
+# reaches the initial compile — so the smoke times out waiting for the reloader.
+# Building from source matches the external path that passes.
+if [[ "${GITHUB_ACTIONS:-}" != "true" && "$(uname)" == "Linux" ]] ; then
+    HOTRELOAD_BUILD_FLAGS=--//bzl/valdi:use_local_compiler=true ./tools/ci/hotreload_smoke.sh
+fi
+
 if [[ $(uname) != Linux ]] ; then
     bzl test //valdi:valdi_ios_objc_test --test_output=errors
     bzl test //valdi:valdi_ios_swift_test --test_output=errors
