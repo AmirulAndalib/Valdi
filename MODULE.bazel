@@ -1,26 +1,30 @@
-module(name = "valdi", version = "0.1")
+module(
+    name = "valdi",
+    version = "0.1",
+)
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 bazel_dep(name = "toolchains_llvm", version = "1.3.0")
 bazel_dep(name = "apple_support", version = "1.22.1", repo_name = "build_bazel_apple_support")
-
 bazel_dep(name = "protobuf", version = "29.3", repo_name = "protobuf_cpp")
 single_version_override(
     module_name = "protobuf",
     version = "29.3",
 )
+
 bazel_dep(name = "rules_pkg", version = "0.9.1")
 single_version_override(
     module_name = "rules_pkg",
     version = "0.9.1",
 )
+
 bazel_dep(name = "rules_proto", version = "7.0.2")
 bazel_dep(name = "rules_python", version = "1.4.1")
-
 bazel_dep(name = "rules_cc", version = "0.1.2")
 bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name = "com_github_google_benchmark")
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "gtest")
+
 single_version_override(
     module_name = "zlib",
     version = "1.3.2",
@@ -29,13 +33,15 @@ single_version_override(
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "rules_java", version = "8.14.0")
 bazel_dep(name = "rules_rust", version = "0.64.0")
-
 bazel_dep(name = "rules_android", version = "0.6.5")
 bazel_dep(name = "rules_shell", version = "0.4.1")
 bazel_dep(name = "rules_android_ndk", version = "0.1.3")
-single_version_override(module_name = "rules_android_ndk", patches = [
-    "@valdi//registry/modules/rules_android_ndk/0.1.3/patches:rules_android_ndk.patch",
-])
+single_version_override(
+    module_name = "rules_android_ndk",
+    patches = [
+        "@valdi//registry/modules/rules_android_ndk/0.1.3/patches:rules_android_ndk.patch",
+    ],
+)
 
 # Make rules_android's own tools/jdk bootclasspath use the hermetic Android SDK instead
 # of rules_android's ANDROID_HOME-based android_sdk_repository_extension. Without this,
@@ -44,11 +50,11 @@ single_version_override(module_name = "rules_android_ndk", patches = [
 # registry/modules/rules_android/0.6.5/source.json (for CLI-bootstrapped apps).
 single_version_override(
     module_name = "rules_android",
-    version = "0.6.5",
     patches = [
         "@valdi//registry/modules/rules_android/0.6.5/patches:rules_android_hermetic_sdk.patch",
         "@valdi//registry/modules/rules_android/0.6.5/patches:rules_android_module_bzl.patch",
     ],
+    version = "0.6.5",
 )
 
 remote_android_extensions = use_extension(
@@ -68,6 +74,7 @@ register_toolchains(
     "@rules_android//toolchains/android:all",
     "@rules_android//toolchains/android_sdk:all",
 )
+
 register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
 
 hermetic_ndk_extension = use_extension("//bzl:hermetic_ndk.bzl", "hermetic_ndk_extension")
@@ -78,23 +85,22 @@ register_toolchains("@androidndk//:all")
 bazel_dep(name = "rules_kotlin", version = "1.9.0")
 single_version_override(
     module_name = "rules_kotlin",
-    version = "1.9.5",
     patches = [
         "@valdi//registry/modules/rules_kotlin/1.9.0/patches:rules_kotlin.patch",
         "@valdi//registry/modules/rules_kotlin/1.9.0/patches:rules_kotlin_hermetic_sdk.patch",
         "@valdi//registry/modules/rules_kotlin/1.9.0/patches:rules_kotlin_android_sdk.patch",
         "@valdi//registry/modules/rules_kotlin/1.9.0/patches:rules_kotlin_module_bzl_v195.patch",
     ],
+    version = "1.9.5",
 )
+
 bazel_dep(name = "rules_jvm_external", version = "6.6")
-
 bazel_dep(name = "rules_xcodeproj", version = "3.2.0")
-
 bazel_dep(name = "rules_swift", version = "3.1.2", repo_name = "build_bazel_rules_swift")
 single_version_override(
     module_name = "rules_swift",
-    patches = ["@valdi//registry/modules/rules_swift/3.1.2/patches:rules_swift.patch"],
     patch_strip = 1,
+    patches = ["@valdi//registry/modules/rules_swift/3.1.2/patches:rules_swift.patch"],
 )
 
 swift_toolchains_extension = use_extension("//bzlmod:swift_toolchains_extension.bzl", "swift_toolchains_extension")
@@ -114,21 +120,20 @@ single_version_override(
 )
 
 bazel_dep(name = "bazel_features", version = "1.32.0")
-
 bazel_dep(name = "platforms", version = "1.0.0")
-
 bazel_dep(name = "aspect_rules_js", version = "2.9.2")
+
 # Explicit dep so we can patch in Node 22 support. Remove once rules_nodejs
 # natively includes Node 22 in its built-in version list.
 bazel_dep(name = "rules_nodejs", version = "6.2.0")
 single_version_override(
     module_name = "rules_nodejs",
-    version = "6.2.0",
-    patches = ["@valdi//registry/modules/rules_nodejs/6.2.0/patches:rules_nodejs.patch"],
     patch_strip = 1,
+    patches = ["@valdi//registry/modules/rules_nodejs/6.2.0/patches:rules_nodejs.patch"],
+    version = "6.2.0",
 )
-bazel_dep(name = "aspect_bazel_lib", version = "2.19.2")
 
+bazel_dep(name = "aspect_bazel_lib", version = "2.19.2")
 bazel_dep(name = "aspect_rules_ts", version = "3.7.0")
 
 rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
@@ -137,20 +142,20 @@ use_repo(rules_ts_ext, "npm_typescript")
 
 http_archive(
     name = "zoo",
-    url = "https://github.com/thecppzoo/zoo/archive/33b868300145773d8c433b6b3d6643eba6334f7d.zip",
     build_file = "@valdi//third-party/zoo:zoo.BUILD",
     integrity = "sha256-9GIWp7GyVdZn24mvsMGtzhDD2N+W5L5AO3o2tYHtnVk=",
     strip_prefix = "zoo-33b868300145773d8c433b6b3d6643eba6334f7d",
+    url = "https://github.com/thecppzoo/zoo/archive/33b868300145773d8c433b6b3d6643eba6334f7d.zip",
 )
 
 http_archive(
     name = "hermes",
-    url = "https://github.com/facebook/hermes/archive/880b1645b5dca974f4329dc4108692d301abee0d.zip",
-    integrity = "sha256-+GQiTtN6H8TQz/+YkVz73dHeYAZ86/9hAUwTlkISx48=",
-    strip_prefix = "hermes-880b1645b5dca974f4329dc4108692d301abee0d",
     build_file = "@valdi//third-party/hermes:hermes.BUILD",
+    integrity = "sha256-+GQiTtN6H8TQz/+YkVz73dHeYAZ86/9hAUwTlkISx48=",
     patch_args = ["-p1"],
     patches = ["@valdi//third-party/hermes/patches:nontrivial_memcall.patch"],
+    strip_prefix = "hermes-880b1645b5dca974f4329dc4108692d301abee0d",
+    url = "https://github.com/facebook/hermes/archive/880b1645b5dca974f4329dc4108692d301abee0d.zip",
 )
 
 bazel_dep(name = "boringssl", version = "0.20250415.0")
@@ -159,6 +164,7 @@ bazel_dep(name = "boringssl", version = "0.20250415.0")
 http_archive(
     name = "boost",
     build_file = "@valdi//third-party/boost:boost.BUILD",
+    integrity = "sha256-hoHxddS9smxSIiZleT7vCEkNd1hSkzD5jTsp3Qc1vMw=",
     patches = [
         "@valdi//third-party/boost/patches:asio.patch",
         "@valdi//third-party/boost/patches:global_asio_initializers.patch",
@@ -166,15 +172,14 @@ http_archive(
         "@valdi//third-party/boost/patches:remove_invalid_file_1_78.patch",
     ],
     strip_prefix = "boost_1_78_0",
-    integrity = "sha256-hoHxddS9smxSIiZleT7vCEkNd1hSkzD5jTsp3Qc1vMw=",
     url = "https://archives.boost.io/release/1.78.0/source/boost_1_78_0.tar.bz2",
 )
 
 http_archive(
     name = "phmap",
     build_file = "@valdi//third-party/phmap:phmap.BUILD",
-    strip_prefix = "parallel-hashmap-1.3.12",
     integrity = "sha256-DMIDFEMhkkz7/MQB9C2CBMDdJOJ2DHocCRuqFtl3fAg=",
+    strip_prefix = "parallel-hashmap-1.3.12",
     url = "https://github.com/greg7mdp/parallel-hashmap/archive/refs/tags/v1.3.12.tar.gz",
 )
 
@@ -232,26 +237,25 @@ bazel_dep(name = "jsoncpp", version = "1.9.6")
 
 http_archive(
     name = "harfbuzz",
-    strip_prefix = "harfbuzz-12.2.0",
     build_file = "@valdi//third-party/harfbuzz:harfbuzz.BUILD",
     integrity = "sha256-7LYDqkJqiyRmVxhme9pkqEwVBNt0VO5Mrb02Lupk5UU=",
+    strip_prefix = "harfbuzz-12.2.0",
     urls = ["https://github.com/harfbuzz/harfbuzz/releases/download/12.2.0/harfbuzz-12.2.0.tar.xz"],
 )
 
 bazel_dep(name = "backward-cpp", version = "1.6")
-
 bazel_dep(name = "xxhash", version = "0.8.3")
 
 http_archive(
     name = "zlib_chromium",
-    url = "https://github.com/simonis/zlib-chromium/archive/93867c6db67801f74c2d0840a271c7aa7fd6716c.zip",
     build_file = "@valdi//third-party/zlib_chromium:zlib_chromium.BUILD",
     integrity = "sha256-aybDRpEOnvUrCW8/wTFSuduz5Rk+YxYGdCUZYVY5G9g=",
-    strip_prefix = "zlib-chromium-93867c6db67801f74c2d0840a271c7aa7fd6716c",
     patch_args = ["-p1"],
     patches = [
         "@valdi//third-party/zlib_chromium/patches:apple.patch",
     ],
+    strip_prefix = "zlib-chromium-93867c6db67801f74c2d0840a271c7aa7fd6716c",
+    url = "https://github.com/simonis/zlib-chromium/archive/93867c6db67801f74c2d0840a271c7aa7fd6716c.zip",
 )
 
 bazel_dep(name = "zstd", version = "1.5.7")
@@ -259,42 +263,42 @@ bazel_dep(name = "zstd", version = "1.5.7")
 http_archive(
     name = "icu",
     build_file = "@valdi//third-party/icu:icu.BUILD",
-    url = "https://github.com/unicode-org/icu/releases/download/release-68-1/icu4c-68_1-src.tgz",
-    strip_prefix = "icu",
     integrity = "sha256-qfLj2LRDS45Th4tDCL0ebuUcnHBC4rGjdqvvtvuyny0=",
+    strip_prefix = "icu",
+    url = "https://github.com/unicode-org/icu/releases/download/release-68-1/icu4c-68_1-src.tgz",
 )
 
 bazel_dep(name = "websocketpp", version = "0.8.2.bcr.3")
 single_version_override(
     module_name = "websocketpp",
-    patches = ["@valdi//third-party/websocketpp/patches:fix_ios_lrt.patch"],
     patch_strip = 1,
+    patches = ["@valdi//third-party/websocketpp/patches:fix_ios_lrt.patch"],
 )
 
 http_archive(
     name = "test262",
-    url = "https://github.com/tc39/test262/archive/refs/heads/main.zip",
     build_file = "@valdi//third-party/test262:test262.BUILD",
-    strip_prefix = "test262-main",
     integrity = "sha256-Lv/ZdXIV5f0n11oFTKBq22r0aLGF6HsDp36B1afgVDo=",
+    strip_prefix = "test262-main",
+    url = "https://github.com/tc39/test262/archive/refs/heads/main.zip",
 )
 
 http_archive(
     name = "resvg",
-    url = "https://github.com/linebender/resvg/archive/b3c7f58d059da6aa0a25141b1948c61b8c579c12.zip",
     build_file = "@valdi//third-party/resvg:resvg.BUILD",
-    strip_prefix = "resvg-b3c7f58d059da6aa0a25141b1948c61b8c579c12",
     integrity = "sha256-0F/rzIZh2AQW3zyJ8S0c269xlbCvn8rFSAI2r0jLdgU=",
+    strip_prefix = "resvg-b3c7f58d059da6aa0a25141b1948c61b8c579c12",
+    url = "https://github.com/linebender/resvg/archive/b3c7f58d059da6aa0a25141b1948c61b8c579c12.zip",
 )
 
 http_archive(
     name = "pngquant",
-    url = "https://github.com/kornelski/pngquant/archive/5b4e91f5dd6af27c928474ffd526bb69e17b0f37.zip",
     build_file = "@valdi//third-party/pngquant:pngquant.BUILD",
-    strip_prefix = "pngquant-5b4e91f5dd6af27c928474ffd526bb69e17b0f37",
     integrity = "sha256-CqMGdZFDTa+6gyxJN3Wvr6d5O4ezR9xvyBd1tzUNR+8=",
     patch_args = ["-p1"],
     patches = ["@valdi//third-party/pngquant:pngquant-build-script-bazel-headers.patch"],
+    strip_prefix = "pngquant-5b4e91f5dd6af27c928474ffd526bb69e17b0f37",
+    url = "https://github.com/kornelski/pngquant/archive/5b4e91f5dd6af27c928474ffd526bb69e17b0f37.zip",
 )
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
@@ -311,28 +315,110 @@ rust.toolchain(
     versions = ["1.87.0"],
 )
 use_repo(rust, "rust_toolchains")
+
 register_toolchains("@rust_toolchains//:all")
 
 resvg_crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
-resvg_crate.spec(package = "gif", repositories = ["resvg_crates"], version = "0.14.1")
-resvg_crate.spec(package = "image-webp", repositories = ["resvg_crates"], version = "0.2.4")
-resvg_crate.spec(package = "zune-jpeg", default_features = False, features = ["std"], repositories = ["resvg_crates"], version = "0.5.8")
-resvg_crate.spec(package = "base64", repositories = ["resvg_crates"], version = "0.22.1")
-resvg_crate.spec(package = "data-url", repositories = ["resvg_crates"], version = "0.3.2")
-resvg_crate.spec(package = "flate2", default_features = False, features = ["rust_backend"], repositories = ["resvg_crates"], version = "1.1.5")
-resvg_crate.spec(package = "imagesize", repositories = ["resvg_crates"], version = "0.14.0")
-resvg_crate.spec(package = "kurbo", repositories = ["resvg_crates"], version = "0.13.0")
-resvg_crate.spec(package = "log", repositories = ["resvg_crates"], version = "0.4.29")
-resvg_crate.spec(package = "pico-args", features = ["eq-separator"], repositories = ["resvg_crates"], version = "0.5.0")
-resvg_crate.spec(package = "rgb", repositories = ["resvg_crates"], version = "0.8.52")
-resvg_crate.spec(package = "roxmltree", repositories = ["resvg_crates"], version = "0.21.1")
-resvg_crate.spec(package = "simplecss", repositories = ["resvg_crates"], version = "0.2.2")
-resvg_crate.spec(package = "siphasher", repositories = ["resvg_crates"], version = "1.0.1")
-resvg_crate.spec(package = "strict-num", repositories = ["resvg_crates"], version = "0.1.1")
-resvg_crate.spec(package = "svgtypes", repositories = ["resvg_crates"], version = "0.16.1")
-resvg_crate.spec(package = "tiny-skia", repositories = ["resvg_crates"], version = "0.12.0")
-resvg_crate.spec(package = "tiny-skia-path", repositories = ["resvg_crates"], version = "0.12.0")
-resvg_crate.spec(package = "xmlwriter", repositories = ["resvg_crates"], version = "0.1.0")
+resvg_crate.spec(
+    package = "gif",
+    repositories = ["resvg_crates"],
+    version = "0.14.1",
+)
+resvg_crate.spec(
+    package = "image-webp",
+    repositories = ["resvg_crates"],
+    version = "0.2.4",
+)
+resvg_crate.spec(
+    default_features = False,
+    features = ["std"],
+    package = "zune-jpeg",
+    repositories = ["resvg_crates"],
+    version = "0.5.8",
+)
+resvg_crate.spec(
+    package = "base64",
+    repositories = ["resvg_crates"],
+    version = "0.22.1",
+)
+resvg_crate.spec(
+    package = "data-url",
+    repositories = ["resvg_crates"],
+    version = "0.3.2",
+)
+resvg_crate.spec(
+    default_features = False,
+    features = ["rust_backend"],
+    package = "flate2",
+    repositories = ["resvg_crates"],
+    version = "1.1.5",
+)
+resvg_crate.spec(
+    package = "imagesize",
+    repositories = ["resvg_crates"],
+    version = "0.14.0",
+)
+resvg_crate.spec(
+    package = "kurbo",
+    repositories = ["resvg_crates"],
+    version = "0.13.0",
+)
+resvg_crate.spec(
+    package = "log",
+    repositories = ["resvg_crates"],
+    version = "0.4.29",
+)
+resvg_crate.spec(
+    features = ["eq-separator"],
+    package = "pico-args",
+    repositories = ["resvg_crates"],
+    version = "0.5.0",
+)
+resvg_crate.spec(
+    package = "rgb",
+    repositories = ["resvg_crates"],
+    version = "0.8.52",
+)
+resvg_crate.spec(
+    package = "roxmltree",
+    repositories = ["resvg_crates"],
+    version = "0.21.1",
+)
+resvg_crate.spec(
+    package = "simplecss",
+    repositories = ["resvg_crates"],
+    version = "0.2.2",
+)
+resvg_crate.spec(
+    package = "siphasher",
+    repositories = ["resvg_crates"],
+    version = "1.0.1",
+)
+resvg_crate.spec(
+    package = "strict-num",
+    repositories = ["resvg_crates"],
+    version = "0.1.1",
+)
+resvg_crate.spec(
+    package = "svgtypes",
+    repositories = ["resvg_crates"],
+    version = "0.16.1",
+)
+resvg_crate.spec(
+    package = "tiny-skia",
+    repositories = ["resvg_crates"],
+    version = "0.12.0",
+)
+resvg_crate.spec(
+    package = "tiny-skia-path",
+    repositories = ["resvg_crates"],
+    version = "0.12.0",
+)
+resvg_crate.spec(
+    package = "xmlwriter",
+    repositories = ["resvg_crates"],
+    version = "0.1.0",
+)
 resvg_crate.render_config(
     default_package_name = "",
     repositories = ["resvg_crates"],
@@ -363,9 +449,18 @@ rust_host_tools.host_tools(
 use_repo(rust_host_tools, "rust_host_tools_nightly")
 
 pngquant_crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
-pngquant_crate.spec(package = "pngquant", artifact = "bin", default_features = False, features = ["png-static", "z-static"], repositories = ["pngquant_crates"], version = "=3.0.0")
+pngquant_crate.spec(
+    artifact = "bin",
+    default_features = False,
+    features = [
+        "png-static",
+        "z-static",
+    ],
+    package = "pngquant",
+    repositories = ["pngquant_crates"],
+    version = "=3.0.0",
+)
 pngquant_crate.annotation(
-    crate = "pngquant",
     build_script_data = [
         "@pngquant_crates__imagequant-sys-4.1.0//:libimagequant.h",
         "@pngquant_crates__libpng-sys-1.1.11//:vendor/png.h",
@@ -375,6 +470,7 @@ pngquant_crate.annotation(
         "DEP_IMAGEQUANT_INCLUDE_FILE": "$(execpath @pngquant_crates__imagequant-sys-4.1.0//:libimagequant.h)",
         "DEP_PNG_INCLUDE_FILE": "$(execpath @pngquant_crates__libpng-sys-1.1.11//:vendor/png.h)",
     },
+    crate = "pngquant",
     gen_all_binaries = True,
     patch_args = ["-p1"],
     patches = ["//third-party/pngquant:pngquant-build-script-bazel-headers.patch"],
@@ -408,83 +504,84 @@ use_repo(
 )
 
 bazel_dep(name = "rules_license", version = "1.0.0")
-
 bazel_dep(name = "rules_fuzzing", version = "0.5.2")
 
 SKIA_URL = "https://github.com/google/skia/archive/8d5c6efb04514a31f09a2e865940f99cdf60ce21.zip"
+
 SKIA_STRIP_PREFIX = "skia-8d5c6efb04514a31f09a2e865940f99cdf60ce21"
+
 SKIA_INTEGRITY = "sha256-piM7FfzT3xekYxvwEDlejJ8Zj+zaxa3oIKpDsx1y6eQ="
 
 http_archive(
     name = "skia",
-    url = SKIA_URL,
-    strip_prefix = SKIA_STRIP_PREFIX,
     integrity = SKIA_INTEGRITY,
+    strip_prefix = SKIA_STRIP_PREFIX,
+    url = SKIA_URL,
 )
 
 http_archive(
     name = "libjpeg_turbo",
     build_file = "@skia//bazel/external/libjpeg_turbo:BUILD.bazel",
-    url = "https://github.com/librepo/chromium-libjpeg_turbo/archive/e14cbfaa85529d47f9f55b0f104a579c1061f9ad.tar.gz",
-    strip_prefix = "chromium-libjpeg_turbo-e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
     integrity = "sha256-tjyUKJeHb8oX2Y8LcO+b4P1GUWHsGaf3dQHOtN/bnf4=",
     patches = [
         "@valdi//third-party/libjpeg_turbo:warning_fix.patch",
         "@valdi//third-party/libjpeg_turbo:include_fix.patch",
     ],
+    strip_prefix = "chromium-libjpeg_turbo-e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+    url = "https://github.com/librepo/chromium-libjpeg_turbo/archive/e14cbfaa85529d47f9f55b0f104a579c1061f9ad.tar.gz",
 )
 
 http_archive(
     name = "libpng",
     build_file = "@skia//bazel/external/libpng:BUILD.bazel",
-    url = "https://github.com/aosp-mirror/platform_external_libpng/archive/ed217e3e601d8e462f7fd1e04bed43ac42212429.tar.gz",
-    strip_prefix = "platform_external_libpng-ed217e3e601d8e462f7fd1e04bed43ac42212429",
     integrity = "sha256-W+kzz3e2EKLJ2pqXKwV4v7TAmJJAW2T0PpLD0K4s48Q=",
     patch_args = ["-p1"],
     patches = [
         "@valdi//third-party/libpng:fix_armv7.patch",
     ],
+    strip_prefix = "platform_external_libpng-ed217e3e601d8e462f7fd1e04bed43ac42212429",
+    url = "https://github.com/aosp-mirror/platform_external_libpng/archive/ed217e3e601d8e462f7fd1e04bed43ac42212429.tar.gz",
 )
 
 http_archive(
     name = "libwebp",
     build_file = "@skia//bazel/external/libwebp:BUILD.bazel",
-    url = "https://github.com/webmproject/libwebp/archive/845d5476a866141ba35ac133f856fa62f0b7445f.tar.gz",
     strip_prefix = "libwebp-845d5476a866141ba35ac133f856fa62f0b7445f",
+    url = "https://github.com/webmproject/libwebp/archive/845d5476a866141ba35ac133f856fa62f0b7445f.tar.gz",
 )
 
 http_archive(
     name = "wuffs",
     build_file = "@skia//bazel/external/wuffs:BUILD.bazel",
-    url = "https://github.com/google/wuffs-mirror-release-c/archive/e3f919ccfe3ef542cfc983a82146070258fb57f8.tar.gz",
-    strip_prefix = "wuffs-mirror-release-c-e3f919ccfe3ef542cfc983a82146070258fb57f8",
     integrity = "sha256-6EnasfNy8Wt4K6dSjn9wKB41QlvS1kTJKjb7lZCfmNs=",
+    strip_prefix = "wuffs-mirror-release-c-e3f919ccfe3ef542cfc983a82146070258fb57f8",
+    url = "https://github.com/google/wuffs-mirror-release-c/archive/e3f919ccfe3ef542cfc983a82146070258fb57f8.tar.gz",
 )
 
 http_archive(
     name = "zlib_skia",
     build_file = "@skia//bazel/external/zlib_skia:BUILD.bazel",
-    url = "https://github.com/gsource-mirror/chromium-src-third_party-zlib/archive/646b7f569718921d7d4b5b8e22572ff6c76f2596.tar.gz",
-    strip_prefix = "chromium-src-third_party-zlib-646b7f569718921d7d4b5b8e22572ff6c76f2596",
     integrity = "sha256-3Wrc+RYXSPFcLyzH36k5cRldSn8jWknXXbTMVDhclo4=",
     patch_args = ["-p1"],
     patches = [
         "@valdi//third-party/zlib_skia:android_ios_x86_64.patch",
     ],
+    strip_prefix = "chromium-src-third_party-zlib-646b7f569718921d7d4b5b8e22572ff6c76f2596",
+    url = "https://github.com/gsource-mirror/chromium-src-third_party-zlib/archive/646b7f569718921d7d4b5b8e22572ff6c76f2596.tar.gz",
 )
 
 http_archive(
     name = "freetype",
     build_file = "@skia//bazel/external/freetype:BUILD.bazel",
-    url = "https://github.com/freetype/freetype/archive/5d4e649f740c675426fbe4cdaffc53ee2a4cb954.tar.gz",
     strip_prefix = "freetype-5d4e649f740c675426fbe4cdaffc53ee2a4cb954",
+    url = "https://github.com/freetype/freetype/archive/5d4e649f740c675426fbe4cdaffc53ee2a4cb954.tar.gz",
 )
 
 http_archive(
     name = "expat",
     build_file = "@skia//bazel/external/expat:BUILD.bazel",
-    url = "https://github.com/libexpat/libexpat/archive/624da0f593bb8d7e146b9f42b06d8e6c80d032a3.tar.gz",
     strip_prefix = "libexpat-624da0f593bb8d7e146b9f42b06d8e6c80d032a3",
+    url = "https://github.com/libexpat/libexpat/archive/624da0f593bb8d7e146b9f42b06d8e6c80d032a3.tar.gz",
 )
 
 node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
@@ -493,19 +590,19 @@ node.toolchain(node_version = "22.12.0")
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
     name = "valdi_npm",
-    pnpm_lock = "//bzl/valdi/npm:pnpm-lock.yaml",
     lifecycle_hooks = {
         "better-sqlite3@9.6.0": [],
         "remotedebug-ios-webkit-adapter@0.4.2": [],
     },
     link_workspace = "valdi",
+    pnpm_lock = "//bzl/valdi/npm:pnpm-lock.yaml",
 )
 use_repo(npm, "valdi_npm")
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
-
 maven.install(
     name = "android_mvn",
+    aar_import_bzl_label = "@rules_android//rules:rules.bzl",
     artifacts = [
         "androidx.annotation:annotation:1.1.0",
         "androidx.appcompat:appcompat:1.2.0",
@@ -552,11 +649,9 @@ maven.install(
         "https://repo1.maven.org/maven2",
         "https://maven.google.com",
     ],
-    aar_import_bzl_label = "@rules_android//rules:rules.bzl",
     use_starlark_android_rules = True,
     version_conflict_policy = "pinned",
 )
-
 use_repo(maven, "android_mvn")
 
 # Test-only artifacts, kept in a separate namespace from android_mvn so
@@ -565,6 +660,7 @@ use_repo(maven, "android_mvn")
 # overridden to Snap's @test_mvn (see android/snapchat/MODULE.bazel).
 maven.install(
     name = "test_mvn",
+    aar_import_bzl_label = "@rules_android//rules:rules.bzl",
     artifacts = [
         "androidx.test:core:1.5.0",
         "androidx.test.espresso:espresso-core:3.5.1",
@@ -579,25 +675,23 @@ maven.install(
         "https://repo1.maven.org/maven2",
         "https://maven.google.com",
     ],
-    aar_import_bzl_label = "@rules_android//rules:rules.bzl",
     use_starlark_android_rules = True,
     version_conflict_policy = "pinned",
 )
-
 use_repo(maven, "test_mvn")
 
 http_archive(
     name = "expat_config",
-    url = SKIA_URL,
-    strip_prefix = "{}/third_party/expat/include".format(SKIA_STRIP_PREFIX),
     integrity = SKIA_INTEGRITY,
+    strip_prefix = "{}/third_party/expat/include".format(SKIA_STRIP_PREFIX),
+    url = SKIA_URL,
 )
 
 http_archive(
     name = "freetype_config",
-    url = SKIA_URL,
-    strip_prefix = "{}/third_party/freetype2/include".format(SKIA_STRIP_PREFIX),
     integrity = SKIA_INTEGRITY,
+    strip_prefix = "{}/third_party/freetype2/include".format(SKIA_STRIP_PREFIX),
+    url = SKIA_URL,
 )
 
 http_archive(
@@ -612,7 +706,7 @@ http_archive(
 # The bin/ sub-module also uses this extension, but targets in the main workspace
 # reference these repos via prebuilt_tools.bzl (e.g. @jscore_libs).
 valdi_compiler_repos = use_extension("//bzl:valdi_compiler_repos_extension.bzl", "valdi_compiler_repos")
-use_repo(valdi_compiler_repos, "jscore_libs", "valdi_compiler_macos", "valdi_compiler_linux")
+use_repo(valdi_compiler_repos, "jscore_libs", "valdi_compiler_linux", "valdi_compiler_macos")
 
 register_toolchains("@valdi//bzl/valdi:valdi_toolchain")
 
@@ -620,8 +714,10 @@ register_toolchains("@valdi//bzl/valdi:valdi_toolchain")
 # register_toolchains() without calling any extensions themselves.
 # Apple CC registered first (wins on macOS/iOS), LLVM second (wins on Linux).
 valdi_toolchains = use_extension("//bzl:valdi_toolchains.bzl", "valdi_toolchains")
-use_repo(valdi_toolchains, "local_config_apple_cc_toolchains", "local_config_apple_cc", "llvm_toolchain", "llvm_toolchain_llvm")
+use_repo(valdi_toolchains, "llvm_toolchain", "llvm_toolchain_llvm", "local_config_apple_cc", "local_config_apple_cc_toolchains")
+
 register_toolchains("@local_config_apple_cc_toolchains//:all")
+
 register_toolchains("@llvm_toolchain//:all")
 
 # Swift Package Manager deps for //compiler/compiler:local_valdi_compiler.
