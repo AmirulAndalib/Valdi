@@ -228,6 +228,8 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
     SCValdiTextGradientHelper *_textGradientHelper;
 
     SCValdiTextInputUnfocusReason _lastUnfocusReason;
+    /// YES if a focus request arrived before the view was attached to a window; applied in didMoveToWindow
+    BOOL _pendingFocused;
 
     // State for the animated text overlay used when per-glyph transforms are present.
     SCValdiTextViewInternal *_animatedTextView;
@@ -317,6 +319,15 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
         _textValue = nil;
         _enabled = YES;
         _selectable = YES;
+
+        [NSNotificationCenter.defaultCenter addObserver:self
+                                               selector:@selector(_applicationDidBecomeActive)
+                                                   name:UIApplicationDidBecomeActiveNotification
+                                                 object:nil];
+        [NSNotificationCenter.defaultCenter addObserver:self
+                                               selector:@selector(_windowDidBecomeKey:)
+                                                   name:UIWindowDidBecomeKeyNotification
+                                                 object:nil];
     }
 
     return self;
@@ -356,6 +367,7 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
     _textAnimationPartCount = 0;
     [_textView unmarkText];
     [_textView resignFirstResponder];
+    _pendingFocused = NO;
     _lastUnfocusReason = SCValdiTextInputUnfocusReasonUnknown;
 
     return self.class == [SCValdiTextView class];
@@ -371,6 +383,46 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
 {
     [super didMoveToWindow];
     [self _updateTextAnimationGroupRegistration];
+    [self _applyPendingFocusedIfNeeded];
+}
+
+- (void)_applicationDidBecomeActive
+{
+    // Every live instance observes this notification, including recycled views sitting in the
+    // Valdi pool; skip the dispatch when there is nothing pending so foregrounding doesn't
+    // enqueue no-op blocks per text input.
+    if (!_pendingFocused) {
+        return;
+    }
+    // UIKit still refuses first-responder transitions while this notification is being
+    // delivered (the scene/window state is settling); attempt on the next runloop turn.
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [weakSelf _applyPendingFocusedIfNeeded];
+    });
+}
+
+- (void)_windowDidBecomeKey:(NSNotification *)notification
+{
+    if (notification.object == self.window) {
+        [self _applyPendingFocusedIfNeeded];
+    }
+}
+
+- (void)_applyPendingFocusedIfNeeded
+{
+    if (!_pendingFocused || self.window == nil) {
+        return;
+    }
+    // Focusing while another window is key (system alert, notification banner) doesn't bring up
+    // the keyboard even when becomeFirstResponder reports success; keep the intent pending until
+    // this view's window is key again.
+    if (!self.window.isKeyWindow) {
+        return;
+    }
+    if (_textView.isFirstResponder || [_textView becomeFirstResponder]) {
+        _pendingFocused = NO;
+    }
 }
 
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
@@ -1218,13 +1270,32 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
 
 - (BOOL)valdi_setFocused:(BOOL)focused
 {
+    // UIKit refuses becomeFirstResponder while the view is not attached to a window — which is
+    // when the 'focused' attribute lands during an initial render pass — and the attribute system
+    // never retries a failed application, permanently leaving the field unfocused (COMPOSER-6146).
+    // Stash the request and apply it in didMoveToWindow instead.
+    if (self.window == nil) {
+        _pendingFocused = focused;
+        return YES;
+    }
+    _pendingFocused = NO;
     // Re-entering UIKit's first responder machinery for a transition that already happened can
     // stall the main thread: it enqueues more work on UIKeyboardTaskQueue while the main thread may
     // already be blocked draining that same queue.
     if (focused == _textView.isFirstResponder) {
         return YES;
     }
-    return focused ? [_textView becomeFirstResponder] : [_textView resignFirstResponder];
+    if (focused) {
+        // UIKit can refuse in-window transitions (resign-active churn from notification banners),
+        // and on a non-key window becomeFirstResponder can report success without ever showing
+        // the keyboard. Keep the intent pending and apply it when the app becomes active or this
+        // view's window becomes key, instead of failing permanently.
+        if (!self.window.isKeyWindow || ![_textView becomeFirstResponder]) {
+            _pendingFocused = YES;
+        }
+        return YES;
+    }
+    return [_textView resignFirstResponder];
 }
 
 - (BOOL)valdi_setClosesWhenReturnKeyPressed:(BOOL)closesWhenReturnKeyPress
