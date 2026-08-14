@@ -28,6 +28,14 @@ BUILD_FLAGS="${HOTRELOAD_BUILD_FLAGS:-}"
 
 log() { echo "[hotreload-smoke] $*"; }
 
+# macOS only. The reloader only reaches a ready state on macOS; on Linux the
+# standalone runtime hard-disables it (see header), so it never signals ready
+# and the wait below always times out. Skip rather than fail there.
+if [ "$(uname -s)" != "Darwin" ]; then
+  log "SKIP: hotreload smoke is macOS-only (Linux standalone runtime disables the reloader)."
+  exit 0
+fi
+
 if ! command -v watchman >/dev/null 2>&1; then
   log "FAILED: watchman not on PATH (required by the compiler's file watcher)"
   exit 1
