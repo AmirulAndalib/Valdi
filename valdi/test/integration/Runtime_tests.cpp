@@ -5484,6 +5484,106 @@ TEST_P(RuntimeFixture, supportsPlatformSpecificAsset) {
     ASSERT_EQ(iOSAssetUrl, asset->getIdentifier());
 }
 
+TEST_P(RuntimeFixture, supportsThemableAsset) {
+    auto lightAssetUrl = STRING_LITERAL("file://light.png");
+    auto darkAssetUrl = STRING_LITERAL("file://dark.png");
+    wrapper.diskCache->store(Path(URL(lightAssetUrl).getPath()), BytesView()).ensureSuccess();
+    wrapper.diskCache->store(Path(URL(darkAssetUrl).getPath()), BytesView()).ensureSuccess();
+
+    auto viewModel = Value()
+                         .setMapValue("lightAsset", Value(lightAssetUrl))
+                         .setMapValue("darkAsset", Value(darkAssetUrl))
+                         .setMapValue("includeDarkAsset", Value(true));
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ThemableAsset@test/src/ThemableAsset"), viewModel, Value());
+
+    tree->setLayoutSpecs(Size(1.0f, 1.0f), LayoutDirectionLTR);
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    auto rootNode = tree->getRootViewNode();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto rootAsset = getSrcAssetFromNode(*rootNode->getChildAt(0));
+    ASSERT_TRUE(rootAsset != nullptr);
+    ASSERT_EQ(lightAssetUrl, rootAsset->getIdentifier());
+
+    auto overriddenAsset = getSrcAssetFromNode(*rootNode->getChildAt(1)->getChildAt(0));
+    ASSERT_TRUE(overriddenAsset != nullptr);
+    ASSERT_EQ(darkAssetUrl, overriddenAsset->getIdentifier());
+
+    auto nestedAsset = getSrcAssetFromNode(*rootNode->getChildAt(2));
+    ASSERT_TRUE(nestedAsset != nullptr);
+    ASSERT_EQ(lightAssetUrl, nestedAsset->getIdentifier());
+}
+
+TEST_P(RuntimeFixture, canSwitchActiveColorPaletteForThemableAsset) {
+    auto lightAssetUrl = STRING_LITERAL("file://light.png");
+    auto darkAssetUrl = STRING_LITERAL("file://dark.png");
+    wrapper.diskCache->store(Path(URL(lightAssetUrl).getPath()), BytesView()).ensureSuccess();
+    wrapper.diskCache->store(Path(URL(darkAssetUrl).getPath()), BytesView()).ensureSuccess();
+
+    auto viewModel = Value()
+                         .setMapValue("lightAsset", Value(lightAssetUrl))
+                         .setMapValue("darkAsset", Value(darkAssetUrl))
+                         .setMapValue("includeDarkAsset", Value(true));
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ThemableAsset@test/src/ThemableAsset"), viewModel, Value());
+
+    tree->setLayoutSpecs(Size(1.0f, 1.0f), LayoutDirectionLTR);
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("setDarkColorPalette"));
+
+    wrapper.flushQueues();
+
+    auto rootNode = tree->getRootViewNode();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    auto asset = getSrcAssetFromNode(*rootNode->getChildAt(0));
+    ASSERT_TRUE(asset != nullptr);
+    ASSERT_EQ(darkAssetUrl, asset->getIdentifier());
+
+    auto nestedAsset = getSrcAssetFromNode(*rootNode->getChildAt(2));
+    ASSERT_TRUE(nestedAsset != nullptr);
+    ASSERT_EQ(darkAssetUrl, nestedAsset->getIdentifier());
+}
+
+TEST_P(RuntimeFixture, missingThemableAssetPaletteClearsAsset) {
+    auto lightAssetUrl = STRING_LITERAL("file://light.png");
+    auto darkAssetUrl = STRING_LITERAL("file://dark.png");
+    wrapper.diskCache->store(Path(URL(lightAssetUrl).getPath()), BytesView()).ensureSuccess();
+    wrapper.diskCache->store(Path(URL(darkAssetUrl).getPath()), BytesView()).ensureSuccess();
+
+    auto viewModel = Value()
+                         .setMapValue("lightAsset", Value(lightAssetUrl))
+                         .setMapValue("darkAsset", Value(darkAssetUrl))
+                         .setMapValue("includeDarkAsset", Value(false));
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ThemableAsset@test/src/ThemableAsset"), viewModel, Value());
+
+    tree->setLayoutSpecs(Size(1.0f, 1.0f), LayoutDirectionLTR);
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("setDarkColorPalette"));
+
+    wrapper.flushQueues();
+
+    auto rootNode = tree->getRootViewNode();
+    ASSERT_TRUE(rootNode != nullptr);
+
+    ASSERT_EQ(nullptr, getSrcAssetFromNode(*rootNode->getChildAt(0)));
+    ASSERT_EQ(nullptr, getSrcAssetFromNode(*rootNode->getChildAt(1)->getChildAt(0)));
+    ASSERT_EQ(nullptr, getSrcAssetFromNode(*rootNode->getChildAt(2)));
+}
+
 TEST_P(RuntimeFixture, canHotReloadAsset) {
     auto assets = registerAssets(wrapper);
 
@@ -6334,6 +6434,289 @@ TEST_P(RuntimeFixture, supportsTextAttribute) {
         ASSERT_EQ(nullptr, style.background);
         ASSERT_EQ(nullptr, style.onTap);
     }
+
+    {
+        ASSERT_EQ(STRING_LITERAL("?"), attributedText->getContentAtIndex(6));
+        const auto& style = attributedText->getStyleAtIndex(6);
+
+        ASSERT_EQ(std::nullopt, style.font);
+        ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x008000FF))), style.color);
+        ASSERT_EQ(nullptr, style.background);
+        ASSERT_EQ(nullptr, style.onTap);
+    }
+
+    {
+        ASSERT_EQ(STRING_LITERAL("!"), attributedText->getContentAtIndex(7));
+        const auto& style = attributedText->getStyleAtIndex(7);
+
+        ASSERT_EQ(std::nullopt, style.font);
+        ASSERT_EQ(TextDecoration::Unset, style.textDecoration);
+        ASSERT_EQ(std::make_optional(Valdi::Color(static_cast<int64_t>(0x0000FFFF))), style.color);
+        ASSERT_EQ(nullptr, style.background);
+        ASSERT_EQ(nullptr, style.onTap);
+    }
+}
+
+static Ref<TextAttributeValue> getTextAttributeValueFromNode(ViewNode* viewNode) {
+    auto view = StandaloneView::unwrap(viewNode->getView());
+    EXPECT_TRUE(view != nullptr);
+    if (view == nullptr) {
+        return nullptr;
+    }
+
+    auto value = view->getAttribute(STRING_LITERAL("value"));
+    EXPECT_EQ(ValueType::ValdiObject, value.getType());
+    auto attributedText = value.getTypedRef<TextAttributeValue>();
+    EXPECT_TRUE(attributedText != nullptr);
+    return attributedText;
+}
+
+static std::vector<Ref<TextInlineAttachment>> getInlineViewAttachments(const Ref<TextAttributeValue>& attributedText) {
+    std::vector<Ref<TextInlineAttachment>> attachments;
+    if (attributedText == nullptr) {
+        return attachments;
+    }
+
+    for (size_t i = 0; i < attributedText->getPartsSize(); i++) {
+        const auto& attachment = attributedText->getStyleAtIndex(i).inlineViewAttachment;
+        if (attachment != nullptr) {
+            attachments.push_back(attachment);
+        }
+    }
+    return attachments;
+}
+
+static Value inlineViewDynamicSizeViewModel(double width, double height) {
+    return Value().setMapValue("childWidth", Value(width)).setMapValue("childHeight", Value(height));
+}
+
+TEST_P(RuntimeFixture, supportsManagedChildFrameViewClasses) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("ManagedChildFrameView"),
+                                                                              true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ManagedChildFrames@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto managedNodes = findViewNodesWithId(tree->getRootViewNode(), "managed");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "managedChild");
+    ASSERT_EQ(static_cast<size_t>(1), managedNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* managedNode = managedNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(managedNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(YGPositionTypeAbsolute, YGNodeStyleGetPositionType(childNode->getYogaNode()));
+    ASSERT_EQ(Frame(10, 0, 30, 20), childNode->getCalculatedFrame());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewAttachmentsFromTextChildren) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewTextAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* labelNode = labelNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(labelNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(Frame(0, 0, 18, 12), childNode->getCalculatedFrame());
+
+    auto labelView = StandaloneView::unwrap(labelNode->getView());
+    ASSERT_TRUE(labelView != nullptr);
+
+    auto value = labelView->getAttribute(STRING_LITERAL("value"));
+    ASSERT_EQ(ValueType::ValdiObject, value.getType());
+
+    auto attributedText = value.getTypedRef<TextAttributeValue>();
+    ASSERT_TRUE(attributedText != nullptr);
+    ASSERT_EQ(static_cast<size_t>(3), attributedText->getPartsSize());
+    ASSERT_EQ(STRING_LITERAL("Before "), attributedText->getContentAtIndex(0));
+    ASSERT_EQ(STRING_LITERAL(" after"), attributedText->getContentAtIndex(2));
+
+    const auto& inlineStyle = attributedText->getStyleAtIndex(1);
+    ASSERT_TRUE(inlineStyle.inlineViewAttachment != nullptr);
+    ASSERT_EQ(static_cast<size_t>(0), inlineStyle.inlineViewAttachment->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Bottom, inlineStyle.inlineViewAttachment->getVerticalAlignment());
+    ASSERT_EQ(Size(18, 12), inlineStyle.inlineViewAttachment->getSize());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewVerticalAlignmentEnumValuesFromTS) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewVerticalAlignmentTextAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto topNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineTop");
+    auto centerNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineCenter");
+    auto bottomNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineBottom");
+    auto baselineNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineBaseline");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), topNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), centerNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), bottomNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), baselineNodes.size());
+
+    auto* labelNode = labelNodes[0];
+    ASSERT_TRUE(labelNode->managesChildFrames());
+    ASSERT_TRUE(topNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(centerNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(bottomNodes[0]->parentManagesChildFrames());
+    ASSERT_TRUE(baselineNodes[0]->parentManagesChildFrames());
+
+    ASSERT_EQ(Frame(0, 0, 11, 12), topNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 22, 24), centerNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 33, 36), bottomNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Frame(0, 0, 44, 14), baselineNodes[0]->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(labelNode);
+    ASSERT_TRUE(attributedText != nullptr);
+    ASSERT_EQ(static_cast<size_t>(9), attributedText->getPartsSize());
+    ASSERT_EQ(STRING_LITERAL("A"), attributedText->getContentAtIndex(0));
+    ASSERT_EQ(STRING_LITERAL("B"), attributedText->getContentAtIndex(2));
+    ASSERT_EQ(STRING_LITERAL("C"), attributedText->getContentAtIndex(4));
+    ASSERT_EQ(STRING_LITERAL("D"), attributedText->getContentAtIndex(6));
+    ASSERT_EQ(STRING_LITERAL("E"), attributedText->getContentAtIndex(8));
+
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(4), attachments.size());
+    ASSERT_EQ(static_cast<size_t>(0), attachments[0]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Top, attachments[0]->getVerticalAlignment());
+    ASSERT_EQ(Size(11, 12), attachments[0]->getSize());
+    ASSERT_EQ(static_cast<size_t>(1), attachments[1]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Center, attachments[1]->getVerticalAlignment());
+    ASSERT_EQ(Size(22, 24), attachments[1]->getSize());
+    ASSERT_EQ(static_cast<size_t>(2), attachments[2]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Bottom, attachments[2]->getVerticalAlignment());
+    ASSERT_EQ(Size(33, 36), attachments[2]->getSize());
+    ASSERT_EQ(static_cast<size_t>(3), attachments[3]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Baseline, attachments[3]->getVerticalAlignment());
+    ASSERT_EQ(Size(44, 14), attachments[3]->getSize());
+}
+
+TEST_P(RuntimeFixture, resolvesInlineViewAttachmentsForTextViewChildren) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiTextView"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewTextViewAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto textViewNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineTextView");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "textViewInlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), textViewNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+
+    auto* textViewNode = textViewNodes[0];
+    auto* childNode = childNodes[0];
+    ASSERT_TRUE(textViewNode->managesChildFrames());
+    ASSERT_TRUE(childNode->parentManagesChildFrames());
+    ASSERT_EQ(YGPositionTypeAbsolute, YGNodeStyleGetPositionType(childNode->getYogaNode()));
+    ASSERT_EQ(Frame(0, 0, 26, 16), childNode->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(textViewNode);
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(1), attachments.size());
+    ASSERT_EQ(static_cast<size_t>(0), attachments[0]->getChildIndex());
+    ASSERT_EQ(InlineViewVerticalAlignment::Top, attachments[0]->getVerticalAlignment());
+    ASSERT_EQ(Size(26, 16), attachments[0]->getSize());
+
+    auto childView = StandaloneView::unwrap(childNode->getView());
+    ASSERT_TRUE(childView != nullptr);
+    ASSERT_EQ(Frame(), childView->getFrame());
+}
+
+TEST_P(RuntimeFixture, rejectsInvalidInlineViewChildIndexesFromTSAttributedText) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewInvalidChildIndexAttribute@test/src/ManagedChildFrames"), Value(), Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+    ASSERT_TRUE(labelNodes[0]->managesChildFrames());
+    ASSERT_TRUE(childNodes[0]->parentManagesChildFrames());
+
+    auto labelView = StandaloneView::unwrap(labelNodes[0]->getView());
+    ASSERT_TRUE(labelView != nullptr);
+    ASSERT_TRUE(labelView->getAttribute(STRING_LITERAL("value")).isUndefined());
+}
+
+TEST_P(RuntimeFixture, inlineViewAttachmentSizeProviderTracksChildLayoutChanges) {
+    wrapper.standaloneRuntime->getViewManager().setManagesChildFramesForClass(STRING_LITERAL("SCValdiLabel"), true);
+
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("InlineViewDynamicSizeAttribute@test/src/ManagedChildFrames"),
+        inlineViewDynamicSizeViewModel(18, 12),
+        Value());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto labelNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineLabel");
+    auto childNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), labelNodes.size());
+    ASSERT_EQ(static_cast<size_t>(1), childNodes.size());
+    ASSERT_EQ(Frame(0, 0, 18, 12), childNodes[0]->getCalculatedFrame());
+
+    auto attributedText = getTextAttributeValueFromNode(labelNodes[0]);
+    auto attachments = getInlineViewAttachments(attributedText);
+    ASSERT_EQ(static_cast<size_t>(1), attachments.size());
+    auto attachment = attachments[0];
+    ASSERT_EQ(Size(18, 12), attachment->getSize());
+
+    auto labelView = StandaloneView::unwrap(labelNodes[0]->getView());
+    ASSERT_TRUE(labelView != nullptr);
+    auto invalidateLayoutCountBeforeSizeChange = labelView->getInvalidateLayoutCount();
+
+    wrapper.setViewModel(tree->getContext(), inlineViewDynamicSizeViewModel(31, 17));
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    ASSERT_EQ(Frame(0, 0, 31, 17), childNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Size(31, 17), attachment->getSize());
+
+    tree->setLayoutSpecs(Size(200, 200), LayoutDirectionLTR);
+
+    auto updatedChildNodes = findViewNodesWithId(tree->getRootViewNode(), "inlineChild");
+    ASSERT_EQ(static_cast<size_t>(1), updatedChildNodes.size());
+    ASSERT_EQ(Frame(0, 0, 31, 17), updatedChildNodes[0]->getCalculatedFrame());
+    ASSERT_EQ(Size(31, 17), attachment->getSize());
+
+    auto updatedAttributedText = getTextAttributeValueFromNode(labelNodes[0]);
+    auto updatedAttachments = getInlineViewAttachments(updatedAttributedText);
+    ASSERT_EQ(static_cast<size_t>(1), updatedAttachments.size());
+    ASSERT_EQ(Size(31, 17), updatedAttachments[0]->getSize());
+    ASSERT_GT(labelView->getInvalidateLayoutCount(), invalidateLayoutCountBeforeSizeChange);
 }
 
 static Ref<TextAttributeValue> getTextAttributeValueFromNode(ViewNode* viewNode) {
@@ -8165,6 +8548,19 @@ TEST_P(RuntimeFixture, supportsNotifyWithUncaughtErrorHandler) {
     ASSERT_TRUE(result.isError());
 }
 
+static DummyView makeColorPaletteTestView(int64_t borderColor, int64_t backgroundColor) {
+    return DummyView("SCValdiView")
+        .addAttribute("border", Value(ValueArray::make({Value(1.0), Value(borderColor)})))
+        .addChild(DummyView("SCValdiView")
+                      .addAttribute("background",
+                                    Value(ValueArray::make({
+                                        Value(ValueArray::make({Value(backgroundColor)})),
+                                        Value(ValueArray::make({})),
+                                        Value(static_cast<int32_t>(0)),
+                                        Value(false),
+                                    }))));
+}
+
 TEST_P(RuntimeFixture, supportsCustomColorPalette) {
     auto tree = wrapper.createViewNodeTreeAndContext(STRING_LITERAL("ColorPaletteTest@test/src/ColorPaletteTest"),
                                                      Value(makeShared<ValueMap>()),
@@ -8172,20 +8568,29 @@ TEST_P(RuntimeFixture, supportsCustomColorPalette) {
 
     wrapper.waitUntilAllUpdatesCompleted();
 
-    ASSERT_EQ(DummyView("SCValdiView")
-                  .addAttribute("border", Value(ValueArray::make({Value(1.0), Value(65535)})))
-                  .addChild(DummyView("SCValdiView")
-                                .addAttribute("background",
-                                              Value(ValueArray::make({
-                                                  Value(ValueArray::make({Value(8388863)})),
-                                                  Value(ValueArray::make({})),
-                                                  Value(static_cast<int32_t>(0)),
-                                                  Value(false),
-                                              })))),
-              getRootView(tree));
+    ASSERT_EQ(makeColorPaletteTestView(65535, 8388863), getRootView(tree));
 }
 
-TEST_P(RuntimeFixture, canUpdateCustomColorPalette) {
+TEST_P(RuntimeFixture, colorPaletteManagerRemainsUsableAfterRuntimeManagerTeardown) {
+    Ref<ColorPaletteManager> colorPaletteManager;
+    {
+        RuntimeWrapper temporaryWrapper(getJsBridge(), getTSNMode());
+        colorPaletteManager = temporaryWrapper.standaloneRuntime->getViewManagerContext()
+                                  ->getAttributesManager()
+                                  .getColorPaletteManager();
+        temporaryWrapper.teardown();
+    }
+
+    colorPaletteManager->configureColorPalette(STRING_LITERAL("dark"),
+                                               {{STRING_LITERAL("background"), Color::rgba(255, 0, 0, 1.0)}});
+    colorPaletteManager->setActiveColorPalette(STRING_LITERAL("dark"));
+
+    ASSERT_EQ(STRING_LITERAL("dark"), colorPaletteManager->getActiveColorPalette()->getName());
+    ASSERT_EQ(Color::rgba(255, 0, 0, 1.0),
+              colorPaletteManager->getActiveColorPalette()->getColorForName(STRING_LITERAL("background")).value());
+}
+
+TEST_P(RuntimeFixture, canSwitchActiveCustomColorPalette) {
     auto tree = wrapper.createViewNodeTreeAndContext(STRING_LITERAL("ColorPaletteTest@test/src/ColorPaletteTest"),
                                                      Value(makeShared<ValueMap>()),
                                                      Value::undefined());
@@ -8193,22 +8598,148 @@ TEST_P(RuntimeFixture, canUpdateCustomColorPalette) {
     wrapper.waitUntilAllUpdatesCompleted();
 
     wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
-                                                                   STRING_LITERAL("updateColorPalette"));
+                                                                   STRING_LITERAL("setDarkColorPalette"));
 
     wrapper.flushQueues();
 
-    ASSERT_EQ(
-        DummyView("SCValdiView")
-            .addAttribute("border", Value(ValueArray::make({Value(1.0), Value(static_cast<int64_t>(4278190335))})))
-            .addChild(DummyView("SCValdiView")
-                          .addAttribute("background",
-                                        Value(ValueArray::make({
-                                            Value(ValueArray::make({Value(static_cast<int64_t>(4294902015))})),
-                                            Value(ValueArray::make({})),
-                                            Value(static_cast<int32_t>(0)),
-                                            Value(false),
-                                        })))),
-        getRootView(tree));
+    ASSERT_EQ(makeColorPaletteTestView(4278190335, 4294902015), getRootView(tree));
+}
+
+TEST_P(RuntimeFixture, doesNotReapplyCustomColorPaletteWhenInactivePaletteChanges) {
+    auto tree = wrapper.createViewNodeTreeAndContext(STRING_LITERAL("ColorPaletteTest@test/src/ColorPaletteTest"),
+                                                     Value(makeShared<ValueMap>()),
+                                                     Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("updateDarkColorPalette"));
+
+    wrapper.flushQueues();
+
+    ASSERT_EQ(makeColorPaletteTestView(65535, 8388863), getRootView(tree));
+}
+
+TEST_P(RuntimeFixture, reappliesCustomColorPaletteWhenActivePaletteChanges) {
+    auto tree = wrapper.createViewNodeTreeAndContext(STRING_LITERAL("ColorPaletteTest@test/src/ColorPaletteTest"),
+                                                     Value(makeShared<ValueMap>()),
+                                                     Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("updateLightColorPalette"));
+
+    wrapper.flushQueues();
+
+    ASSERT_EQ(makeColorPaletteTestView(4278190335, 4294902015), getRootView(tree));
+}
+
+static DummyView makeColorPaletteOverrideTestView(int64_t rootBackgroundColor,
+                                                  int64_t overrideBackgroundColor,
+                                                  int64_t overrideChildBackgroundColor,
+                                                  int64_t siblingBackgroundColor) {
+    auto makeBackground = [](int64_t color) {
+        return Value(ValueArray::make({
+            Value(ValueArray::make({Value(color)})),
+            Value(ValueArray::make({})),
+            Value(static_cast<int32_t>(0)),
+            Value(false),
+        }));
+    };
+
+    return DummyView("SCValdiView")
+        .addAttribute("background", makeBackground(rootBackgroundColor))
+        .addChild(
+            DummyView("SCValdiView")
+                .addAttribute("background", makeBackground(overrideBackgroundColor))
+                .addChild(
+                    DummyView("SCValdiView").addAttribute("background", makeBackground(overrideChildBackgroundColor))))
+        .addChild(DummyView("SCValdiView").addAttribute("background", makeBackground(siblingBackgroundColor)));
+}
+
+TEST_P(RuntimeFixture, supportsPerViewNodeColorPaletteOverride) {
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ColorPaletteOverrideTest@test/src/ColorPaletteOverrideTest"),
+        Value(makeShared<ValueMap>()),
+        Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    ASSERT_EQ(makeColorPaletteOverrideTestView(65535, 4278190335, 4294902015, 8388863), getRootView(tree));
+}
+
+TEST_P(RuntimeFixture, switchingActiveColorPaletteDoesNotChangeOverriddenSubtree) {
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ColorPaletteOverrideTest@test/src/ColorPaletteOverrideTest"),
+        Value(makeShared<ValueMap>()),
+        Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("setDarkActiveColorPalette"));
+
+    wrapper.flushQueues();
+
+    ASSERT_EQ(makeColorPaletteOverrideTestView(4278190335, 4278190335, 4294902015, 4294902015), getRootView(tree));
+}
+
+TEST_P(RuntimeFixture, clearingRootColorPaletteOverrideFallsBackToActivePalette) {
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ColorPaletteOverrideTest@test/src/ColorPaletteOverrideTest"),
+        Value(makeShared<ValueMap>()),
+        Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    auto root = tree->getRootViewNode();
+    ASSERT_NE(nullptr, root);
+    ASSERT_EQ(STRING_LITERAL("light"), root->getResolvedColorPalette()->getName());
+
+    tree->scheduleExclusiveUpdate(
+        [&]() { root->setColorPaletteName(tree->getCurrentViewTransactionScope(), STRING_LITERAL("dark")); });
+    wrapper.flushQueues();
+    ASSERT_EQ(STRING_LITERAL("dark"), root->getResolvedColorPalette()->getName());
+
+    tree->scheduleExclusiveUpdate(
+        [&]() { root->setColorPaletteName(tree->getCurrentViewTransactionScope(), StringBox()); });
+    wrapper.flushQueues();
+
+    ASSERT_NE(nullptr, root->getResolvedColorPalette());
+    ASSERT_EQ(STRING_LITERAL("light"), root->getResolvedColorPalette()->getName());
+}
+
+TEST_P(RuntimeFixture, mutatingOverriddenColorPaletteUpdatesOverriddenSubtree) {
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ColorPaletteOverrideTest@test/src/ColorPaletteOverrideTest"),
+        Value(makeShared<ValueMap>()),
+        Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("updateDarkColorPalette"));
+
+    wrapper.flushQueues();
+
+    ASSERT_EQ(makeColorPaletteOverrideTestView(65535, 255, 4294967295, 8388863), getRootView(tree));
+}
+
+TEST_P(RuntimeFixture, mutatingUnusedColorPaletteDoesNotChangeRenderedAttributes) {
+    auto tree = wrapper.createViewNodeTreeAndContext(
+        STRING_LITERAL("ColorPaletteOverrideTest@test/src/ColorPaletteOverrideTest"),
+        Value(makeShared<ValueMap>()),
+        Value::undefined());
+
+    wrapper.waitUntilAllUpdatesCompleted();
+
+    wrapper.runtime->getJavaScriptRuntime()->callComponentFunction(tree->getContext(),
+                                                                   STRING_LITERAL("updateUnusedColorPalette"));
+
+    wrapper.flushQueues();
+
+    ASSERT_EQ(makeColorPaletteOverrideTestView(65535, 4278190335, 4294902015, 8388863), getRootView(tree));
 }
 
 static Result<Value> postprocessArrayValueToLength(ViewNode& viewNode, const Value& in) {

@@ -39,6 +39,8 @@ class Runtime {
   // Map of task IDs to timeout IDs for scheduleWorkItem
   private _taskIdCounter = 1;
   private _scheduledTasks = new Map<number, number>();
+  // Named color palettes registered via configureColorPalette (see PR #121's runtime API).
+  private colorPalettes: { [name: string]: any } = {};
 
   // jsEvaluator for the ModuleLoader. Called when a compiled module's lazy
   // Proxy is first accessed. Resolves via bootstrap modules (Init.js deps)
@@ -127,8 +129,16 @@ class Runtime {
     }
   }
 
-  setColorPalette(palette: any) {
+  configureColorPalette(name: string, palette: any) {
+    this.colorPalettes[name] = palette;
     (global as any).currentPalette = palette;
+  }
+
+  setActiveColorPalette(name: string) {
+    const palette = this.colorPalettes[name];
+    if (palette !== undefined) {
+      (global as any).currentPalette = palette;
+    }
   }
 
   getColorPalette() {

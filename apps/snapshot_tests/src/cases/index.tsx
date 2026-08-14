@@ -32,6 +32,7 @@ import { EmojiRendering } from './EmojiRendering';
 import { MaskImage } from './MaskImage';
 import { TextFieldRendering } from './TextFieldRendering';
 import { BorderStyles } from './BorderStyles';
+import { ColorPaletteThemes, ColorPaletteNestedOverride } from './ColorPalette';
 
 export const testCases: SnapshotTestCase[] = [
   { name: 'BasicLayout', width: 200, height: 150, render: () => { <BasicLayout />; } },
@@ -61,4 +62,6 @@ export const testCases: SnapshotTestCase[] = [
   { name: 'MaskImage', width: 280, height: 360, render: () => { <MaskImage />; } },
   { name: 'TextFieldRendering', width: 280, height: 320, render: () => { <TextFieldRendering />; } },
   { name: 'BorderStyles', width: 220, height: 340, render: () => { <BorderStyles />; } },
+  { name: 'ColorPaletteThemes', width: 320, height: 164, render: () => { <ColorPaletteThemes />; } },
+  { name: 'ColorPaletteNestedOverride', width: 220, height: 220, render: () => { <ColorPaletteNestedOverride />; } },
 ];
