@@ -48,6 +48,13 @@ static Value makeGradientValue(std::initializer_list<int64_t> colors,
     return makeGradientValueImpl(colors, locations, angle, radial);
 }
 
+static Value makeGradientValue(std::initializer_list<Value> colors,
+                               std::initializer_list<double> locations,
+                               int32_t angle,
+                               bool radial) {
+    return makeGradientValueImpl(colors, locations, angle, radial);
+}
+
 static Ref<ColorPalette> makeTestColorPalette() {
     auto colorPalette = makeShared<ColorPalette>(STRING_LITERAL("default"));
     colorPalette->updateColors({
@@ -181,6 +188,31 @@ TEST(AttributeProcessor, canParseLinearGradientWithLocations) {
     ASSERT_TRUE(postprocessed) << postprocessed.description();
     ASSERT_EQ(makeGradientValue({0x0000FFFF, 0xFFFFFFFF, 0xFF0000FF}, {0.0, 0.25, 0.75}, 0, false),
               postprocessed.value());
+}
+
+TEST(AttributeProcessor, canParseLinearGradientWithTransparentRgbaStop) {
+    auto colorPalette = makeTestColorPalette();
+
+    auto result = preprocessGradient(Value(STRING_LITERAL("linear-gradient(red 0, rgba(0,0,0,0) 1)")));
+
+    ASSERT_TRUE(result.success()) << result.description();
+
+    ASSERT_EQ(makeGradientValue(
+                  {
+                      Value(STRING_LITERAL("red")),
+                      Value(static_cast<int64_t>(0x00000000)),
+                  },
+                  {
+                      0.0,
+                      1.0,
+                  },
+                  0,
+                  false),
+              result.value());
+
+    auto postprocessed = postprocessGradient(false, *colorPalette, result.value());
+    ASSERT_TRUE(postprocessed) << postprocessed.description();
+    ASSERT_EQ(makeGradientValue({0xFF0000FF, 0x00000000}, {0.0, 1.0}, 0, false), postprocessed.value());
 }
 
 TEST(AttributeProcessor, failsWhenLinearGradientWithLocationsIsNotBalanced) {
