@@ -79,9 +79,8 @@ def setup_dependencies(workspace_root = None):
 
     http_archive(
         name = "rules_kotlin",
-        url = "https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.0/rules_kotlin-v1.9.0.tar.gz",
-        sha256 = "5766f1e599acf551aa56f49dab9ab9108269b03c557496c54acaf41f98e2b8d6",
-        patches = ["@valdi//registry/modules/rules_kotlin/1.9.0/patches:rules_kotlin.patch"],
+        url = "https://github.com/bazel-contrib/rules_kotlin/releases/download/v2.3.10/rules_kotlin-v2.3.10.tar.gz",
+        sha256 = "c8fda2b1518018f26d7ca914cd9adb0e9f1799d0db7c4b510de67ed500060dae",
     )
 
     http_archive(
