@@ -24,10 +24,10 @@ def setup_dependencies(workspace_root = None):
 
     http_archive(
         name = "toolchains_llvm",
-        canonical_id = "v1.3.0",
-        sha256 = "d3c255b2ceec9eaebb6b5a44c904a48429b8dcb71e630de2f103e7b4aab9f073",
-        strip_prefix = "toolchains_llvm-v1.3.0",
-        url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.3.0/toolchains_llvm-v1.3.0.tar.gz",
+        canonical_id = "v1.7.0",
+        sha256 = "85c341e957ba58482892a8088e4a34391d15bd98917f0993ecb62f008d6986d6",
+        strip_prefix = "toolchains_llvm-v1.7.0",
+        url = "https://github.com/bazel-contrib/toolchains_llvm/releases/download/v1.7.0/toolchains_llvm-v1.7.0.tar.gz",
     )
 
     http_archive(
