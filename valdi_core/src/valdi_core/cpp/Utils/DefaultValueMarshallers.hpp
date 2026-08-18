@@ -10,6 +10,7 @@
 #include "valdi_core/cpp/Schema/ValueSchemaRegistry.hpp"
 #include "valdi_core/cpp/Utils/DjinniUtils.hpp"
 #include "valdi_core/cpp/Utils/InlineContainerAllocator.hpp"
+#include "valdi_core/cpp/Utils/InterfaceMarshallDiagnostics.hpp"
 #include "valdi_core/cpp/Utils/PlatformObjectAttachments.hpp"
 #include "valdi_core/cpp/Utils/Promise.hpp"
 #include "valdi_core/cpp/Utils/SmallVector.hpp"
@@ -1169,6 +1170,7 @@ public:
         auto attachments =
             castOrNull<PlatformObjectAttachments>(objectStore.getValueForObjectKey(value, exceptionTracker));
         if (!exceptionTracker) {
+            setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::AttachmentsLookupFailed);
             return Value();
         }
 
@@ -1176,12 +1178,14 @@ public:
         if (attachments != nullptr) {
             proxyObject = attachments->getProxyForSource(this);
             if (proxyObject != nullptr) {
+                setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::ReusedExistingProxy);
                 return Value(proxyObject);
             }
         } else {
             attachments = makeShared<PlatformObjectAttachments>();
             objectStore.setValueForObjectKey(value, attachments, exceptionTracker);
             if (!exceptionTracker) {
+                setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::AttachmentsStoreFailed);
                 return Value();
             }
         }
@@ -1190,11 +1194,13 @@ public:
 
         auto typedObjectIndex = marshallTypedObject(&value, value, referenceInfoBuilder, exceptionTracker);
         if (!exceptionTracker) {
+            setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::TypedObjectMarshallFailed);
             return Value();
         }
 
         proxyObject = _objectClass->newProxy(value, typedObjectIndex.getTypedObjectRef(), exceptionTracker);
         if (!exceptionTracker) {
+            setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::ProxyCreationFailed);
             return this->handleMarshallError(
                 exceptionTracker, fmt::format("While creating proxy object for class: {}: ", _schema->getClassName()));
         }
@@ -1213,9 +1219,11 @@ public:
          */
         objectStore.setObjectForId(proxyObject->getId(), value, exceptionTracker);
         if (!exceptionTracker) {
+            setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::ObjectStoreSetFailed);
             return Value();
         }
 
+        setLastInterfaceMarshallOutcome(InterfaceMarshallOutcome::CreatedNewProxy);
         return Value(proxyObject);
     }
 
