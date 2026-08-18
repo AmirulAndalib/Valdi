@@ -184,7 +184,9 @@ jobs:
 
   linux-ci:
     name: "Linux: ${{ matrix.name }}"
-    runs-on: ubuntu-latest
+    # Pin the major image (mirrors the macos-26 pin above) so a GitHub
+    # ubuntu-latest roll can't silently change the toolchain under CI.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -320,7 +322,7 @@ jobs:
 
   api-surface:
     name: API Surface Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -336,7 +338,7 @@ jobs:
 
   web-integration-test:
     name: valdi_web Integration Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
