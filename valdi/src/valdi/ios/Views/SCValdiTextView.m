@@ -1128,12 +1128,17 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
     return fontAttributes;
 }
 
+// Attribute setters mark the text dirty and defer the rebuild to the next layout pass
+// (layoutSubviews/sizeThatFits both flush it) so a render pass that applies several
+// attributes pays for one SCValdiProcessedText build instead of one per setter. The
+// full rebuild is expensive for animated/styled captions and runs on the main thread;
+// it dominated PERF_STUCK_DETECTED hangs on the caption editor.
 - (void)valdi_setFontAttributes:(SCValdiFontAttributes *)fontAttributes
 {
     _fontAttributes = fontAttributes;
     _needAttributedTextUpdate = YES;
     [self _applyNumberOfLinesAttributes];
-    [self _updateAttributedTextIfNeeded];
+    [self setNeedsLayout];
 }
 
 - (void)valdi_setCustomUnderlineStyle:(SCValdiCustomUnderlineStyle *)customUnderlineStyle
@@ -1143,7 +1148,7 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
     if (_effectsLayoutManager) {
         [self _updateEffectsLayoutManager];
     }
-    [self _updateAttributedTextIfNeeded];
+    [self setNeedsLayout];
     [_textView setNeedsDisplay];
 }
 
@@ -1171,6 +1176,16 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
 
 - (void)valdi_setValue:(id)textValue
 {
+    // Rebinding an identical plain string is a no-op; skip the synchronous rebuild.
+    // Restricted to the case where the displayed text already matches (and no marked
+    // IME text is pending), because JS can re-set the previous value to reject an edit
+    // and the rebuild is what clobbers the rejected characters back out of the view.
+    if ([textValue isKindOfClass:[NSString class]] && _textView.markedTextRange == nil &&
+        [ObjectAs(_textValue, NSString) isEqualToString:textValue] &&
+        [_textView.text isEqualToString:textValue]) {
+        return;
+    }
+
     NSString *oldTextValue = _textView.text;
     _textValue = textValue;
     _needAttributedTextUpdate = YES;
@@ -1187,7 +1202,7 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
 {
     _characterLimit = characterLimit;
     _needAttributedTextUpdate = YES;
-    [self _updateAttributedTextIfNeeded];
+    [self setNeedsLayout];
     return YES;
 }
 
@@ -1257,7 +1272,7 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
     _enabled = enabled;
     [self _updateTextViewInteractionMode];
     _needAttributedTextUpdate = YES;
-    [self _updateAttributedTextIfNeeded];
+    [self setNeedsLayout];
     return YES;
 }
 
