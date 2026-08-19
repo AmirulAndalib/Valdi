@@ -17,6 +17,7 @@
 #include "valdi_core/cpp/Utils/ResolvablePromise.hpp"
 #include "valdi_core/cpp/Utils/SmallVector.hpp"
 #include "valdi_core/cpp/Utils/Trace.hpp"
+#include "valdi_core/cpp/Utils/TrackedLock.hpp"
 #include "valdi_core/cpp/Utils/Value.hpp"
 
 #include "utils/debugging/Assert.hpp"
@@ -151,6 +152,12 @@ Result<Value> ValueFunctionWithJSValue::dispatchAndWaitOnJsThread(const Ref<Java
                                                                   size_t parametersSize) {
     auto promise = std::make_shared<std::promise<Result<Value>>>();
     auto future = promise->get_future();
+
+    // The JS callback may need locks this thread holds (e.g. the ViewNodeTree lock when the call
+    // originates from the scroll path); suspend them while parked so the JS thread can make
+    // progress instead of stalling until the deadline. Same pattern as
+    // DeferredViewTransaction::flush before dispatchSync.
+    DropAllTrackedLocks dropAllTrackedLocks;
 
     taskScheduler->dispatchOnJsThreadAsync(
         getContext(),
