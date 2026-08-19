@@ -140,6 +140,10 @@ public:
 class RuntimeFixture : public JSBridgeTestFixture {
 protected:
     void SetUp() override {
+        JSBridgeTestFixture::SetUp();
+        if (IsSkipped()) {
+            return;
+        }
         auto* jsBridge = getJsBridge();
         wrapper = RuntimeWrapper(jsBridge, getTSNMode());
     }

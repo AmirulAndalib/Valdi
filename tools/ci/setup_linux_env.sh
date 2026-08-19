@@ -127,7 +127,12 @@ if ! command -v watchman >/dev/null 2>&1; then
     sudo chmod 2777 /usr/local/var/run/watchman
     sudo ldconfig
     rm -rf "$WATCHMAN_ZIP" "$WATCHMAN_DIR"
-    watchman --version
+    # watchman is optional here (only the hot-reload smoke uses it, and that's not in
+    # the //valdi:test gate). Some runners are too old for the pinned release's prebuilt
+    # binary (e.g. it needs a newer glibc than Ubuntu 22.04 ships), where `watchman
+    # --version` exits non-zero and, under `set -e`, would abort the whole setup. Don't
+    # let a broken optional tool fail environment setup.
+    watchman --version || echo "warning: watchman unavailable on this runner; hot-reload smoke will be skipped"
 fi
 
 # ---------------------------------------------------------------------------
