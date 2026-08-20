@@ -30,6 +30,7 @@
 #include "valdi/runtime/Resources/DirectionalAsset.hpp"
 #include "valdi/runtime/Resources/PlatformSpecificAsset.hpp"
 #include "valdi/runtime/Resources/ThemableAsset.hpp"
+#include "valdi/runtime/Utils/MainThreadManager.hpp"
 #include "valdi/runtime/ValdiRuntimeTweaks.hpp"
 #include "valdi_core/JSRuntimeNativeObjectsManager.hpp"
 #include "valdi_core/cpp/Constants.hpp"
@@ -539,6 +540,7 @@ Result<Void> JavaScriptRuntime::initializeContext() {
 
     if (runtimeTweaks != nullptr) {
         Context::setDestroyedContextFixEnabled(runtimeTweaks->enableRenderRequestContextFix());
+        MainThreadManager::setPreRasterFenceDisabled(runtimeTweaks->disablePreRasterFence());
     }
 
     VALDI_INFO(*_logger, "Creating JSContext from engine '{}'", _javaScriptBridge.getName());

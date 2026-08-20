@@ -112,6 +112,10 @@ bool ValdiRuntimeTweaks::enableRenderRequestContextFix() const {
     return _tweakValueProvider->getBool(configKey, true);
 }
 
+bool ValdiRuntimeTweaks::disablePreRasterFence() const {
+    return getConfigKey("VALDI_DISABLE_PRE_RASTER_FENCE");
+}
+
 bool ValdiRuntimeTweaks::applyManagedChildFramePadding() const {
     auto configKey =
         StringCache::getGlobal().makeStringFromLiteral(std::string_view("VALDI_MANAGES_CHILD_FRAME_PADDING_ENABLED"));
