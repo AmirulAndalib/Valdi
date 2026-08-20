@@ -140,6 +140,9 @@ final class ValdiAnnotationTests: XCTestCase {
         )
     }
 
+    // XCTExpectFailure is only in Apple's XCTest, not swift-corelibs-xctest on Linux, so this
+    // expected-failure test builds and runs on macOS only.
+    #if !os(Linux)
     func testBadCases() throws {
         var content: String = ""
 
@@ -171,6 +174,7 @@ final class ValdiAnnotationTests: XCTestCase {
             _ = try extractAnnotations(content)
         }
     }
+    #endif
 
     func testiOSTypeNameValidation() throws {
         XCTAssertTrue(ObjCValidation.isValidIOSTypeName(iosTypeName: "SCCSomeType"))

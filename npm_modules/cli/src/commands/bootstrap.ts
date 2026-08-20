@@ -181,6 +181,8 @@ function initializeConfigFiles(
     TemplateFile.init(TEMPLATE_BASE_PATHS.WATCHMAN_CONFIG),
     TemplateFile.init(TEMPLATE_BASE_PATHS.EDITOR_CONFIG),
     TemplateFile.init(TEMPLATE_BASE_PATHS.AGENTS).withReplacements({ MODULE_NAME: projectName }),
+    TemplateFile.init(TEMPLATE_BASE_PATHS.RULES_PYTHON_PATCH_BUILD),
+    TemplateFile.init(TEMPLATE_BASE_PATHS.RULES_PYTHON_PATCH),
   ];
 
   TEMPLATE_FILES.forEach(templateFile => {

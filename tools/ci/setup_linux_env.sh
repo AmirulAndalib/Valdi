@@ -90,6 +90,20 @@ sudo apt-get install -y \
     libfontconfig1-dev \
     zlib1g-dev
 
+# Chrome/Puppeteer headless-shell needs a set of GTK/X/ALSA shared libraries. The GitHub
+# ubuntu runner image ships them by default, but the internal SnapCI VM (Ubuntu 22.04) does
+# not, so web_integration_test.sh's headless Chrome fails to launch with e.g.
+# "libatk-1.0.so.0: cannot open shared object file". Install them here (this script is shared
+# by both CIs; harmless where already present). Ubuntu 24.04+ (newer GHA runners) renamed some
+# of these with a t64 suffix, so fall back to the t64 name when the classic one is unavailable.
+echo "--- Installing Chrome/Puppeteer runtime libraries ---"
+for lib in \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libcups2 \
+    libdrm2 libgbm1 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgtk-3-0 libpango-1.0-0 libcairo2 libasound2; do
+    sudo apt-get install -y "$lib" 2>/dev/null || sudo apt-get install -y "${lib}t64"
+done
+
 # libtinfo5 is not in the default repos on Ubuntu 24.04+ (used by newer GHA runners).
 # Fall back to the 22.04 archive package if apt can't find it. Discover the deb
 # filename dynamically so a security-update revision bump (Ubuntu drops the old
