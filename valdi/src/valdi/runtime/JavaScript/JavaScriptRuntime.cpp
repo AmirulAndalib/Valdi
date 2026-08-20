@@ -2436,15 +2436,8 @@ void JavaScriptRuntime::buildContext(Valdi::IJavaScriptContext& context,
         return;
     }
 
-    // Expose isLoggingEnabled to JS.
-    // In appstore builds this is controlled by VALDI_DISABLE_JS_LOGGING:
-    // COF false (default/control) = logging enabled, COF true (treatment) = logging disabled.
-    // In non-appstore builds this is always true.
-    bool isLoggingEnabled = true;
-    if constexpr (snap::kIsAppstoreBuild) {
-        // Defaults to true (logging enabled) when no tweaks provider is available (e.g., unit tests).
-        isLoggingEnabled = tweaks != nullptr ? !tweaks->disableJsLogging() : true;
-    }
+    // Expose isLoggingEnabled to JS. Disabled in appstore builds, always enabled otherwise.
+    bool isLoggingEnabled = !snap::kIsAppstoreBuild;
     auto jsIsLoggingEnabled = context.newBool(isLoggingEnabled);
     context.setObjectProperty(runtimeObject.get(), "isLoggingEnabled", jsIsLoggingEnabled.get(), exceptionTracker);
     if (!exceptionTracker) {

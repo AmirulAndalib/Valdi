@@ -31,7 +31,6 @@ public:
     bool shouldNudgeJSThread() const;
     bool disablePersistentStoreEncryption() const;
     bool enableScopedContextStackTraceCapture() const;
-    bool disableJsLogging() const;
     bool enableRenderRequestContextFix() const;
     bool applyManagedChildFramePadding() const;
     bool disableHitTestSyncDeadline() const;
