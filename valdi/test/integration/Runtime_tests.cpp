@@ -67,6 +67,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 using namespace Valdi;
@@ -9382,6 +9383,54 @@ TEST_P(RuntimeFixture, supportsCommonJsStyleModuleLoading) {
     ASSERT_TRUE(scopedJsResult) << scopedJsResult.value();
 
     ASSERT_EQ(Value(STRING_LITERAL("number")), scopedJsResult.value());
+}
+
+TEST_P(RuntimeFixture, recordsRuntimeBuiltinWithModulePathForANRAttribution) {
+    wrapper.teardown();
+
+    auto tweakModule = makeShared<TestTweakValueProvider>().toShared();
+    tweakModule->config.setMapValue("VALDI_ENABLE_MODULE_LOAD_DIAGNOSTICS", Valdi::Value(static_cast<bool>(true)));
+
+    wrapper = RuntimeWrapper(getJsBridge(), getTSNMode(), false, tweakModule);
+
+    auto* jsRuntime = wrapper.runtime->getJavaScriptRuntime();
+
+    // Spins on a builtin whose load always fails until the gate bundle exists, keeping the JS
+    // thread inside runtime.loadJsModule long enough for the observer below to catch the
+    // recorded name mid-call. The gate is flipped off the JS thread (worker queue), which is
+    // the only way to release the loop while the JS thread never yields.
+    std::string evalBody = "while (!runtime.isModuleLoaded('anr_attribution_gate')) {"
+                           "  try { runtime.loadJsModule('test/src/AnrAttributionMissing'); } catch (e) {}"
+                           "}"
+                           "return 0;";
+
+    Result<Value> evalResult;
+    std::thread evalThread([&] {
+        evalResult = jsRuntime->evaluateScript(makeShared<ByteBuffer>(evalBody)->toBytesView(),
+                                               STRING_LITERAL("anr_attribution_eval.js"));
+    });
+
+    const std::string expected = "[stuck-in: runtime.loadJsModule(test/src/AnrAttributionMissing)]";
+    std::string observed;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (std::chrono::steady_clock::now() < deadline) {
+        auto info = jsRuntime->getANRAttributionInfo();
+        if (info.find(expected) != std::string::npos) {
+            observed = info;
+            break;
+        }
+        std::this_thread::yield();
+    }
+
+    // Registering the gate bundle makes isModuleLoaded return true, releasing the JS loop.
+    wrapper.loadModule(STRING_LITERAL("anr_attribution_gate"), ResourceManagerLoadModuleType::Sources);
+    evalThread.join();
+
+    ASSERT_TRUE(evalResult) << evalResult.description();
+    EXPECT_NE(std::string::npos, observed.find(expected)) << "observed: '" << observed << "'";
+    // The [module:] suffix may legitimately remain (last dispatched context), but the in-flight
+    // native call must have unwound.
+    EXPECT_EQ(std::string::npos, jsRuntime->getANRAttributionInfo().find("[stuck-in:"));
 }
 
 TEST_P(RuntimeFixture, canGetFileEntry) {

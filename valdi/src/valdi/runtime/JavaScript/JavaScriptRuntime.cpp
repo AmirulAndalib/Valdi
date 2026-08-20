@@ -164,9 +164,25 @@ STRING_CONST(callActionParameterParametersKey, "parameters")
 
 class JavaScriptRuntimeCallable : public JSFunctionWithMethod<JavaScriptRuntime> {
 public:
-    using JSFunctionWithMethod<JavaScriptRuntime>::JSFunctionWithMethod;
+    JavaScriptRuntimeCallable(JavaScriptRuntime& self,
+                              JSValueRef (JavaScriptRuntime::*function)(JSFunctionNativeCallContext&),
+                              const ReferenceInfo& referenceInfo)
+        : JSFunctionWithMethod<JavaScriptRuntime>(self, function, referenceInfo),
+          _runtime(self),
+          _functionName(referenceInfo.toFunctionIdentifier()) {}
 
     ~JavaScriptRuntimeCallable() override = default;
+
+    JSValueRef operator()(JSFunctionNativeCallContext& callContext) noexcept override {
+        // Runtime builtins run native work on the JS thread without going through
+        // JSFunctionWithValueFunction, so record them for ANR attribution here.
+        ScopedNativeCallActivity nativeCallActivity(&_runtime, _functionName);
+        return JSFunctionWithMethod<JavaScriptRuntime>::operator()(callContext);
+    }
+
+private:
+    JavaScriptRuntime& _runtime;
+    StringBox _functionName;
 };
 
 class JavaScriptRuntimeTraceProxyCallable : public JSFunction {
@@ -1450,6 +1466,15 @@ JSValueRef JavaScriptRuntime::loadJsModule(IJavaScriptContext& jsContext,
     VALDI_TRACE_META("Valdi.loadJsModule", importPath);
     snap::utils::time::StopWatch sw;
     sw.start();
+
+    StringBox nativeCallName;
+    if (anrDiagnosticsActiveOnJsThread()) {
+        nativeCallName =
+            StringCache::getGlobal().makeString(fmt::format("runtime.loadJsModule({})", importPath.toStringView()));
+    }
+    // Nested inside the generic builtin activity so a stall during module evaluation names the
+    // module being loaded rather than just "runtime.loadJsModule".
+    ScopedNativeCallActivity moduleLoadActivity(this, nativeCallName);
 
     auto resourceIdResult = JavaScriptPathResolver::resolveResourceId(importPath);
     if (!resourceIdResult) {
