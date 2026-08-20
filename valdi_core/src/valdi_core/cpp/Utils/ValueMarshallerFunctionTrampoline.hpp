@@ -11,6 +11,7 @@
 #include "valdi_core/cpp/Utils/InlineContainerAllocator.hpp"
 #include "valdi_core/cpp/Utils/PlatformValueDelegate.hpp"
 #include "valdi_core/cpp/Utils/ReferenceInfo.hpp"
+#include "valdi_core/cpp/Utils/ResolvablePromise.hpp"
 #include "valdi_core/cpp/Utils/Trace.hpp"
 #include "valdi_core/cpp/Utils/ValueFunction.hpp"
 #include "valdi_core/cpp/Utils/ValueMarshaller.hpp"
@@ -91,6 +92,22 @@ public:
         auto unconvertedReturnValue = (*valueFunction)(callContext);
         if (!exceptionTracker) {
             return std::nullopt;
+        }
+
+        if (_isPromiseReturnType && unconvertedReturnValue.isUndefined()) {
+            // A Promise-returning function can only yield 'undefined' when the JS call was
+            // skipped or failed without the error reaching this tracker: the runtime was
+            // torn down (dead task scheduler / disposed JS value) or the JS-side error was
+            // swallowed because Promise calls don't set PropagatesError. Unmarshalling
+            // 'undefined' would raise a fatal platform exception at the call site, so
+            // deliver the failure as a rejected promise instead — the same outcome
+            // callPromise() produces for these failures when called off the JS thread.
+            auto rejectedPromise = makeShared<ResolvablePromise>();
+            auto errorMessage = fmt::format("Function {} returned no value because the call was skipped or failed "
+                                            "(runtime destroyed or JS error swallowed)",
+                                            referenceInfoBuilder.build().toString());
+            rejectedPromise->fulfill(Result<Value>(Error(std::string_view(errorMessage))));
+            unconvertedReturnValue = Value(rejectedPromise);
         }
 
         VALDI_TRACE(_cppToPlatformTraceName);
