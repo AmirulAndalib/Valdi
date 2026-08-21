@@ -23,8 +23,13 @@ constexpr auto kTaskTraceLabel = "Valdi.TaskQueue";
 TaskQueue::Task::Task(task_id_t id,
                       DispatchFunction function,
                       std::chrono::steady_clock::time_point executeTime,
-                      bool isBarrier)
-    : id(id), function(std::move(function)), executeTime(executeTime), isBarrier(isBarrier) {}
+                      bool isBarrier,
+                      uint64_t parentSpanId)
+    : id(id),
+      function(std::move(function)),
+      executeTime(executeTime),
+      isBarrier(isBarrier),
+      parentSpanId(parentSpanId) {}
 
 TaskQueue::TaskQueue() : _disposed(false) {}
 
@@ -65,11 +70,12 @@ EnqueuedTask TaskQueue::enqueue(Valdi::DispatchFunction function, std::chrono::s
 
 task_id_t TaskQueue::insertTask(DispatchFunction&& function,
                                 std::chrono::steady_clock::time_point executeTime,
-                                bool isBarrier) {
+                                bool isBarrier,
+                                uint64_t parentSpanId) {
     auto id = ++_taskIdCounter;
 
     // Keep the tasks sorted by execute time
-    Task task(id, std::move(function), executeTime, isBarrier);
+    Task task(id, std::move(function), executeTime, isBarrier, parentSpanId);
 
     auto it = std::upper_bound(_tasks.begin(), _tasks.end(), task, [](const Task& a, const Task& b) {
         if (a.executeTime == b.executeTime) {
@@ -90,10 +96,12 @@ EnqueuedTask TaskQueue::enqueue(Valdi::DispatchFunction function, std::chrono::s
         return enqueuedTask;
     }
 
+    const uint64_t parentSpanId = ::snap::utils::debugging::getCurrentSpanId();
+
     {
         std::lock_guard<Mutex> lockGuard(_mutex);
 
-        enqueuedTask.id = insertTask(std::move(function), executeTime, false);
+        enqueuedTask.id = insertTask(std::move(function), executeTime, false, parentSpanId);
         enqueuedTask.isFirst = _first;
         _first = false;
 
@@ -135,7 +143,7 @@ void TaskQueue::barrier(const DispatchFunction& function) {
     auto executeTime = std::chrono::steady_clock::now();
 
     std::unique_lock<Mutex> lockGuard(_mutex);
-    auto id = insertTask(DispatchFunction(), executeTime, true);
+    auto id = insertTask(DispatchFunction(), executeTime, true, 0);
 
     while (!_tasks.empty()) {
         // Wait until we have no currently running tasks, and that the task at the front is our barrier task
@@ -158,7 +166,9 @@ void TaskQueue::barrier(const DispatchFunction& function) {
     }
 }
 
-DispatchFunction TaskQueue::nextTask(std::chrono::steady_clock::time_point maxTime, bool* shouldRun) {
+DispatchFunction TaskQueue::nextTask(std::chrono::steady_clock::time_point maxTime,
+                                     bool* shouldRun,
+                                     uint64_t* parentSpanId) {
     std::unique_lock<Mutex> lockGuard(_mutex);
     bool hasTask = false;
 
@@ -226,6 +236,7 @@ DispatchFunction TaskQueue::nextTask(std::chrono::steady_clock::time_point maxTi
         *shouldRun = false;
     } else {
         nextTaskFunction = std::move(_tasks.front().function);
+        *parentSpanId = _tasks.front().parentSpanId;
         _currentRunningTasks++;
         _tasks.pop_front();
     }
@@ -255,10 +266,11 @@ bool TaskQueue::runNextTask() {
 
 bool TaskQueue::runNextTask(std::chrono::steady_clock::time_point maxTime) {
     auto shouldRun = true;
-    auto task = nextTask(maxTime, &shouldRun);
+    uint64_t parentSpanId = 0;
+    auto task = nextTask(maxTime, &shouldRun, &parentSpanId);
     if (shouldRun) {
         {
-            ::snap::utils::debugging::ScopedTrace taskTrace(kTaskTraceLabel);
+            ::snap::utils::debugging::ScopedTrace taskTrace(kTaskTraceLabel, parentSpanId);
             task();
         }
         // Dispose the task before notifying the condition,

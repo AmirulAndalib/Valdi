@@ -269,6 +269,9 @@ public:
     // A const char* converts to std::string and string_view with equal rank, so without this
     // overload such calls are ambiguous.
     explicit constexpr TraceDriver(const char* /*name*/) noexcept {}
+    // Mirrors TraceSdkScopedTrace's parent-span constructor, so a scope aliased to whichever of
+    // the two a build selects can be constructed the same way in both.
+    constexpr TraceDriver(std::string_view /*name*/, uint64_t /*parentSpanId*/) noexcept {}
     TraceDriver(const TraceDriver&) = delete;
     TraceDriver(TraceDriver&& other) noexcept {}
     // If we change the next line to '~TraceDriver() = default;',
@@ -316,6 +319,19 @@ struct TraceSdkScopedTraceSupport {
     virtual int64_t beginAsync(std::string_view label) = 0;
     virtual void endAsync(int64_t cookie) = 0;
     virtual void traceCounter(const std::string& name, int64_t count) = 0;
+
+    /// Id of the innermost span open on this thread, or 0 when none is open or tracing is idle.
+    /// Captured where work is scheduled and handed to beginSyncWithFlow where it runs, so the
+    /// two spans can be linked.
+    virtual uint64_t getCurrentSpanId() {
+        return 0;
+    }
+
+    /// beginSync, plus a link back to the span that scheduled this work. A default-implemented
+    /// forward to beginSync keeps existing backends working unchanged.
+    virtual int64_t beginSyncWithFlow(std::string_view label, uint64_t parentSpanId) {
+        return beginSync(label);
+    }
 };
 } // namespace detail
 
@@ -329,6 +345,9 @@ public:
     // Avoids the strlen() the const char* overload pays, and lets callers hand over a name they
     // do not own a std::string for.
     explicit TraceSdkScopedTrace(std::string_view name) noexcept;
+    // Same, plus the id of the span that scheduled this work, so the two get linked. Taking it
+    // here rather than in a separate scope type keeps one span implementation.
+    TraceSdkScopedTrace(std::string_view name, uint64_t parentSpanId) noexcept;
     TraceSdkScopedTrace(const TraceSdkScopedTrace&) = delete;
 
     virtual ~TraceSdkScopedTrace();
@@ -348,5 +367,19 @@ private:
 namespace snap::utils::debugging {
 using ScopedTrace = typename std::
     conditional<snap::kTracingEnabled, profiling::TraceSdkScopedTrace, ::snap::profiling::TraceDriver<>>::type;
+
+// Reads the enclosing span's id where work is scheduled, so the span around that work can link
+// back to it. Sits beside ScopedTrace because the two are used together: capture the id at the
+// scheduling site, hand it to the scope where the work runs. Null-safe, and compiled out
+// alongside the spans themselves.
+inline uint64_t getCurrentSpanId() {
+    if constexpr (snap::kTracingEnabled) {
+        auto* support =
+            std::atomic_load_explicit(&::snap::profiling::scopedTraceSupportInstance, std::memory_order_relaxed);
+        return support != nullptr ? support->getCurrentSpanId() : 0;
+    } else {
+        return 0;
+    }
+}
 
 } // namespace snap::utils::debugging
