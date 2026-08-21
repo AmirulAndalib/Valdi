@@ -29,7 +29,6 @@ public:
     bool shouldCrashOnANR() const;
     bool disableAnimationRemoveOnCompleteIos() const;
     bool shouldNudgeJSThread() const;
-    bool disablePersistentStoreEncryption() const;
     bool enableScopedContextStackTraceCapture() const;
     bool enableRenderRequestContextFix() const;
     // Killswitch for the pre-raster quiescence fence in BridgedView::rasterInto.
