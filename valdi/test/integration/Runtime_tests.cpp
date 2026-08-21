@@ -6941,6 +6941,35 @@ TEST_P(RuntimeFixture, supportsNativeModule) {
     ASSERT_EQ(50.0, result.value().toDouble());
 }
 
+// Integration coverage for the sync-teardown guard against a live JS engine, complementing the
+// ValueMarshallerRegistry unit tests that pin forwardCall()'s graceful-null behavior. Reproduces
+// the two facts the guard relies on: once the owning JS runtime is disposed (e.g. by worker
+// termination), a JS-backed function (1) reports ownerIsTearingDown() == true, and (2) a
+// synchronous call is skipped and yields 'undefined' rather than running. Before the guard,
+// unmarshalling that 'undefined' into compute()'s number return raised an uncatchable error at
+// the call site.
+TEST_P(RuntimeFixture, jsFunctionReportsOwnerTearingDownAndSkipsSyncCallAfterRuntimeDisposed) {
+    auto fnResult = getJsModulePropertyAsUntypedFunction(wrapper.runtime, nullptr, "test/src/NativeModule", "compute");
+    ASSERT_TRUE(fnResult) << fnResult.description();
+    auto function = fnResult.value();
+
+    // While the runtime is live: not tearing down, and a sync call runs and returns a real number.
+    ASSERT_FALSE(function->ownerIsTearingDown());
+    auto liveResult = function->call(ValueFunctionFlagsCallSync, nullptr, 0);
+    ASSERT_TRUE(liveResult) << liveResult.description();
+    ASSERT_TRUE(liveResult.value().isNumber());
+
+    // Dispose the JS runtime (logout / aggressive worker termination equivalent).
+    wrapper.teardown();
+
+    // The owner now reports tearing-down, and the sync call is skipped -> undefined. This is the
+    // exact state that crashed forwardCall() before the guard; here we assert the JS layer's half.
+    ASSERT_TRUE(function->ownerIsTearingDown());
+    auto skippedResult = function->call(ValueFunctionFlagsCallSync, nullptr, 0);
+    ASSERT_TRUE(skippedResult) << skippedResult.description();
+    ASSERT_TRUE(skippedResult.value().isUndefined());
+}
+
 // Verifies that a sync JS call from the main thread triggers the assertion when the module has
 // async_strict_mode and the function is not annotated with @AllowSyncCall. Uses a dedicated
 // test_async_strict module (async_strict_mode=True) so the main test module can stay non-strict.

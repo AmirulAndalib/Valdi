@@ -81,6 +81,11 @@ public:
                           ExceptionTracker& exceptionTracker) final {
         return Value::undefined();
     }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& /*exceptionTracker*/) final {
+        // void return: platform void, not an object null (which would fail assertFieldType).
+        return this->_delegate->newVoid();
+    }
 };
 
 template<typename ValueType>
@@ -104,6 +109,10 @@ public:
                           const ReferenceInfoBuilder& referenceInfoBuilder,
                           ExceptionTracker& exceptionTracker) final {
         return Valdi::Value(this->_delegate->valueToBool(value, exceptionTracker));
+    }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        return this->_delegate->newBool(false, exceptionTracker);
     }
 };
 
@@ -129,6 +138,10 @@ public:
                           ExceptionTracker& exceptionTracker) final {
         return Valdi::Value(this->_delegate->valueToInt(value, exceptionTracker));
     }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        return this->_delegate->newInt(0, exceptionTracker);
+    }
 };
 
 template<typename ValueType>
@@ -152,6 +165,10 @@ public:
                           const ReferenceInfoBuilder& referenceInfoBuilder,
                           ExceptionTracker& exceptionTracker) final {
         return Valdi::Value(this->_delegate->valueToLong(value, exceptionTracker));
+    }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        return this->_delegate->newLong(0, exceptionTracker);
     }
 };
 
@@ -177,6 +194,10 @@ public:
                           const ReferenceInfoBuilder& referenceInfoBuilder,
                           ExceptionTracker& exceptionTracker) final {
         return Valdi::Value(this->_delegate->valueToDouble(value, exceptionTracker));
+    }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        return this->_delegate->newDouble(0.0, exceptionTracker);
     }
 };
 
@@ -1291,6 +1312,15 @@ public:
         return _enumClass->enumCaseToValue(value, _isBoxed, exceptionTracker);
     }
 
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        // A non-boxed enum lowers to a primitive on the platform, so an object null would fail
+        // assertFieldType. Synthesize the first case instead; nothing consumes it during teardown.
+        if (_schema->getCasesSize() == 0) {
+            return this->_delegate->newNull();
+        }
+        return _enumClass->newEnum(0, _isBoxed, exceptionTracker);
+    }
+
 protected:
     Ref<EnumSchema> _schema;
     Ref<PlatformEnumClassDelegate<ValueType>> _enumClass;
@@ -1347,6 +1377,14 @@ public:
         } else {
             return _inner->marshall(receiver, value, referenceInfoBuilder, exceptionTracker);
         }
+    }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        // An optional indirect is nullable; otherwise the typed default is the inner's.
+        if (_optional || _inner == nullptr) {
+            return this->_delegate->newNull();
+        }
+        return _inner->makeDefaultReturnValue(exceptionTracker);
     }
 
     ValueMarshaller<ValueType>* getInner() const {
@@ -1424,6 +1462,19 @@ public:
         return inner->marshall(receiver, value, referenceInfoBuilder, exceptionTracker);
     }
 
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        // Function/Provider return types resolve through here, so a primitive-returning function
+        // skipped during teardown must get the inner's typed default, not an object null.
+        if (_optional) {
+            return this->_delegate->newNull();
+        }
+        auto* inner = ensureInner(exceptionTracker);
+        if (inner == nullptr) {
+            return this->_delegate->newNull();
+        }
+        return inner->makeDefaultReturnValue(exceptionTracker);
+    }
+
 private:
     // Resolves and caches the inner marshaller on first use. Resolution mutates the shared registry
     // (getValueMarshaller writes _valueMarshallerBySchemaKey / flushes indirects) and can run on any
@@ -1488,6 +1539,14 @@ public:
                           const ReferenceInfoBuilder& referenceInfoBuilder,
                           ExceptionTracker& exceptionTracker) final {
         return _marshaller->marshall(receiver, value, referenceInfoBuilder, exceptionTracker);
+    }
+
+    ValueType makeDefaultReturnValue(ExceptionTracker& exceptionTracker) final {
+        // Returns flow through the unmarshaller, so its typed default is the right one.
+        if (_unmarshaller == nullptr) {
+            return this->_delegate->newNull();
+        }
+        return _unmarshaller->makeDefaultReturnValue(exceptionTracker);
     }
 
     void setMarshaller(const Ref<ValueMarshaller<ValueType>>& marshaller) {

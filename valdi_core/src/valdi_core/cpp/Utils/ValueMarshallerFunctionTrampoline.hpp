@@ -110,6 +110,22 @@ public:
             unconvertedReturnValue = Value(rejectedPromise);
         }
 
+        if (!_isPromiseReturnType && unconvertedReturnValue.isUndefined() && valueFunction->ownerIsTearingDown()) {
+            // The sync counterpart of the Promise guard above. A non-Promise typed function can
+            // only yield 'undefined' with a clean tracker when its JS body was skipped during
+            // teardown: the owning runtime/context was disposed or requested execution termination
+            // between dispatch and execution (see JavaScriptRuntime::makeJsThreadDispatchFunction's
+            // _isDisposed early-return), so nothing ran and nothing threw. Unmarshalling 'undefined'
+            // into the declared return type would raise a fatal, uncatchable platform exception
+            // (SCValdiError) at the call site. Gated on ownerIsTearingDown() so a genuine
+            // undefined-return bug from a live context still surfaces below. Deliver a type-safe
+            // default instead (platform null for object/optional returns, a typed zero/void/first
+            // enum case for non-nullable primitive returns), matching the skipped-call outcome;
+            // an object-typed null for a primitive return would itself crash the platform
+            // trampoline (std::abort on iOS / NPE on Android).
+            return std::make_optional<ValueType>(_returnValueMarshaller->makeDefaultReturnValue(exceptionTracker));
+        }
+
         VALDI_TRACE(_cppToPlatformTraceName);
         auto returnValue = _returnValueMarshaller->unmarshall(
             unconvertedReturnValue, referenceInfoBuilder.withReturnValue(), exceptionTracker);
