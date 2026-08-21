@@ -10,9 +10,15 @@
 
 #include "valdi_core/cpp/Constants.hpp"
 
+#include "utils/debugging/Trace.hpp"
+
 #include <pthread.h>
 
 namespace Valdi {
+
+namespace {
+constexpr auto kTaskTraceLabel = "Valdi.TaskQueue";
+} // namespace
 
 TaskQueue::Task::Task(task_id_t id,
                       DispatchFunction function,
@@ -251,7 +257,10 @@ bool TaskQueue::runNextTask(std::chrono::steady_clock::time_point maxTime) {
     auto shouldRun = true;
     auto task = nextTask(maxTime, &shouldRun);
     if (shouldRun) {
-        task();
+        {
+            ::snap::utils::debugging::ScopedTrace taskTrace(kTaskTraceLabel);
+            task();
+        }
         // Dispose the task before notifying the condition,
         // to ensure that all retained objects by the task
         // are released.
