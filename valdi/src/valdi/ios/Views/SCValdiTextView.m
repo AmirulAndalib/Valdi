@@ -142,6 +142,48 @@ static CGFloat SCValdiTextViewContentHeightFromContentSize(UITextView *textView,
     return MAX(0.0, strippedContentHeight) + baseTopInset + baseBottomInset;
 }
 
+// Number of line fragments TextKit laid out for `glyphRange`.
+static NSUInteger SCValdiTextViewLaidOutLineCount(NSLayoutManager *layoutManager, NSRange glyphRange)
+{
+    NSUInteger lineCount = 0;
+    NSUInteger glyphIndex = glyphRange.location;
+    NSUInteger glyphEnd = NSMaxRange(glyphRange);
+    while (glyphIndex < glyphEnd) {
+        NSRange lineRange = NSMakeRange(0, 0);
+        [layoutManager lineFragmentRectForGlyphAtIndex:glyphIndex effectiveRange:&lineRange];
+        if (lineRange.length == 0) {
+            break;
+        }
+        glyphIndex = NSMaxRange(lineRange);
+        lineCount++;
+    }
+    return lineCount;
+}
+
+// YES when the container was too short for the rest of the text: TextKit drops a line fragment
+// whole rather than clipping it. maximumNumberOfLines truncates by design and still wants centering.
+static BOOL SCValdiTextViewLayoutIsHeightTruncated(UITextView *textView)
+{
+    if (textView.scrollEnabled) {
+        // A scrolling text view gets an unbounded container, so its height never cuts the text off.
+        return NO;
+    }
+
+    NSLayoutManager *layoutManager = textView.layoutManager;
+    NSTextContainer *textContainer = textView.textContainer;
+    NSRange laidOutGlyphs = [layoutManager glyphRangeForTextContainer:textContainer];
+    NSRange laidOutCharacters = [layoutManager characterRangeForGlyphRange:laidOutGlyphs actualGlyphRange:NULL];
+    if (NSMaxRange(laidOutCharacters) >= textView.textStorage.length) {
+        return NO;
+    }
+
+    NSUInteger maximumNumberOfLines = textContainer.maximumNumberOfLines;
+    if (maximumNumberOfLines == 0) {
+        return YES;
+    }
+    return SCValdiTextViewLaidOutLineCount(layoutManager, laidOutGlyphs) < maximumNumberOfLines;
+}
+
 static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
                                                       CGFloat baseTopInset,
                                                       CGFloat baseBottomInset)
@@ -585,7 +627,16 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
     CGFloat baseTopInset = textContainerInset.bottom;
     CGFloat baseBottomInset = textContainerInset.bottom;
     CGFloat boundsHeight = textView.bounds.size.height;
+
+    if (textContainerInset.top != baseTopInset && SCValdiTextViewLayoutIsHeightTruncated(textView)) {
+        textContainerInset.top = baseTopInset;
+        textView.textContainerInset = textContainerInset;
+    }
+
     CGFloat contentSizeHeight = SCValdiTextViewContentHeightForGravity(textView, baseTopInset, baseBottomInset);
+    if (SCValdiTextViewLayoutIsHeightTruncated(textView)) {
+        contentSizeHeight = MAX(contentSizeHeight, boundsHeight);
+    }
     CGFloat topCorrection;
 
     switch (_textGravity) {
@@ -602,6 +653,8 @@ static CGFloat SCValdiTextViewContentHeightForGravity(UITextView *textView,
     }
 
     topCorrection = (topCorrection < 0.0 ? 0.0 : topCorrection);
+    CGFloat onePixel = 1.0 / MAX(1.0, textView.traitCollection.displayScale);
+    topCorrection = MIN(topCorrection, MAX(0.0, boundsHeight - contentSizeHeight - onePixel));
 
     textContainerInset.top = baseTopInset + topCorrection;
     textContainerInset.bottom = baseBottomInset;
