@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace snap::profiling {
@@ -264,6 +265,10 @@ public:
     template<size_t kSize>
     explicit constexpr TraceDriver(const char (& /*name*/)[kSize]) noexcept {}
     explicit constexpr TraceDriver(const std::string& /*name*/) noexcept {}
+    explicit constexpr TraceDriver(std::string_view /*name*/) noexcept {}
+    // A const char* converts to std::string and string_view with equal rank, so without this
+    // overload such calls are ambiguous.
+    explicit constexpr TraceDriver(const char* /*name*/) noexcept {}
     TraceDriver(const TraceDriver&) = delete;
     TraceDriver(TraceDriver&& other) noexcept {}
     // If we change the next line to '~TraceDriver() = default;',
@@ -321,6 +326,9 @@ class TraceSdkScopedTrace {
 public:
     explicit TraceSdkScopedTrace(const char* name) noexcept;
     explicit TraceSdkScopedTrace(const std::string& name) noexcept : TraceSdkScopedTrace(name.data()) {}
+    // Avoids the strlen() the const char* overload pays, and lets callers hand over a name they
+    // do not own a std::string for.
+    explicit TraceSdkScopedTrace(std::string_view name) noexcept;
     TraceSdkScopedTrace(const TraceSdkScopedTrace&) = delete;
 
     virtual ~TraceSdkScopedTrace();
