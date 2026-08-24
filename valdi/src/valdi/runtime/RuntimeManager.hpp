@@ -19,6 +19,7 @@
 #include "valdi_core/cpp/Utils/Mutex.hpp"
 #include "valdi_core/cpp/Utils/Shared.hpp"
 #include <atomic>
+#include <optional>
 #include <vector>
 
 struct YGConfig;
@@ -169,6 +170,8 @@ protected:
                                       bool activeColorPaletteChanged) override;
 
 private:
+    using MetricsDuration = snap::utils::time::Duration<std::chrono::steady_clock>;
+
     std::shared_ptr<MetricsStopWatch> _initStopWatch;
     std::shared_ptr<YGConfig> _yogaConfig;
     Shared<DebuggerService> _debuggerService;
@@ -202,6 +205,8 @@ private:
     Holder<Ref<UserSession>> _userSession;
     Ref<ValdiRuntimeTweaks> _runtimeTweaks;
     Ref<Metrics> _metrics;
+    std::optional<MetricsDuration> _userSessionAttachLatency;
+    bool _userSessionAttachLatencyEmitted = false;
     Path _mmapCacheDirectory;
     Ref<JavaScriptANRDetector> _anrDetector;
     PlatformType _platformType;
@@ -225,9 +230,8 @@ private:
 
     void updateLoadOperationsCount(int increment);
 
-    using MetricsDuration = snap::utils::time::Duration<std::chrono::steady_clock>;
-
     void emitMetrics(void (Metrics::*emitterFunc)(const MetricsDuration&));
+    void emitUserSessionAttachMetricsIfNeeded();
 };
 
 } // namespace Valdi

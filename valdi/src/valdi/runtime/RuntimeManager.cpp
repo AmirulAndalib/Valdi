@@ -461,7 +461,21 @@ void RuntimeManager::setUserSession(const StringBox& userId) {
     if (userId.isEmpty()) {
         _userSession.set(nullptr);
     } else {
+        // Keep the existing UserSession instance for a same-user re-attach: downstream
+        // consumers (e.g. PersistentStore) dedupe session changes by pointer, so a fresh
+        // allocation for the same userId would read as a user switch and wipe their caches.
+        auto currentSession = _userSession.get();
+        if (currentSession != nullptr && currentSession->getUserId() == userId) {
+            return;
+        }
+        {
+            std::lock_guard<Mutex> guard(_mutex);
+            if (!_userSessionAttachLatency.has_value() && _initStopWatch != nullptr) {
+                _userSessionAttachLatency = _initStopWatch->elapsed();
+            }
+        }
         _userSession.set(Valdi::makeShared<UserSession>(userId));
+        emitUserSessionAttachMetricsIfNeeded();
     }
 }
 
@@ -549,9 +563,14 @@ const Holder<Ref<UserSession>>& RuntimeManager::getUserSession() const {
 }
 
 void RuntimeManager::setMetrics(const Ref<Metrics>& metrics) {
-    std::lock_guard<Mutex> guard(_mutex);
-    _metrics = metrics;
-    _anrDetector->setMetrics(metrics);
+    {
+        std::lock_guard<Mutex> guard(_mutex);
+        _metrics = metrics;
+        _anrDetector->setMetrics(metrics);
+    }
+    // The user session can be attached before the metrics sink is installed
+    // (module factories are only injected when the first Runtime is created).
+    emitUserSessionAttachMetricsIfNeeded();
 }
 
 void RuntimeManager::setTweakValueProvider(const Shared<ITweakValueProvider>& tweakValueProvider) {
@@ -798,6 +817,23 @@ void RuntimeManager::emitIosRuntimeCreateMetrics() {
 
 void RuntimeManager::emitUserSessionReadyMetrics() {
     emitMetrics(&Metrics::emitUserSessionReadyLatency);
+}
+
+void RuntimeManager::emitUserSessionAttachMetricsIfNeeded() {
+    Ref<Metrics> metrics;
+    MetricsDuration latency;
+
+    {
+        std::lock_guard<Mutex> guard(_mutex);
+        if (_userSessionAttachLatencyEmitted || !_userSessionAttachLatency.has_value() || _metrics == nullptr) {
+            return;
+        }
+        _userSessionAttachLatencyEmitted = true;
+        metrics = _metrics;
+        latency = *_userSessionAttachLatency;
+    }
+
+    metrics->emitUserSessionAttachLatency(latency);
 }
 
 void RuntimeManager::setKeepDebuggerServiceOnPause(bool keepDebuggerServiceOnPause) {
