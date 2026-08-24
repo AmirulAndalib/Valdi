@@ -6970,6 +6970,27 @@ TEST_P(RuntimeFixture, jsFunctionReportsOwnerTearingDownAndSkipsSyncCallAfterRun
     ASSERT_TRUE(skippedResult.value().isUndefined());
 }
 
+// The teardown case (resolving after the runtime is disposed reports the distinguishable
+// kResolutionSkippedDuringTeardownErrorCode) is covered end-to-end by the iOS
+// SCValdiJSRuntimeModuleErrorTests teardown regression, which induces disposal on the correct
+// thread. Inducing it here from the test thread races the JS-thread teardown and trips the
+// runtime's thread-access checker, so only the live-runtime control is asserted at this layer.
+
+// Control: a genuine resolution failure against a LIVE runtime — a module that
+// does not exist — must still surface as an error, and must NOT be mislabeled as the teardown
+// sentinel. Guards against the fix masking real resolution bugs.
+TEST_P(RuntimeFixture, pushModuleToMarshallerStillErrorsForMissingModuleWhenRuntimeLive) {
+    SimpleExceptionTracker exceptionTracker;
+    Marshaller marshaller(exceptionTracker);
+    wrapper.runtime->getJavaScriptRuntime()->pushModuleToMarshaller(
+        nullptr, STRING_LITERAL("test/src/ThisModuleDoesNotExist"), marshaller);
+
+    ASSERT_FALSE(exceptionTracker) << "Resolving a non-existent module on a live runtime must report an error";
+    auto error = exceptionTracker.extractError();
+    EXPECT_NE(Valdi::kResolutionSkippedDuringTeardownErrorCode, error.getErrorCode())
+        << "A genuine resolution failure must not be labeled as a teardown skip: " << error.toString();
+}
+
 // Verifies that a sync JS call from the main thread triggers the assertion when the module has
 // async_strict_mode and the function is not annotated with @AllowSyncCall. Uses a dedicated
 // test_async_strict module (async_strict_mode=True) so the main test module can stay non-strict.

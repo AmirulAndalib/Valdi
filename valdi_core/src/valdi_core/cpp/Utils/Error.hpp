@@ -11,6 +11,15 @@
 
 namespace Valdi {
 
+/**
+ Error code stamped on the error reported when a native->JS resolution/call is skipped because the
+ owning JS runtime was disposed / torn down (makeJsThreadDispatchFunction early-returns on
+ _isDisposed/!_running) — nothing ran and nothing threw. Distinguishing this from a genuine
+ resolution failure lets a marshalling boundary degrade gracefully on teardown without masking a
+ real bug. Distinct from ErrorCodes::Composer (1-9).
+ */
+static constexpr int32_t kResolutionSkippedDuringTeardownErrorCode = 100;
+
 struct ErrorStorage : public SimpleRefCountable {
     StringBox message;
     StringBox stackTrace;
@@ -52,7 +61,7 @@ public:
     const StringBox& getStack() const noexcept;
 
     std::optional<Error> getCause() const noexcept;
-    
+
     /**
      Return the error code associated with this error.
      Returns 0 if no specific error code was set.

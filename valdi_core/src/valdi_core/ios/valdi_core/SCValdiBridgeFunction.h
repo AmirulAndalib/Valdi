@@ -12,6 +12,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/**
+ * Error domain for NSErrors produced by resolveFunctionWithJSRuntime:error:.
+ */
+FOUNDATION_EXPORT NSString* const SCValdiBridgeFunctionErrorDomain;
+
 @interface SCValdiBridgeFunction : SCValdiMarshallableObject
 
 @property (readonly, nonatomic) id callBlock;
@@ -35,6 +40,20 @@ VALDI_NO_INIT
  * Resolve and instantiate the function from the given JSRuntime instance
  */
 + (nonnull instancetype)functionWithJSRuntime:(nonnull id<SCValdiJSRuntime>)jsRuntime;
+
+/**
+ * Resolve and instantiate the function from the given JSRuntime instance, without raising.
+ *
+ * functionWithJSRuntime: raises an SCValdiError (NSException) when resolution fails -- e.g. when
+ * the JS runtime has been torn down (logout) while the caller is still active. Swift cannot catch
+ * NSException, so a failure below a Swift frame terminates the process. Swift callers must use
+ * this variant instead: resolution failures are reported as an NSError and a nil return.
+ *
+ * Programming errors (a failed NSAssert, an unrecognized selector) still raise, deliberately.
+ */
++ (nullable instancetype)resolveFunctionWithJSRuntime:(nonnull id<SCValdiJSRuntime>)jsRuntime
+                                                error:(NSError* _Nullable* _Nullable)error
+    NS_SWIFT_NAME(resolve(jsRuntime:));
 
 @end
 

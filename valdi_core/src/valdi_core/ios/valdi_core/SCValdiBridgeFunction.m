@@ -11,6 +11,8 @@
 #import "valdi_core/SCValdiError.h"
 #import "valdi_core/SCValdiMarshaller.h"
 
+NSString *const SCValdiBridgeFunctionErrorDomain = @"SCValdiBridgeFunctionErrorDomain";
+
 @implementation SCValdiBridgeFunction
 
 - (id)callBlock
@@ -36,6 +38,23 @@
                  @"When async_strict_mode is enabled, function resolution (functionWithJSRuntime:) must not be called from the main thread (to avoid ANRs). Use a background thread, the JS thread, or invokeWithJSRuntimeProvider:completionHandler:.");
     }
     return SCValdiMakeBridgeFunctionFromJSRuntime(self, jsRuntime, [self modulePath]);
+}
+
++ (nullable instancetype)resolveFunctionWithJSRuntime:(id<SCValdiJSRuntime>)jsRuntime error:(NSError **)error
+{
+    @try {
+        return [self functionWithJSRuntime:jsRuntime];
+    } @catch (SCValdiError *exception) {
+        // Resolution legitimately fails when the JS runtime has been torn down (e.g. logout) while
+        // a caller is still active. Swift cannot catch the NSException, so convert it here.
+        if (error != NULL) {
+            NSString *reason = exception.reason ?: exception.name;
+            *error = [NSError errorWithDomain:SCValdiBridgeFunctionErrorDomain
+                                         code:1
+                                     userInfo:@{NSLocalizedDescriptionKey : reason}];
+        }
+        return nil;
+    }
 }
 
 @end

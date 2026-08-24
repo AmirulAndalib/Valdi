@@ -3432,7 +3432,9 @@ int32_t JavaScriptRuntime::pushModuleToMarshaller(
     const Valdi::StringBox& path,
     Marshaller& marshaller) {
     int32_t retValue = 0;
+    bool taskRan = false;
     dispatchOnJsThreadSync(nullptr, [&](JavaScriptEntryParameters& jsEntry) {
+        taskRan = true;
         auto importResult = this->importModule(path, jsEntry);
         if (!jsEntry.exceptionTracker) {
             marshaller.getExceptionTracker().onError(jsEntry.exceptionTracker.extractError());
@@ -3458,6 +3460,16 @@ int32_t JavaScriptRuntime::pushModuleToMarshaller(
             retValue = importResult->pushToMarshaller(jsEntry.jsContext, marshaller);
         }
     });
+
+    if (!taskRan) {
+        // JS-thread tasks are dropped once the runtime is disposed/torn down (e.g. logout). Report
+        // that as a module-resolution error instead of leaving the slot empty: an empty slot
+        // unmarshals as 'undefined' and surfaces as a misleading conversion failure at the call
+        // site.
+        marshaller.getExceptionTracker().onError(
+            Error(STRING_FORMAT("Cannot load module '{}': the JS runtime has been destroyed", path),
+                  kResolutionSkippedDuringTeardownErrorCode));
+    }
 
     return retValue;
 }
