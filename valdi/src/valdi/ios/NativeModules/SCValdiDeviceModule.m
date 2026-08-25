@@ -20,20 +20,26 @@
 
 @end
 
+static void *SCValdiDeviceModuleGeometryKVOContext = &SCValdiDeviceModuleGeometryKVOContext;
+
 @implementation SCValdiDeviceModule {
     // Those fields are non mutable
     NSString *_systemVersion;
     NSString *_model;
+
+    // These fields are mutable (updated on the JS queue after window resizes / rotations)
     CGFloat _displayWidth;
     CGFloat _displayHeight;
     CGFloat _displayScale;
-
-    // This field is mutable
     UIEdgeInsets _insets;
     UITraitCollection *_traitCollection;
 
     SCValdiBridgeObserver *_displayInsetsObserver;
+    SCValdiBridgeObserver *_displaySizeObserver;
     SCValdiBridgeObserver *_darkModeObserver;
+
+    // Window scenes whose effectiveGeometry is under KVO (main thread only, iOS 16+).
+    NSMutableSet<UIWindowScene *> *_geometryObservedScenes;
 
     __weak id<SCValdiJSQueueDispatcher> _jsQueueDispatcher;
     dispatch_group_t _deviceSettingsReadyGroup;
@@ -52,6 +58,7 @@
     if (self) {
         _jsQueueDispatcher = jsQueueDispatcher;
         _displayInsetsObserver = [SCValdiBridgeObserver new];
+        _displaySizeObserver = [SCValdiBridgeObserver new];
         _darkModeObserver = [SCValdiBridgeObserver new];
         _darkModeObserver.delegate = self;
         _locale = [NSLocale autoupdatingCurrentLocale];
@@ -67,6 +74,14 @@
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(_handleTraitCollectionDidChange:)
                                                      name:SCValdiRootViewTraitCollectionDidChangeNotificationKey
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(_handleRootViewDidMoveToWindow:)
+                                                     name:SCValdiRootViewDidMoveToWindowNotificationKey
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(_handleSceneDidDisconnect:)
+                                                     name:UISceneDidDisconnectNotification
                                                    object:nil];
 
      [[NSNotificationCenter defaultCenter] addObserver:self
@@ -89,6 +104,20 @@
     return self;
 }
 
+- (void)dealloc
+{
+    // KVO is not auto-deregistered when the OBSERVER deallocates. Scenes outlive runtimes
+    // (and each runtime owns its own device module), so a scene would message a dangling
+    // pointer on its next geometry change.
+    if (@available(iOS 16.0, *)) {
+        for (UIWindowScene *windowScene in _geometryObservedScenes) {
+            [windowScene removeObserver:self
+                             forKeyPath:NSStringFromSelector(@selector(effectiveGeometry))
+                                context:SCValdiDeviceModuleGeometryKVOContext];
+        }
+    }
+}
+
 - (void)_updateDeviceSettingsIfNeeded
 {
     if (_deviceSettingsReady) {
@@ -100,14 +129,31 @@
     _model = device.model;
 
     UIScreen *screen = UIScreen.mainScreen;
-    _displayWidth = screen.bounds.size.width;
-    _displayHeight = screen.bounds.size.height;
+    CGSize displaySize = [self _currentDisplaySize];
+    _displayWidth = displaySize.width;
+    _displayHeight = displaySize.height;
     _displayScale = screen.scale;
     _insets = [self _currentInsets];
 
     _deviceSettingsReady = YES;
     [self _updateTraitCollection:[screen.traitCollection copy] shouldNotify:NO];
     dispatch_group_leave(_deviceSettingsReadyGroup);
+}
+
+// The window bounds, not the screen bounds: with resizable windows (iPad multitasking,
+// foldables) the screen no longer describes the app's drawable area. Identical on
+// full-screen phones.
+- (CGSize)_currentDisplaySize
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    UIWindow *keyWindow = UIApplication.sharedApplication.keyWindow;
+#pragma clang diagnostic pop
+    CGSize windowSize = keyWindow.bounds.size;
+    if (windowSize.width > 0 && windowSize.height > 0) {
+        return windowSize;
+    }
+    return UIScreen.mainScreen.bounds.size;
 }
 
 - (void)performHapticFeedback:(SCValdiMarshaller *)marshaller
@@ -188,14 +234,108 @@
 {
     // screen bounds change after the notification event so we have to post back to the main queue
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIScreen *screen = UIScreen.mainScreen;
-        _displayWidth = screen.bounds.size.width;
-        _displayHeight = screen.bounds.size.height;
-        _displayScale = screen.scale;
+        [self _updateDisplaySize:[self _currentDisplaySize] scale:UIScreen.mainScreen.scale];
+        // Longstanding contract: rotation always pings the insets observer, even when
+        // nothing ends up changing. Kept for subscribers that predate the size observer.
         [self _dispatchOnJsQueue:^{
             [self->_displayInsetsObserver notifyWithMarshaller:nil];
         }];
     });
+}
+
+// A window can resize without an orientation change (resizable windows, iPad multitasking,
+// foldables). Per Apple, KVO on UIWindowScene.effectiveGeometry is "the recommended way to
+// receive notifications of changes to the window scene's geometry" — and unlike the
+// -[UIWindowSceneDelegate windowScene:didUpdateEffectiveGeometry:] callback, it doesn't
+// require owning the app's scene delegate (which may not even exist under the legacy
+// UIApplication lifecycle).
+- (void)_handleRootViewDidMoveToWindow:(NSNotification *)notification
+{
+    UIWindow *window = ((UIView *)notification.object).window;
+    if (!window) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        [self _observeGeometryOfWindowSceneIfNeeded:window.windowScene];
+    }
+    // Seed from the key window, not the attaching window: root views can be hosted in
+    // non-fullscreen windows (overlays, test stubs) whose bounds must not become the
+    // process-wide display size.
+    [self _updateDisplaySize:[self _currentDisplaySize] scale:UIScreen.mainScreen.scale];
+}
+
+- (void)_observeGeometryOfWindowSceneIfNeeded:(UIWindowScene *)windowScene API_AVAILABLE(ios(16.0))
+{
+    if (!windowScene || [_geometryObservedScenes containsObject:windowScene]) {
+        return;
+    }
+    if (!_geometryObservedScenes) {
+        _geometryObservedScenes = [NSMutableSet set];
+    }
+    [_geometryObservedScenes addObject:windowScene];
+    [windowScene addObserver:self
+                  forKeyPath:NSStringFromSelector(@selector(effectiveGeometry))
+                     options:0
+                     context:SCValdiDeviceModuleGeometryKVOContext];
+}
+
+- (void)_handleSceneDidDisconnect:(NSNotification *)notification
+{
+    if (@available(iOS 16.0, *)) {
+        UIScene *scene = notification.object;
+        if ([scene isKindOfClass:[UIWindowScene class]] && [_geometryObservedScenes containsObject:(UIWindowScene *)scene]) {
+            [scene removeObserver:self
+                       forKeyPath:NSStringFromSelector(@selector(effectiveGeometry))
+                          context:SCValdiDeviceModuleGeometryKVOContext];
+            [_geometryObservedScenes removeObject:(UIWindowScene *)scene];
+        }
+    }
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context
+{
+    if (context != SCValdiDeviceModuleGeometryKVOContext) {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        UIWindowScene *windowScene = (UIWindowScene *)object;
+        CGSize size;
+        if (@available(iOS 26.0, *)) {
+            size = windowScene.effectiveGeometry.coordinateSpace.bounds.size;
+        } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            size = windowScene.coordinateSpace.bounds.size;
+#pragma clang diagnostic pop
+        }
+        [self _updateDisplaySize:size scale:windowScene.screen.scale];
+    }
+}
+
+- (void)_updateDisplaySize:(CGSize)size scale:(CGFloat)scale
+{
+    [self _dispatchOnJsQueue:^{
+        if (self->_displayWidth == size.width && self->_displayHeight == size.height &&
+            self->_displayScale == scale) {
+            return;
+        }
+        SCLogValdiDebug(@"SCValdiDeviceModule: display size changed from (%0.1f,%0.1f)@%0.1f to (%0.1f,%0.1f)@%0.1f",
+                        self->_displayWidth, self->_displayHeight, self->_displayScale,
+                        size.width, size.height, scale);
+        self->_displayWidth = size.width;
+        self->_displayHeight = size.height;
+        self->_displayScale = scale;
+        // Size observer only: TypeScript invalidates its Device caches directly on it
+        // (registered at Device module load, ahead of any component callback), and real
+        // inset changes arrive via safeAreaInsetsDidChange with their own diffing. Pinging
+        // the insets observer here would make every insets subscriber re-render on each
+        // frame of a continuous resize.
+        [self->_displaySizeObserver notifyWithMarshaller:nil];
+    }];
 }
 
 - (void)ensureDeviceModuleIsReadyForContextCreation
@@ -440,6 +580,7 @@
         @"copyToClipBoard" : BRIDGE_METHOD(copyToClipBoard),
         @"getSystemVersion" : BRIDGE_METHOD(systemVersion),
         @"observeDisplayInsetChange" : _displayInsetsObserver,
+        @"observeDisplaySizeChange" : _displaySizeObserver,
         @"observeDarkMode" : _darkModeObserver,
         @"performHapticFeedback" : BRIDGE_METHOD(performHapticFeedback),
         @"getLocaleUsesMetricSystem" : BRIDGE_METHOD(localeUsesMetricSystem),

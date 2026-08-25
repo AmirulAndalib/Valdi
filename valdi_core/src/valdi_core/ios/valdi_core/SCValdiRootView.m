@@ -7,6 +7,7 @@
 
 NSNotificationName const SCValdiRootViewDisplayInsetDidChangeNotificationKey = @"SCValdiRootViewDisplayInsetDidChangeNotificationKey";
 NSNotificationName const SCValdiRootViewTraitCollectionDidChangeNotificationKey = @"SCValdiRootViewTraitCollectionDidChangeNotificationKey";
+NSNotificationName const SCValdiRootViewDidMoveToWindowNotificationKey = @"SCValdiRootViewDidMoveToWindowNotificationKey";
 
 @implementation SCValdiRootView {
     NSMutableArray *_pendingInitialRenderCompletions;
@@ -192,6 +193,10 @@ NSNotificationName const SCValdiRootViewTraitCollectionDidChangeNotificationKey 
         });
     } else {
         [self _updateViewInflationState];
+        // Lets the device module discover this view's window scene and observe its geometry
+        // (resizable windows, foldables) without owning the app's scene delegate.
+        [[NSNotificationCenter defaultCenter] postNotificationName:SCValdiRootViewDidMoveToWindowNotificationKey
+                                                            object:self];
     }
 }
 

@@ -123,5 +123,6 @@ relying on this view's dealloc.
 
 extern NSNotificationName const SCValdiRootViewDisplayInsetDidChangeNotificationKey;
 extern NSNotificationName const SCValdiRootViewTraitCollectionDidChangeNotificationKey;
+extern NSNotificationName const SCValdiRootViewDidMoveToWindowNotificationKey;
 
 NS_ASSUME_NONNULL_END

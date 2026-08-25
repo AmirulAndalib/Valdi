@@ -760,6 +760,27 @@ objc_library(
     ],
 )
 
+# SCValdiDeviceModuleTests also ships in :objc_unit_tests_lib for the standalone repo's
+# suite; this target keeps it runnable from the monorepo, where @ocmock (an
+# :objc_unit_tests_lib dep) is not defined.
+ios_unit_test(
+    name = "valdi_ios_device_module_test",
+    minimum_os_version = "13.0",
+    runner = "@build_bazel_rules_apple//apple/testing/default_runner:ios_xctestrun_ordered_runner",
+    deps = [":objc_device_module_tests_lib"],
+)
+
+objc_library(
+    name = "objc_device_module_tests_lib",
+    testonly = True,
+    srcs = ["test/ios/SCValdiDeviceModuleTests.m"],
+    copts = ["-I."],
+    includes = ["src"],
+    module_name = "ValdiIosDeviceModuleTests",
+    target_compatible_with = ["@platforms//os:ios"],
+    deps = [":valdi_ios"],
+)
+
 ios_unit_test(
     name = "valdi_ios_perf_test",
     minimum_os_version = "13.0",

@@ -111,6 +111,17 @@ const observingInsets = nativeObserveDisplayInsetChange(() => {
   cacheDisplayBottomInset.invalidate();
 });
 
+// Registered at module load so it runs before any consumer's size observer: a window can
+// resize without any inset change (foldables, resizable windows), which would otherwise
+// leave these caches stale for consumers reacting to the size notification.
+const observingSize = nativeObserveDisplaySizeChange?.(() => {
+  cacheDisplayWidth.invalidate();
+  cacheDisplayHeight.invalidate();
+  cacheWindowWidth.invalidate();
+  cacheWindowHeight.invalidate();
+  cacheDisplayScale.invalidate();
+});
+
 const observingDarkMode = nativeObserveDarkMode((isDark: boolean) => {
   darkMode = isDark;
 });
