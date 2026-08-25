@@ -62,7 +62,12 @@ JavaThread::JavaThread(JavaEnv env, jobject ref) : GlobalRefJavaObject(env, ref,
 JavaThread::~JavaThread() = default;
 
 void jniNativeThreadEntryPoint(JNIEnv* /*env*/, jclass /*cls*/, jlong ptr) {
-    auto* thread = reinterpret_cast<Valdi::Thread*>(ptr);
+    // Retain for the duration of handler(), mirroring threadEntryPoint() in Thread.cpp.
+    // Tearing down a ThreadedDispatchQueue from its own thread drops the owning Ref<Thread>
+    // mid-task; without this retain, ~Thread() destroys the still-executing runnable and its
+    // captured Ref<TaskQueue>, and TaskQueue::runNextTask then re-locks an already-destroyed
+    // mutex.
+    Valdi::Ref<Valdi::Thread> thread(reinterpret_cast<Valdi::Thread*>(ptr));
     thread->handler();
 }
 

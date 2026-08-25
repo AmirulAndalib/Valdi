@@ -57,7 +57,10 @@ private:
     ThreadQoSClass _qosClass;
     bool _disableSyncCallsInCallingThread = false;
 
-    static void handler(ThreadedDispatchQueue* dispatchQueue, const Ref<TaskQueue>& taskQueue);
+    // taskQueue is taken by value so the handler owns a strong ref for the entire loop: if the
+    // queue is torn down from its own thread, runNextTask's frame stays valid until handler
+    // returns, independent of the Thread/lambda lifetime.
+    static void handler(ThreadedDispatchQueue* dispatchQueue, Ref<TaskQueue> taskQueue);
     void teardown();
     void startThread();
     void teardownThread();

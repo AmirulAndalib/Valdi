@@ -139,7 +139,7 @@ ThreadedDispatchQueue* ThreadedDispatchQueue::getCurrent() {
     return current;
 }
 
-void ThreadedDispatchQueue::handler(ThreadedDispatchQueue* dispatchQueue, const Ref<TaskQueue>& taskQueue) {
+void ThreadedDispatchQueue::handler(ThreadedDispatchQueue* dispatchQueue, Ref<TaskQueue> taskQueue) {
     current = dispatchQueue;
 
     while (!taskQueue->isDisposed()) {
