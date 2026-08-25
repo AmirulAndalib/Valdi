@@ -154,7 +154,13 @@ bool ValdiRuntimeTweaks::isMmapModuleArchiveDenylisted(const StringBox& modulePa
         while (!prefix.empty() && prefix.back() == ' ') {
             prefix.remove_suffix(1);
         }
-        if (!prefix.empty() && moduleView.substr(0, prefix.size()) == prefix) {
+        // A trailing '$' anchors the entry: "camera$" matches only the module
+        // "camera", not "camera_control_center". Without it the entry is a prefix.
+        bool exact = !prefix.empty() && prefix.back() == '$';
+        if (exact) {
+            prefix.remove_suffix(1);
+        }
+        if (!prefix.empty() && (exact ? moduleView == prefix : moduleView.substr(0, prefix.size()) == prefix)) {
             return true;
         }
         start = end + 1;

@@ -38,8 +38,10 @@ public:
     // True when VALDI_MAX_VIEW_OPERATIONS_PROCESSING_TIME > 0 (throttling enabled). Gates top-down move order in TS.
     bool useTopDownMoveOrder() const;
     bool enableMmapModuleArchives() const;
-    // True when the module matches a prefix in VALDI_MMAP_MODULE_ARCHIVES_DENYLIST
-    // (comma-separated). Denylisted modules keep heap-backed archives even when
+    // True when the module matches an entry in VALDI_MMAP_MODULE_ARCHIVES_DENYLIST
+    // (comma-separated). Each entry is a prefix; a trailing '$' anchors it to an
+    // exact module name ("camera$" pins only "camera", not "camera_control_center").
+    // Denylisted modules keep heap-backed archives even when
     // enableMmapModuleArchives() is on — on swapless iOS that de-facto pins them,
     // trading back their share of the memory win to avoid refault latency on
     // bursty surfaces.

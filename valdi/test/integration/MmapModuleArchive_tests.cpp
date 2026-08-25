@@ -330,6 +330,36 @@ TEST_F(MmapModuleArchiveFixture, HeapPathWhenModuleMatchesDenylistPrefix) {
 
 // A populated denylist that does NOT match the module leaves the mmap path
 // untouched — pinning one surface must not degrade the others.
+// A trailing '$' anchors a denylist entry to an exact module name: "test$"
+// pins the module "test".
+TEST_F(MmapModuleArchiveFixture, HeapPathWhenModuleMatchesExactEntry) {
+    TemporaryDirectory tmp;
+    _tweakProvider->setDenylist("some_other_module,test$");
+    auto& wrapper = makeWrapper(/*enableCof=*/true);
+    wrapper.runtime->setMmapCacheDirectory(tmp.path());
+
+    auto result = wrapper.loadModule(STRING_LITERAL(kModuleName), ResourceManagerLoadModuleType::Sources);
+    ASSERT_TRUE(result) << result.description();
+
+    EXPECT_TRUE(_metrics->moduleTookHeapPath(kModuleName)) << "Exact entry must pin the module";
+    EXPECT_FALSE(_metrics->moduleTookMmapPath(kModuleName));
+}
+
+// An anchored entry must NOT prefix-match: "tes$" does not pin "test", even
+// though the unanchored "tes" would.
+TEST_F(MmapModuleArchiveFixture, MmapPathWhenExactEntryIsOnlyPrefix) {
+    TemporaryDirectory tmp;
+    _tweakProvider->setDenylist("tes$");
+    auto& wrapper = makeWrapper(/*enableCof=*/true);
+    wrapper.runtime->setMmapCacheDirectory(tmp.path());
+
+    auto result = wrapper.loadModule(STRING_LITERAL(kModuleName), ResourceManagerLoadModuleType::Sources);
+    ASSERT_TRUE(result) << result.description();
+
+    EXPECT_TRUE(_metrics->moduleTookMmapPath(kModuleName)) << "Anchored entry must not act as a prefix";
+    EXPECT_FALSE(_metrics->moduleTookHeapPath(kModuleName));
+}
+
 TEST_F(MmapModuleArchiveFixture, MmapPathWhenDenylistDoesNotMatch) {
     TemporaryDirectory tmp;
     _tweakProvider->setDenylist("search_v2,profile_identity");
