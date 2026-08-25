@@ -1486,6 +1486,24 @@ JSValueRef JavaScriptRuntime::loadJsModule(IJavaScriptContext& jsContext,
 
     auto resourceId = resourceIdResult.moveValue();
 
+    // Record the in-flight load so an ANR firing mid-load can be attributed to this bundle:
+    // evaluation runs under the global context (no bundle name) and no JS stack exists while the
+    // bundle is still being parsed, so this is the only attribution source. A local class has the
+    // enclosing member function's access; RAII restores the outer load on every early return.
+    class ScopedLoadingModule {
+    public:
+        ScopedLoadingModule(JavaScriptRuntime& runtime, const StringBox& bundleName)
+            : _runtime(runtime), _previous(runtime.swapCurrentLoadingModule(bundleName)) {}
+        ~ScopedLoadingModule() {
+            _runtime.swapCurrentLoadingModule(std::move(_previous));
+        }
+
+    private:
+        JavaScriptRuntime& _runtime;
+        StringBox _previous;
+    };
+    ScopedLoadingModule scopedLoadingModule(*this, resourceId.bundleName);
+
     ModuleLoadResult result;
     auto importPathStringView = importPath.toStringView();
     auto nativeModuleInfo = jsContext.getNativeModuleInfo(importPathStringView);
@@ -3984,6 +4002,17 @@ StringBox JavaScriptRuntime::swapCurrentNativeCallName(StringBox name) {
     std::lock_guard<Mutex> lock(_nativeCallActivityMutex);
     std::swap(_currentNativeCallName, name);
     return name;
+}
+
+StringBox JavaScriptRuntime::swapCurrentLoadingModule(StringBox bundleName) {
+    std::lock_guard<Mutex> lock(_nativeCallActivityMutex);
+    std::swap(_currentLoadingModule, bundleName);
+    return bundleName;
+}
+
+StringBox JavaScriptRuntime::getCurrentlyLoadingModule() const {
+    std::lock_guard<Mutex> lock(_nativeCallActivityMutex);
+    return _currentLoadingModule;
 }
 
 bool JavaScriptRuntime::isReadyForANRDetection() const {

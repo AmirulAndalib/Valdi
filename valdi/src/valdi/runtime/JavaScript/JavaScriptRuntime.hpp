@@ -226,6 +226,11 @@ public:
     // calls, read by the ANR detector.
     StringBox swapCurrentNativeCallName(StringBox name);
 
+    // Swaps the recorded in-flight module load bundle name and returns the previous one, so
+    // nested loads report the innermost and unwind to the parent. Written on the JS thread
+    // around module loads, read by the ANR detector.
+    StringBox swapCurrentLoadingModule(StringBox bundleName);
+
     void fullTeardown();
     void partialTeardown();
     void requestFullTeardown();
@@ -280,6 +285,7 @@ public:
     Ref<Context> getLastDispatchedContext() const final;
     std::string getANRAttributionInfo() const final;
     bool isReadyForANRDetection() const final;
+    StringBox getCurrentlyLoadingModule() const final;
 
     void performGc();
     JavaScriptContextMemoryStatistics dumpMemoryStatistics();
@@ -419,6 +425,11 @@ private:
     bool _anrDiagnosticsEnabled = false;
     mutable Mutex _nativeCallActivityMutex;
     StringBox _currentNativeCallName;
+    // Bundle name of the module currently being loaded on the JS thread, empty when no load is
+    // in flight. Guarded by _nativeCallActivityMutex: written on the JS thread around module
+    // loads, read by the ANR detector to attribute mid-load ANRs. Not gated on
+    // _anrDiagnosticsEnabled — it drives report attribution, not extra diagnostics.
+    StringBox _currentLoadingModule;
     // A lock that will block the JS thread until postInit() is called and the initialization has completed
     AsyncGroup _initLock;
     bool _hasGcScheduled = false;

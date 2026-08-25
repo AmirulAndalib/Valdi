@@ -159,6 +159,15 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
         moduleName = stacktraces[0].getContext()->getPath().getResourceId().bundleName;
     }
 
+    // Module loads run under the global context (no bundle name) and expose no JS stack while the
+    // bundle is being parsed, so a load that holds the JS thread past the threshold would
+    // otherwise be reported unattributed. Attribute it to the bundle being loaded instead.
+    bool isLoadingModule = false;
+    if (moduleName.isEmpty()) {
+        moduleName = taskScheduler.getCurrentlyLoadingModule();
+        isLoadingModule = !moduleName.isEmpty();
+    }
+
     if (!hasRunningStacktrace(stacktraces) && ack.load()) {
         // The ack was submitted while waiting to capture stacktraces.
         // We consider that task scheduler has recovered
@@ -172,6 +181,9 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
         // getANRAttributionInfo() reads saved native state, not JS, so it is safe to call while the
         // ANR has the JS thread stuck.
         message += taskScheduler.getANRAttributionInfo();
+    } else if (isLoadingModule) {
+        message =
+            fmt::format("Detected ANR in '{}' after {} (while loading module)", moduleName, detectionThresholdString);
     } else {
         message = fmt::format("Detected ANR in '{}' after {}", moduleName, detectionThresholdString);
     }

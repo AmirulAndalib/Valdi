@@ -57,6 +57,10 @@ public:
         return _readyForANRDetection;
     }
 
+    StringBox getCurrentlyLoadingModule() const override {
+        return _currentlyLoadingModule;
+    }
+
     int getLastTaskId() {
         return _taskIdSequence;
     }
@@ -73,11 +77,16 @@ public:
         _readyForANRDetection = ready;
     }
 
+    void setCurrentlyLoadingModule(StringBox module) {
+        _currentlyLoadingModule = std::move(module);
+    }
+
 private:
     std::atomic_bool _shouldSimulateANR = false;
     std::atomic_bool _readyForANRDetection = true;
     std::atomic_int _taskIdSequence = 0;
     std::string _anrAttributionInfo;
+    StringBox _currentlyLoadingModule;
 };
 
 struct ANRDetectorTestHelper {
@@ -176,6 +185,26 @@ TEST(ANRDetector, doesNotDetectANRWhileSchedulerIsNotReadyForDetection) {
     auto anr = helper.getLastANR();
     ASSERT_TRUE(anr.has_value());
     ASSERT_EQ("Detected unattributed ANR after 1.0 ms", anr->getMessage());
+}
+
+TEST(ANRDetector, attributesANRToCurrentlyLoadingModule) {
+    ANRDetectorTestHelper helper;
+
+    helper.taskScheduler->setShouldSimulateANR();
+    helper.taskScheduler->setCurrentlyLoadingModule(STRING_LITERAL("memories"));
+
+    helper.anrDetector->onEnterForeground();
+    helper.anrDetector->start(std::chrono::milliseconds(1));
+
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+    helper.waitForNextTick();
+
+    auto anr = helper.getLastANR();
+    ASSERT_TRUE(anr.has_value());
+
+    ASSERT_EQ("Detected ANR in 'memories' after 1.0 ms (while loading module)", anr->getMessage());
+    ASSERT_EQ(STRING_LITERAL("memories"), anr->getModuleName());
 }
 
 TEST(ANRDetector, givesStaleInFlightSynAFreshBudgetOnEnterForeground) {
