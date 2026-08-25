@@ -8,6 +8,7 @@
 #import "SCValdiObjCValueDelegate.h"
 #import "valdi_core/SCValdiObjCConversionUtils.h"
 #import "valdi_core/SCValdiError.h"
+#import "valdi_core/SCValdiLogger.h"
 #import "valdi_core/SCValdiMarshallableObjectUtils.h"
 #import "valdi_core/SCValdiBridgedPromise+CPP.h"
 #import "valdi_core/cpp/Utils/PlatformFunctionTrampolineUtils.hpp"
@@ -26,10 +27,46 @@ static void checkResult(const Valdi::Result<T> &result) {
     }
 }
 
-static void checkExceptionTracker(Valdi::ExceptionTracker &exceptionTracker) {
-    if (!exceptionTracker) {
-        NSExceptionThrowFromError(exceptionTracker.extractError());
+/**
+ A type-safe default value for the given reduced Objective-C return type, matching the semantics of
+ Valdi::ValueMarshaller::makeDefaultReturnValue: platform null for object/pointer returns, and a
+ typed zero/false for the primitive returns. The value must be assignable through
+ ObjCValue::getAsReturnValue for `returnType`, whose assertion would otherwise abort.
+ */
+static ObjCValue defaultReturnValueForType(SCValdiFieldValueType returnType) {
+    switch (returnType) {
+        case SCValdiFieldValueTypeVoid:
+            return ObjCValue();
+        case SCValdiFieldValueTypePtr:
+            return ObjCValue::makePtr(nullptr);
+        case SCValdiFieldValueTypeObject:
+            return ObjCValue::makeNull();
+        case SCValdiFieldValueTypeDouble:
+            return ObjCValue::makeDouble(0);
+        case SCValdiFieldValueTypeBool:
+            return ObjCValue::makeBool(false);
+        case SCValdiFieldValueTypeInt:
+            return ObjCValue::makeInt(0);
+        case SCValdiFieldValueTypeLong:
+            return ObjCValue::makeLong(0);
     }
+    return ObjCValue::makeNull();
+}
+
+/**
+ Called after a bridged invocation whose ExceptionTracker recorded a synchronous error. Such an
+ error must not cross the bridge as an SCValdiError NSException: a Swift caller cannot catch it and
+ the process aborts below the Swift frame, and an unguarded Objective-C caller aborts too (the
+ "no Objective-C exception may cross into Swift" invariant, ios/swift/README.md). Report the error
+ through the shared logger and degrade the invocation to a type-safe default return value instead of
+ raising.
+ */
+static SCValdiFieldValue reportInvocationErrorAndMakeDefaultReturnValue(Valdi::ExceptionTracker &exceptionTracker,
+                                                                        SCValdiFieldValueType returnType) {
+    Valdi::Error error = exceptionTracker.extractError();
+    SCLogValdiError(@"Valdi bridge invocation threw synchronously; degrading to a default return value: %@",
+                    NSStringFromString(error.flatten().getMessage()));
+    return defaultReturnValueForType(returnType).getAsReturnValue(returnType);
 }
 
 static inline bool objectIsNull(__unsafe_unretained id object) {
@@ -218,7 +255,9 @@ private:
                 return cppTrampoline->forwardCall(valueFunction.get(), parameters, parametersSize, Valdi::ReferenceInfoBuilder().withObject(functionName), nullptr, exceptionTracker);
             });
 
-            checkExceptionTracker(exceptionTracker);
+            if (!exceptionTracker) {
+                return reportInvocationErrorAndMakeDefaultReturnValue(exceptionTracker, blockHelper->getReturnType());
+            }
 
             return result.value().getAsReturnValue(blockHelper->getReturnType());
         };
@@ -352,7 +391,9 @@ private:
                 return cppTrampoline->forwardCall(valueFunction.get(), parameters, parametersSize, Valdi::ReferenceInfoBuilder().withObject(functionName), nullptr, exceptionTracker);
             });
 
-            checkExceptionTracker(exceptionTracker);
+            if (!exceptionTracker) {
+                return reportInvocationErrorAndMakeDefaultReturnValue(exceptionTracker, blockHelper->getReturnType());
+            }
 
             return result.value().getAsReturnValue(blockHelper->getReturnType());
         };
