@@ -748,6 +748,12 @@ void Runtime::registerTypeConverter(const StringBox& className, const StringBox&
 
 void Runtime::setRuntimeTweaks(const Ref<ValdiRuntimeTweaks>& runtimeTweaks) {
     _resourceManager->setRuntimeTweaks(runtimeTweaks);
+    if (_javaScriptRuntime != nullptr) {
+        // Push the resolution-teardown-degrade kill switch down to the JS runtime so it can be read
+        // during teardown, when the listener (this Runtime) is no longer reachable.
+        _javaScriptRuntime->setResolutionTeardownDegradeEnabled(
+            runtimeTweaks != nullptr ? runtimeTweaks->enableResolutionTeardownDegrade() : true);
+    }
 }
 
 void Runtime::setMmapCacheDirectory(const Path& path) {

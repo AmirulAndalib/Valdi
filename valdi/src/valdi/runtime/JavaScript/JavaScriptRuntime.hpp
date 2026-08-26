@@ -217,6 +217,12 @@ public:
     RetainedListener getListener() const;
     void setANRDiagnosticsEnabled(bool enabled);
 
+    // Kept in sync with the VALDI_ENABLE_RESOLUTION_TEARDOWN_DEGRADE tweak by Runtime::setRuntimeTweaks
+    // so pushModuleToMarshaller can read the kill switch after teardown (when the listener is gone).
+    void setResolutionTeardownDegradeEnabled(bool enabled) {
+        _resolutionTeardownDegradeEnabled = enabled;
+    }
+
     // True when ANR diagnostics are on and the caller is on this runtime's JS thread. Guards the
     // native-call activity writes so worker threads never touch the JS thread's slot.
     bool anrDiagnosticsActiveOnJsThread();
@@ -417,6 +423,11 @@ private:
 
     Ref<DispatchQueue> _dispatchQueue;
     std::atomic<bool> _isDisposed;
+    // Mirror of the VALDI_ENABLE_RESOLUTION_TEARDOWN_DEGRADE kill switch, set via
+    // setResolutionTeardownDegradeEnabled from Runtime::setRuntimeTweaks. pushModuleToMarshaller reads it
+    // to gate the teardown degrade; held here (not fetched via the listener) so it survives teardown.
+    // Defaults to on.
+    std::atomic<bool> _resolutionTeardownDegradeEnabled = true;
     std::atomic<ContextId> _lastDispatchedContextId;
     // ANR attribution diagnostics, gated by the VALDI_ENABLE_MODULE_LOAD_DIAGNOSTICS COF key (key
     // name kept from the earlier module-load diagnostics for config continuity). The mutex guards

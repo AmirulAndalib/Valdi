@@ -3487,15 +3487,10 @@ int32_t JavaScriptRuntime::pushModuleToMarshaller(
         //
         // The distinguishable teardown code lets a marshalling boundary degrade gracefully rather
         // than raise. The kill switch omits the code (reverting to the plain raising behavior) so the
-        // degrade can be disabled remotely without a rebuild. Default to the code (degrade enabled)
-        // when the listener/tweaks are unavailable during teardown.
-        int32_t errorCode = kResolutionSkippedDuringTeardownErrorCode;
-        if (auto listener = getListener()) {
-            auto runtimeTweaks = listener->getRuntimeTweaks();
-            if (runtimeTweaks != nullptr && !runtimeTweaks->enableResolutionTeardownDegrade()) {
-                errorCode = 0;
-            }
-        }
+        // degrade can be disabled remotely without a rebuild. It reads _resolutionTeardownDegradeEnabled,
+        // which Runtime::setRuntimeTweaks keeps in sync with the COF-backed tweak — the listener is
+        // already detached by the time this branch runs, so it can't be read through it here.
+        int32_t errorCode = _resolutionTeardownDegradeEnabled ? kResolutionSkippedDuringTeardownErrorCode : 0;
         marshaller.getExceptionTracker().onError(
             Error(STRING_FORMAT("Cannot load module '{}': the JS runtime has been destroyed", path), errorCode));
     }
