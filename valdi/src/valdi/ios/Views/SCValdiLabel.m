@@ -63,6 +63,7 @@ static NSString *const kTextGradientLayoutKey = @"text_gradient";
     id<SCValdiFunction> _onSelectionChange;
     id<SCValdiFunction> _onTextSelectionMenu;
     id<SCValdiFunction> _onTextSelectionMenuAction;
+    BOOL _loggedMissingFontAttributes;
 }
 
 + (BOOL)valdi_managesChildFrames
@@ -348,6 +349,13 @@ static NSString *const kTextGradientLayoutKey = @"text_gradient";
 
         SCValdiFontAttributes *fontAttributes = [self fontAttributes];
 
+        if (_fontAttributes == nil && _textValue != nil && ![_textValue isKindOfClass:[NSString class]] &&
+            !_loggedMissingFontAttributes) {
+            _loggedMissingFontAttributes = YES;
+            SCLogValdiError(@"SCValdiLabel rendering text without applied fontSpecs (text class: %@, frame: %@)",
+                            [_textValue class], NSStringFromCGRect(self.frame));
+        }
+
         if ([self _needAttributedString] || [self _isSelectable]) {
             UIColor *textGradientColor = _textGradientHelper.gradientColor;
             SCValdiProcessedTextConfiguration *configuration = nil;
@@ -485,6 +493,9 @@ static NSString *const kTextGradientLayoutKey = @"text_gradient";
 - (void)valdi_setFontAttributes:(SCValdiFontAttributes *)fontAttributes
 {
     _fontAttributes = fontAttributes;
+    if (fontAttributes != nil) {
+        _loggedMissingFontAttributes = NO;
+    }
     _needAttributedTextUpdate = YES;
     [self setNeedsLayout];
 }

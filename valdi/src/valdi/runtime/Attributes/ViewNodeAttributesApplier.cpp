@@ -353,6 +353,11 @@ void ViewNodeAttributesApplier::updateCompositeAttribute(ViewTransactionScope& v
 
         setAttribute(viewTransactionScope, compositeId, this, Value(value), animator);
     } else {
+        VALDI_WARN(getLogger(),
+                   "{} Removing composite attribute '{}' from class {}: all parts empty, view resets to defaults",
+                   _viewNode->getLoggerFormatPrefix(),
+                   getAttributeName(compositeId),
+                   _boundAttributes->getClassName());
         removeAttribute(viewTransactionScope, compositeId, this, animator);
     }
 }
