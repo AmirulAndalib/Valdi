@@ -7,9 +7,21 @@
 
 #include <atomic>
 #include <chrono>
+#include <fmt/format.h>
 #include <string>
 #include <string_view>
 #include <type_traits>
+
+/// Builds a trace span name, or an empty string in builds that cannot emit spans.
+///
+/// A macro rather than a function because the cost is usually in the arguments, not the
+/// formatting: a name derived from a lookup or an interned string would be computed at the call
+/// site before a function could decline to use it. kTracingEnabled is constexpr, so the dead
+/// branch and the arguments it holds are never evaluated.
+///
+/// An empty name emits no span, so call sites need no further gating.
+#define SC_TRACE_NAME_FMT(fmtString, ...)                                                                              \
+    (::snap::kTracingEnabled ? ::fmt::format(fmtString, ##__VA_ARGS__) : ::std::string{})
 
 namespace snap::profiling {
 
