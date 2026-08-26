@@ -180,6 +180,13 @@ void SCValdiMarshallerSwapIndexes(SCValdiMarshallerRef marshaller, NSInteger lef
  */
 void SCValdiMarshallerCheck(SCValdiMarshallerRef marshaller);
 
+/**
+ If the marshaller carries the "resolution skipped during JS runtime teardown" error, clear it and
+ return YES so the caller can degrade gracefully instead of raising. Any other pending error is left
+ in place (raise it afterwards with SCValdiMarshallerCheck). Returns NO when no error is pending.
+ */
+BOOL SCValdiMarshallerConsumeResolutionTeardownError(SCValdiMarshallerRef marshaller);
+
 BOOL SCValdiMarshallerEquals(SCValdiMarshallerRef leftMarshaller, SCValdiMarshallerRef rightMarshaller);
 
 BOOL SCValdiIsNull(__unsafe_unretained id object);

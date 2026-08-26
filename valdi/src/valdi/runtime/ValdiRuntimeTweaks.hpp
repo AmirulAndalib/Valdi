@@ -33,6 +33,11 @@ public:
     bool enableRenderRequestContextFix() const;
     // Killswitch for the pre-raster quiescence fence in BridgedView::rasterInto.
     bool disablePreRasterFence() const;
+    // Kill switch for the bridge-function resolution teardown degrade. When true (default), a
+    // native->JS resolution that races runtime teardown is reported with the distinguishable
+    // kResolutionSkippedDuringTeardownErrorCode so a marshalling boundary can degrade to a no-op
+    // instead of raising an uncatchable error. Set false to restore the raising behavior.
+    bool enableResolutionTeardownDegrade() const;
     bool applyManagedChildFramePadding() const;
     bool disableHitTestSyncDeadline() const;
     // True when VALDI_MAX_VIEW_OPERATIONS_PROCESSING_TIME > 0 (throttling enabled). Gates top-down move order in TS.

@@ -8,6 +8,7 @@
 #include "SCValdiMarshaller.h"
 #import "valdi_core/SCValdiMarshaller+CPP.h"
 #include <Foundation/Foundation.h>
+#import "valdi_core/cpp/Utils/Error.hpp"
 #import "valdi_core/cpp/Utils/InterfaceMarshallDiagnostics.hpp"
 #import "valdi_core/cpp/Utils/Marshaller.hpp"
 #import "valdi_core/cpp/Utils/ValueTypedObject.hpp"
@@ -96,6 +97,22 @@ FOUNDATION_EXPORT void SCValdiMarshallerThrowBadType(SCValdiMarshallerRef marsha
 FOUNDATION_EXPORT void SCValdiMarshallerCheck(SCValdiMarshallerRef marshaller)
 {
     SCValdiMarshallerCppCheck(SCValdiMarshallerUnwrap(marshaller));
+}
+
+FOUNDATION_EXPORT BOOL SCValdiMarshallerConsumeResolutionTeardownError(SCValdiMarshallerRef marshaller)
+{
+    auto &tracker = SCValdiMarshallerUnwrap(marshaller)->getExceptionTracker();
+    if (tracker) {
+        // A truthy tracker means no pending error (inverted convention, see SCValdiMarshallerCppCheck).
+        return NO;
+    }
+    auto error = tracker.extractError();
+    if (error.getErrorCode() == Valdi::kResolutionSkippedDuringTeardownErrorCode) {
+        return YES;
+    }
+    // Not a teardown error: put it back so SCValdiMarshallerCheck raises it as before.
+    tracker.onError(error);
+    return NO;
 }
 
 FOUNDATION_EXPORT NSInteger SCValdiMarshallerPushMap(SCValdiMarshallerRef marshaller, NSInteger initialCapacity)

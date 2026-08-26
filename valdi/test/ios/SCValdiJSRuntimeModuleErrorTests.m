@@ -203,4 +203,55 @@ static NSString *const kUnresolvableModulePath = @"__no_such_bundle__/__no_such_
     [self waitForExpectations:@[expectation] timeout:10.0];
 }
 
+/// Companion to the safe-resolver teardown test, for the RAISING resolver (functionWithJSRuntime: /
+/// Swift SCCFoo(jsRuntime:)) that the majority of call sites still use. When resolution races runtime
+/// teardown it must NOT raise an SCValdiError (uncatchable below a Swift frame -> SIGABRT); it degrades
+/// to a non-nil no-op function so a dying session unwinds quietly. Gated by the
+/// VALDI_ENABLE_RESOLUTION_TEARDOWN_DEGRADE kill switch (default on).
+- (void)testRaisingResolverAfterRuntimeTeardownDegradesInsteadOfRaising
+{
+    __block id<SCValdiJSRuntime> jsRuntime = nil;
+
+    [self withJSRuntime:^(id<SCValdiJSRuntime> runtime) {
+        jsRuntime = runtime;
+        XCTAssertNotNil([SCCValdiTestMakeTestObject functionWithJSRuntime:runtime]);
+    }];
+
+    // Dealloc drives RuntimeManager::fullTeardown(), which marks the runtime disposed synchronously.
+    self.runtimeManager = nil;
+
+    // valdi_test enables async_strict_mode, so resolution must happen off the main thread.
+    XCTestExpectation *expectation = [self expectationWithDescription:@"raising resolution after teardown completed"];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        SCCValdiTestMakeTestObject *function = nil;
+        @try {
+            function = [SCCValdiTestMakeTestObject functionWithJSRuntime:jsRuntime];
+        } @catch (NSException *exception) {
+            XCTFail(@"functionWithJSRuntime: must degrade, not raise, after runtime teardown, got %@: %@",
+                    exception.name, exception.reason);
+            [expectation fulfill];
+            return;
+        }
+        // The raising resolver is imported into Swift as non-null, so the degrade must return an object
+        // rather than nil (which would trap on first use).
+        XCTAssertNotNil(function);
+        [expectation fulfill];
+    });
+    [self waitForExpectations:@[expectation] timeout:10.0];
+}
+
+/// The degrade must trigger only on teardown, never mask a genuine resolution failure on a live
+/// runtime: functionWithJSRuntime: for an unresolvable module still raises.
+- (void)testRaisingResolverStillRaisesForUnresolvableModuleOnLiveRuntime
+{
+    [self withJSRuntime:^(id<SCValdiJSRuntime> jsRuntime) {
+        @try {
+            (void)[SCValdiTestUnresolvableBridgeFunction functionWithJSRuntime:jsRuntime];
+            XCTFail(@"functionWithJSRuntime: must still raise for an unresolvable module on a live runtime");
+        } @catch (SCValdiError *error) {
+            XCTAssertNotNil(error.reason);
+        }
+    }];
+}
+
 @end
