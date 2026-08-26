@@ -151,6 +151,10 @@ class ManagedContextImpl implements IManagedContext {
     nativeProcessFrame(this.snapDrawingValdiContext.native, deltaMs);
   }
 
+  get allAssetsLoaded(): boolean {
+    return this.assetTracker.allAssetsLoaded;
+  }
+
   onAllAssetsLoaded(): Promise<IManagedContextAssetsLoadResult> {
     return new Promise(resolve => {
       this.assetTracker.onAllAssetsLoaded(() => {

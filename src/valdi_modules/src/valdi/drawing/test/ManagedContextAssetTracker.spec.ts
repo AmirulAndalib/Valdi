@@ -35,6 +35,28 @@ describe('ManagedContextAssetTracker', () => {
     expect(called).toBeTrue();
   });
 
+  it('reports allAssetsLoaded synchronously', () => {
+    const assetTracker = new ManagedContextAssetTracker();
+
+    expect(assetTracker.allAssetsLoaded).toBeTrue();
+
+    assetTracker.onBeganRequestingLoadedAsset(1);
+    expect(assetTracker.allAssetsLoaded).toBeFalse();
+
+    assetTracker.onLoadedAssetChanged(1, undefined);
+    expect(assetTracker.allAssetsLoaded).toBeTrue();
+  });
+
+  it('counts an errored asset as settled for allAssetsLoaded', () => {
+    const assetTracker = new ManagedContextAssetTracker();
+
+    assetTracker.onBeganRequestingLoadedAsset(1);
+    expect(assetTracker.allAssetsLoaded).toBeFalse();
+
+    assetTracker.onLoadedAssetChanged(1, 'It failed');
+    expect(assetTracker.allAssetsLoaded).toBeTrue();
+  });
+
   it('notifies when all assets are loaded', () => {
     const assetTracker = new ManagedContextAssetTracker();
 

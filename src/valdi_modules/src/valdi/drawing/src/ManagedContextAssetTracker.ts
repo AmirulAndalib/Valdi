@@ -10,6 +10,11 @@ export class ManagedContextAssetTracker {
     return this._assetCount;
   }
 
+  /** True when every tracked asset has settled, counting an errored asset as settled. */
+  get allAssetsLoaded(): boolean {
+    return this.areAllAssetsLoaded();
+  }
+
   private assetStateById: { [key: number]: AssetState } = {};
   private _assetCount = 0;
   private onAllAssetsLoadedCallbacks: (() => void)[] = [];

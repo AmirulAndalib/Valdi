@@ -73,6 +73,12 @@ export interface IManagedContext {
   onAllAssetsLoaded(): Promise<IManagedContextAssetsLoadResult>;
 
   /**
+   * True when every tracked asset has settled, counting an errored asset as settled. Lets a
+   * per-frame caller skip {@link onAllAssetsLoaded} entirely when nothing is outstanding.
+   */
+  readonly allAssetsLoaded: boolean;
+
+  /**
    * Destroy the managed context and its associated resources
    */
   dispose(): void;
