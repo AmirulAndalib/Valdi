@@ -35,8 +35,12 @@ static inline bool isLowSurrogate(char16_t c) {
 /*
  * Like utf8DecodeCheck, but for UTF-16.
  */
-static inline OffsetPt utf16DecodeCheck(const char16_t* str, std::u16string::size_type i) {
-    if (isHighSurrogate(str[i]) && isLowSurrogate(str[i + 1])) {
+static inline OffsetPt utf16DecodeCheck(const char16_t* str,
+                                        std::u16string::size_type i,
+                                        std::u16string::size_type len) {
+    // Only look ahead at str[i + 1] when it is still inside the buffer, so a lone high
+    // surrogate at the end of the input is treated as invalid instead of read out of bounds.
+    if (isHighSurrogate(str[i]) && (i + 1 < len) && isLowSurrogate(str[i + 1])) {
         // High surrogate followed by low surrogate
         char32_t pt = (((str[i] - 0xD800) << 10) | (str[i + 1] - 0xDC00)) + 0x10000;
         return {2, pt};
@@ -48,8 +52,8 @@ static inline OffsetPt utf16DecodeCheck(const char16_t* str, std::u16string::siz
     }
 }
 
-static inline char32_t utf16Decode(const char16_t* str, std::u16string::size_type& i) {
-    OffsetPt res = utf16DecodeCheck(str, i);
+static inline char32_t utf16Decode(const char16_t* str, std::u16string::size_type& i, std::u16string::size_type len) {
+    OffsetPt res = utf16DecodeCheck(str, i, len);
     if (res.offset < 0) {
         i += 1;
         return 0xFFFD;
@@ -81,7 +85,7 @@ static inline void utf8Encode(char32_t pt, std::vector<char>& out) {
     }
 }
 
-static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i) {
+static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i, std::string::size_type len) {
     uint32_t b0;
     uint32_t b1;
     uint32_t b2;
@@ -97,6 +101,10 @@ static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i
         return kInvalidPt;
     } else if (b0 < 0xE0) {
         // 2-byte character
+        // Bounds-check the continuation byte before reading it; a truncated lead byte at
+        // the end of the buffer is invalid rather than an out-of-bounds read.
+        if (i + 1 >= len)
+            return kInvalidPt;
         if (((b1 = str[i + 1]) & 0xC0) != 0x80)
             return kInvalidPt;
 
@@ -107,6 +115,9 @@ static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i
         return {2, pt};
     } else if (b0 < 0xF0) {
         // 3-byte character
+        // All continuation bytes must be inside the buffer before we read them.
+        if (i + 2 >= len)
+            return kInvalidPt;
         if (((b1 = str[i + 1]) & 0xC0) != 0x80)
             return kInvalidPt;
         if (((b2 = str[i + 2]) & 0xC0) != 0x80)
@@ -119,6 +130,9 @@ static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i
         return {3, pt};
     } else if (b0 < 0xF8) {
         // 4-byte character
+        // All continuation bytes must be inside the buffer before we read them.
+        if (i + 3 >= len)
+            return kInvalidPt;
         if (((b1 = str[i + 1]) & 0xC0) != 0x80)
             return kInvalidPt;
         if (((b2 = str[i + 2]) & 0xC0) != 0x80)
@@ -137,8 +151,8 @@ static inline OffsetPt utf8DecodeCheck(const char* str, std::string::size_type i
     }
 }
 
-static inline char32_t utf8Decode(const char* str, std::string::size_type& i) {
-    OffsetPt res = utf8DecodeCheck(str, i);
+static inline char32_t utf8Decode(const char* str, std::string::size_type& i, std::string::size_type len) {
+    OffsetPt res = utf8DecodeCheck(str, i, len);
     if (res.offset < 0) {
         i += 1;
         return 0xFFFD;
@@ -165,7 +179,7 @@ std::pair<const char*, size_t> utf16ToUtf8(const char16_t* utf16String, size_t l
     buffer.clear();
 
     for (std::u16string::size_type i = 0; i < len;) {
-        utf8Encode(utf16Decode(utf16String, i), buffer);
+        utf8Encode(utf16Decode(utf16String, i, len), buffer);
     }
 
     return std::make_pair(buffer.data(), buffer.size());
@@ -177,7 +191,7 @@ std::pair<const char16_t*, size_t> utf8ToUtf16(const char* utf8String, size_t le
     buffer.clear();
 
     for (std::string::size_type i = 0; i < len;) {
-        utf16Encode(utf8Decode(utf8String, i), buffer);
+        utf16Encode(utf8Decode(utf8String, i, len), buffer);
     }
 
     return std::make_pair(buffer.data(), buffer.size());
@@ -189,7 +203,7 @@ std::pair<const uint32_t*, size_t> utf8ToUtf32(const char* utf8String, size_t le
     buffer.clear();
 
     for (std::string::size_type i = 0; i < len;) {
-        buffer.emplace_back(utf8Decode(utf8String, i));
+        buffer.emplace_back(utf8Decode(utf8String, i, len));
     }
 
     return std::make_pair(buffer.data(), buffer.size());
@@ -201,7 +215,7 @@ std::pair<const uint32_t*, size_t> utf16ToUtf32(const char16_t* utf16String, siz
     buffer.clear();
 
     for (std::u16string::size_type i = 0; i < len;) {
-        buffer.emplace_back(utf16Decode(utf16String, i));
+        buffer.emplace_back(utf16Decode(utf16String, i, len));
     }
 
     return std::make_pair(buffer.data(), buffer.size());
