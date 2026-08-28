@@ -9,4 +9,14 @@
 
 @implementation SCValdiConfiguration
 
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        // Killswitch default: gesture prewarm is on unless a COF flips it off.
+        _enableGesturePrewarm = YES;
+    }
+    return self;
+}
+
 @end

@@ -10,6 +10,14 @@
 
 #import <UIKit/UIKit.h>
 
+/// Realizes the private Gestures.framework (GestureFoundation) once per process by building and
+/// discarding a gesture recognizer. On iOS 18+ the first UIGestureRecognizer created in the process
+/// pays a large one-time framework realization; when that lands inside a Composer render pass it
+/// trips the frozen-frame watchdog (COMPOSER-6174). Call this early to pay the cost off a visible
+/// frame. Safe to call from any thread and any number of times; the work runs once, asynchronously
+/// on the main thread.
+FOUNDATION_EXTERN void SCValdiPrewarmGestureRecognizers(void);
+
 @protocol SCValdiGestureRecognizer <NSObject, UIGestureRecognizerDelegate>
 
 - (void)setFunction:(id<SCValdiFunction>)function;

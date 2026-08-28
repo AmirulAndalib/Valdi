@@ -70,6 +70,12 @@ typedef void (^SCValdiPerformHapticFeedbackBlock)(NSString* type);
 @property (assign, nonatomic) BOOL enableReferenceTracking;
 
 /**
+ Whether Gestures.framework is prewarmed off a visible frame at the first context creation
+ (COMPOSER-6174). Defaults to YES; acts as a killswitch that can be disabled remotely.
+ */
+@property (assign, nonatomic) BOOL enableGesturePrewarm;
+
+/**
  * The currently selected JavaScript engine type.
  * In production, iOS uses the JavaScriptCore engine and Android uses QuickJS.
  * In non-production builds, this is controlled by a tweak

@@ -21,7 +21,9 @@
 
 @property (readonly, nonatomic) Valdi::SharedContext context;
 
-- (instancetype)initWithContext:(Valdi::SharedContext)context enableReferenceTracking:(BOOL)enableReferenceTracking;
+- (instancetype)initWithContext:(Valdi::SharedContext)context
+        enableReferenceTracking:(BOOL)enableReferenceTracking
+           enableGesturePrewarm:(BOOL)enableGesturePrewarm;
 
 - (void)onDestroyed;
 

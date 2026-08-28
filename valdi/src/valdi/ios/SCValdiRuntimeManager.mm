@@ -123,6 +123,7 @@ static void updateRuntimeManagersArray(void (^callback)(NSMutableArray<NSValue *
     BOOL _applicationIsTerminating;
     BOOL _forceTornDown;
     BOOL _referenceTrackingEnabled;
+    BOOL _gesturePrewarmEnabled;
     NSValue *_weakBox;
 
     NSMutableArray<SCValdiRuntimeCreatedCallback> *_runtimeCreatedCallbacks;
@@ -148,6 +149,9 @@ static void updateRuntimeManagersArray(void (^callback)(NSMutableArray<NSValue *
                                                    object:nil];
 
         _weakBox = [NSValue valueWithNonretainedObject:self];
+
+        // Killswitch default: gesture prewarm is on until a configuration disables it.
+        _gesturePrewarmEnabled = YES;
 
         updateRuntimeManagersArray(^(NSMutableArray<NSValue *> *runtimeManagers) {
             [runtimeManagers addObject:self->_weakBox];
@@ -340,11 +344,12 @@ static void updateRuntimeManagersArray(void (^callback)(NSMutableArray<NSValue *
 
 - (void)_applyConfiguration
 {
+    SCValdiConfiguration *configuration = [self _getOrCreateConfiguration];
+    _gesturePrewarmEnabled = configuration.enableGesturePrewarm;
+
     if (_cppInstance == nullptr) {
         return;
     }
-
-    SCValdiConfiguration *configuration = [self _getOrCreateConfiguration];
 
     _referenceTrackingEnabled = configuration.enableReferenceTracking;
     BOOL useScreenUserInterfaceStyleForDarkMode = !configuration.useViewControllerBasedUserInterfaceStyleForDarkMode;
@@ -467,6 +472,11 @@ static void updateRuntimeManagersArray(void (^callback)(NSMutableArray<NSValue *
 - (BOOL)referenceTrackingEnabled
 {
     return _referenceTrackingEnabled;
+}
+
+- (BOOL)gesturePrewarmEnabled
+{
+    return _gesturePrewarmEnabled;
 }
 
 - (SCValdiRuntime *)mainRuntime

@@ -16,6 +16,21 @@
 
 #import <UIKit/UIGestureRecognizerSubclass.h>
 
+void SCValdiPrewarmGestureRecognizers(void)
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // Always hop to a later main-thread turn: the realization cost must run on the main thread
+        // (UIKit), but never inside the caller's current render/init frame, which is the whole point.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIView *scratchView = [[UIView alloc] initWithFrame:CGRectZero];
+            SCValdiTouchGestureRecognizer *recognizer = [SCValdiTouchGestureRecognizer new];
+            [scratchView addGestureRecognizer:recognizer];
+            [scratchView removeGestureRecognizer:recognizer];
+        });
+    });
+}
+
 static BOOL SCValdiCallTouchPredicate(UIGestureRecognizer *gestureRecognizer, id<SCValdiFunction> predicate)
 {
     if (!predicate) {

@@ -31,6 +31,12 @@ typedef void (^SCValdiRuntimeCreatedCallback)(id<SCValdiRuntimeProtocol>);
 @property (readonly, nonatomic) BOOL referenceTrackingEnabled;
 
 /**
+ Whether Gestures.framework is prewarmed at context creation. Reflects
+ SCValdiConfiguration.enableGesturePrewarm; defaults to YES (killswitch).
+ */
+@property (readonly, nonatomic) BOOL gesturePrewarmEnabled;
+
+/**
  The block will be provided with a SCValdiConfiguration instance that you can mutate
  and the runtime manager will apply this configuration after the block finishes executing.
  */

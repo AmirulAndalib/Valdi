@@ -34,6 +34,7 @@
 #import "valdi/ios/SCValdiViewModel.h"
 #import "valdi/ios/SCValdiViewNode+CPP.h"
 #import "valdi/ios/Utils/ContextUtils.h"
+#import "valdi/ios/Gestures/SCValdiGestureRecognizers.h"
 
 #import <atomic>
 #import <limits>
@@ -76,6 +77,7 @@ static Valdi::SharedRuntime getRuntimeFromContext(const Valdi::SharedContext &co
 
 - (instancetype)initWithContext:(Valdi::SharedContext)context
         enableReferenceTracking:(BOOL)enableReferenceTracking
+            enableGesturePrewarm:(BOOL)enableGesturePrewarm
 {
     self = [super init];
 
@@ -98,6 +100,13 @@ static Valdi::SharedRuntime getRuntimeFromContext(const Valdi::SharedContext &co
         _componentPath = ValdiIOS::NSStringFromSTDStringView(_context->getPath().toString());
         _moduleOwnerName = ValdiIOS::NSStringFromString(_context->getAttribution().owner);
         _moduleName = ValdiIOS::NSStringFromString(_context->getAttribution().moduleName);
+
+        // Warm Gestures.framework off a visible frame so the first onTouch recognizer a surface
+        // builds doesn't pay the one-time realization cost mid-render (COMPOSER-6174). No-op after
+        // the first context. Gated by a killswitch (VALDI_IOS_ENABLE_GESTURE_PREWARM).
+        if (enableGesturePrewarm) {
+            SCValdiPrewarmGestureRecognizers();
+        }
     }
 
     return self;

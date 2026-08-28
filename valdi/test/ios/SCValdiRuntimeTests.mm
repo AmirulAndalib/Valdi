@@ -383,6 +383,25 @@
     XCTAssertEqual(1, CFGetRetainCount((__bridge CFTypeRef)(onTap)));
 }
 
+- (void)testGesturePrewarmEnabledByDefault
+{
+    // Killswitch default: prewarm is on unless a configuration disables it.
+    XCTAssertTrue(self.runtimeManager.gesturePrewarmEnabled);
+}
+
+- (void)testGesturePrewarmReflectsConfiguration
+{
+    [self.runtimeManager updateConfiguration:^(SCValdiConfiguration *configuration) {
+        configuration.enableGesturePrewarm = NO;
+    }];
+    XCTAssertFalse(self.runtimeManager.gesturePrewarmEnabled);
+
+    [self.runtimeManager updateConfiguration:^(SCValdiConfiguration *configuration) {
+        configuration.enableGesturePrewarm = YES;
+    }];
+    XCTAssertTrue(self.runtimeManager.gesturePrewarmEnabled);
+}
+
 - (void)testCanHandleTap
 {
     NSMutableArray<NSNumber *> *tappedCards = [NSMutableArray new];

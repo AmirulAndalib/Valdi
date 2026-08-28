@@ -35,9 +35,13 @@ RuntimeListener::~RuntimeListener()
 
 void RuntimeListener::onContextCreated(Valdi::Runtime &runtime, const Valdi::SharedContext &context)
 {
-    BOOL enableReferenceTracking = getObjCRuntime(runtime).manager.referenceTrackingEnabled;
+    id<SCValdiRuntimeManagerProtocol> manager = getObjCRuntime(runtime).manager;
+    BOOL enableReferenceTracking = manager.referenceTrackingEnabled;
+    BOOL enableGesturePrewarm = manager.gesturePrewarmEnabled;
 
-    SCValdiContext *valdiContext = [[SCValdiContext alloc] initWithContext:context enableReferenceTracking:enableReferenceTracking];
+    SCValdiContext *valdiContext = [[SCValdiContext alloc] initWithContext:context
+                                                  enableReferenceTracking:enableReferenceTracking
+                                                     enableGesturePrewarm:enableGesturePrewarm];
     context->setUserData(ValdiObjectFromNSObject(valdiContext));
     [_runtimeRef makeStrong];
 }
