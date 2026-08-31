@@ -15,6 +15,7 @@
     if (self) {
         // Killswitch default: gesture prewarm is on unless a COF flips it off.
         _enableGesturePrewarm = YES;
+        self.enableDebuggerService = YES;
     }
     return self;
 }
