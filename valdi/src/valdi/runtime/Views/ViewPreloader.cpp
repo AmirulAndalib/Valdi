@@ -78,23 +78,40 @@ void ViewPreloader::setWorkQueue(const Ref<DispatchQueue>& workQueue) {
 }
 
 Ref<ViewFactory> ViewPreloader::dequeueNextViewFactoryToPreload() {
-    std::lock_guard<std::mutex> lock(_mutex);
-
     while (true) {
-        if (_preloadCountByClassName.empty() || _paused) {
+        StringBox className;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            if (_preloadCountByClassName.empty() || _paused) {
+                _preloading = false;
+                return nullptr;
+            }
+            className = _preloadCountByClassName.begin()->first;
+        }
+
+        // Resolve the factory with _mutex released: a cache miss creates it, which class-loads
+        // the view class and binds its whole attribute hierarchy through JNI. Holding _mutex
+        // across that work blocks stopPreload()/pausePreload() on the main thread during
+        // applicationWillPause, which shows up as a main-thread ANR on low-end devices.
+        auto viewFactory = _globalViewFactories->getViewFactory(className);
+        auto poolSize = viewFactory->getPoolSize();
+
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_paused) {
+            // pausePreload() was called while the factory was being resolved
             _preloading = false;
             return nullptr;
         }
-
-        auto it = _preloadCountByClassName.begin();
-        auto viewFactory = _globalViewFactories->getViewFactory(it->first);
-        auto poolSize = viewFactory->getPoolSize();
+        auto it = _preloadCountByClassName.find(className);
+        if (it == _preloadCountByClassName.end()) {
+            // stopPreload() removed this entry while the factory was being resolved
+            continue;
+        }
         if (poolSize < it->second) {
             return viewFactory;
-        } else {
-            // Finished preloading this ViewFactory
-            _preloadCountByClassName.erase(it);
         }
+        // Finished preloading this ViewFactory
+        _preloadCountByClassName.erase(it);
     }
 }
 

@@ -5053,6 +5053,23 @@ TEST_P(RuntimeFixture, canPausePreloading) {
     ASSERT_EQ(5, getNumberOfPooledViews(viewClassName, stats));
 }
 
+TEST_P(RuntimeFixture, viewClassReplacementReusesExistingViewFactory) {
+    auto replacementClassName = STRING_LITERAL("ValdiView");
+    auto aliasClassName = STRING_LITERAL("ReplacedValdiView");
+
+    auto viewManagerContext = wrapper.standaloneRuntime->getViewManagerContext();
+    const auto& globalViewFactories = viewManagerContext->getGlobalViewFactories();
+
+    // The replacement class already has a factory before the alias is first resolved
+    auto viewFactory = globalViewFactories->getViewFactory(replacementClassName);
+
+    viewManagerContext->registerViewClassReplacement(aliasClassName, replacementClassName);
+
+    // Both names must resolve to the pre-existing factory so they share a single view pool
+    ASSERT_EQ(viewFactory.get(), globalViewFactories->getViewFactory(aliasClassName).get());
+    ASSERT_EQ(viewFactory.get(), globalViewFactories->getViewFactory(replacementClassName).get());
+}
+
 TEST_P(RuntimeFixture, canResolveJsImportPath) {
     auto bridgeModuleResult = JavaScriptPathResolver::resolveResourceId(STRING_LITERAL("BridgeModule"));
     ASSERT_TRUE(bridgeModuleResult.success());

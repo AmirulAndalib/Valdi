@@ -48,10 +48,35 @@ Ref<ViewFactory> GlobalViewFactories::getViewFactory(const StringBox& className)
 
     const auto& replacementIt = _viewClassReplacements.find(className);
     if (replacementIt != _viewClassReplacements.end()) {
-        auto viewFactory = createViewFactory(replacementIt->second);
-
+        auto replacementClassName = replacementIt->second;
+        // Reuse the replacement class' existing factory so both names share a single view pool.
+        // Copy the Ref before inserting: FlatMap insertion can invalidate the found iterator.
+        auto existingIt = _viewFactories.find(replacementClassName);
+        if (existingIt != _viewFactories.end()) {
+            auto existingFactory = existingIt->second;
+            _viewFactories[className] = existingFactory;
+            return existingFactory;
+        }
+        // Release the mutex during creation, like the non-replacement path below. Factory
+        // creation class-loads the view class and binds attributes through JNI; holding _mutex
+        // across it blocks clearViewPools() on the main thread during applicationWillPause.
+        guard.unlock();
+        auto viewFactory = createViewFactory(replacementClassName);
+        guard.lock();
+        // Another thread may have created a factory under either name while the mutex was
+        // released; link to it instead of overwriting, so the view pool doesn't get split.
+        auto createdIt = _viewFactories.find(className);
+        if (createdIt != _viewFactories.end()) {
+            return createdIt->second;
+        }
+        auto replacementCreatedIt = _viewFactories.find(replacementClassName);
+        if (replacementCreatedIt != _viewFactories.end()) {
+            auto replacementFactory = replacementCreatedIt->second;
+            _viewFactories[className] = replacementFactory;
+            return replacementFactory;
+        }
         _viewFactories[className] = viewFactory;
-        _viewFactories[replacementIt->second] = viewFactory;
+        _viewFactories[replacementClassName] = viewFactory;
 
         return viewFactory;
     } else {
