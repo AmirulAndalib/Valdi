@@ -424,12 +424,6 @@ struct ObjectConvertVisitor : public IJavaScriptPropertyNamesVisitor {
             return false;
         }
 
-        auto convertedProperty =
-            jsValueToValue(context, propertyValueResult.get(), referenceInfoBuilder, exceptionTracker);
-        if (!exceptionTracker) {
-            return false;
-        }
-
         if (!context.isValueUndefined(propertyValueResult.get())) {
             auto cppPropertyName = context.propertyNameToString(propertyName);
 
