@@ -17,6 +17,10 @@ bzl test //valdi:test_layout --test_output=all --test_arg=--gtest_print_time=1
 # canLockAllJSContexts, is DISABLED, so the suite runs green).
 bzl test //valdi:test_svg --test_output=errors
 
+# djinni-support-lib Valdi proxy dispatch unit tests. Engine-free (links only
+# valdi_core, not valdi_standalone_runtime), so safe on both Linux and macOS.
+bzl test //third-party/djinni-support-lib:test_valdi --test_output=errors
+
 # The hot-reload smoke runs as its own parallel job on external GitHub Actions
 # (the hotreload-smoke matrix leg). Gate it here too — but ONLY internally (skip
 # on GitHub Actions to avoid duplicating that job) and only on Linux (it needs

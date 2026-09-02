@@ -171,6 +171,20 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "test_valdi",
+    size = "small",
+    srcs = glob(["test/valdi/**/*.cpp"]),
+    copts = ["-fexceptions"],
+    linkstatic = 1,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":djinni_support_lib_valdi",
+        "@gtest//:gtest_main",
+        "@valdi//valdi_core",
+    ],
+)
+
 SWIFT_CXX_INTEROP_COPTS = [
     "-cxx-interoperability-mode=default",
     "-Xcc",

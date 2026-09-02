@@ -474,6 +474,8 @@ extern std::mutex cppProxyCacheMutex;
 void setGlobalOneWayCalls(bool enabled) noexcept;
 bool globalOneWayCallsEnabled() noexcept;
 
+void logDroppedExpiredProxyCall(const Valdi::ValueTypedProxyObject& proxy, size_t methodIndex) noexcept;
+
 class ValdiProxyBase {
 protected:
     Valdi::Ref<Valdi::ValueTypedProxyObject> _js;
@@ -492,14 +494,21 @@ public:
         return _js;
     }
     Valdi::Value callJsMethod(size_t i, std::initializer_list<Valdi::Value> parameters) {
+        // Void-only so a return value is never dropped (COMPOSER-6103).
+        const bool isOneWay = globalOneWayCallsEnabled() && i < _isVoidMethod.size() && _isVoidMethod[i];
         if (_js->expired()) {
+            // A one-way event to a torn-down listener is a no-op by definition; throwing
+            // instead aborts callers on non-JS threads with no handler up-stack.
+            if (isOneWay) {
+                logDroppedExpiredProxyCall(*_js, i);
+                return Valdi::Value::undefined();
+            }
             throw JsException(Valdi::Error("proxy expired"));
         }
         if (_methods[i] == nullptr) {
             _methods[i] = _js->getTypedObject()->getProperty(i).getFunctionRef();
         }
-        // Void-only so a return value is never dropped (COMPOSER-6103).
-        if (globalOneWayCallsEnabled() && i < _isVoidMethod.size() && _isVoidMethod[i]) {
+        if (isOneWay) {
             std::ignore = _methods[i]->call(Valdi::ValueFunctionFlagsNone, parameters);
             return Valdi::Value::undefined();
         }
