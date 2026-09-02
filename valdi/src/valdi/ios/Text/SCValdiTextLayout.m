@@ -320,9 +320,6 @@ static atomic_bool sFontLeadingInMeasureEnabled = true;
 
     CGRect boundingRect;
     if (textValue) {
-        if (textValue.length == 0) {
-            return CGSizeZero;
-        }
         boundingRect = [textValue boundingRectWithSize:maxSize options:options attributes:attributes context:context];
     } else {
         SCValdiProcessedText *processedText =
@@ -332,10 +329,15 @@ static atomic_bool sFontLeadingInMeasureEnabled = true;
                                                      fontManager:fontManager
                                                  traitCollection:traitCollection
                                                    configuration:nil];
-        if (processedText.attributedString.length == 0) {
-            return CGSizeZero;
+        NSAttributedString *attributedString = processedText.attributedString;
+        if (attributedString.length > 0) {
+            boundingRect = [attributedString boundingRectWithSize:maxSize options:options context:context];
+        } else {
+            // An empty attributed string has no font runs, so NSStringDrawing would measure it with
+            // its default font, shorter than the requested font's line. Measure with the resolved
+            // attributes so nil/empty values get the same one-line height as the NSString branch.
+            boundingRect = [@"" boundingRectWithSize:maxSize options:options attributes:attributes context:context];
         }
-        boundingRect = [processedText.attributedString boundingRectWithSize:maxSize options:options context:context];
     }
 
     CGSize outSize = boundingRect.size;

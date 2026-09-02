@@ -18,6 +18,7 @@
 #import "valdi/ios/Text/NSAttributedString+Valdi.h"
 #import "valdi/ios/Text/SCValdiFontAttributes.h"
 #import "valdi/ios/Text/SCValdiTextLayout.h"
+#import "valdi/ios/Views/SCValdiLabel.h"
 #import "valdi_core/SCValdiRectUtils.h"
 
 @interface SCValdiTextMeasureRenderParityTests : XCTestCase
@@ -254,29 +255,105 @@ static CGFloat ParityTextKitHeight(NSAttributedString *attributed, CGFloat width
                                measured.height, renderedHeight);
 }
 
-- (void)testEmptyTextMeasuresZero
+/// The core empty-text contract: an empty string measures one line tall, exactly the height
+/// the same font produces for non-empty text (NSStringDrawing behaves this way with or
+/// without the leading option, matching UITextView/UITextField and Android's StaticLayout).
+/// Components size themselves from their value's measure alone — e.g. Drawing.measureText
+/// over the Share Yours prompt — so an empty value that measures zero collapses them even
+/// though the placeholder they display renders fine; the placeholder is never part of that
+/// sizing.
+- (void)testEmptyTextMeasuresOneLineTall
 {
-    SCValdiFontAttributes *fontAttributes = ParityFontAttributes([UIFont systemFontOfSize:20]);
-    CGSize measured = [SCValdiTextLayout measureSizeWithMaxSize:CGSizeMake(300, CGFLOAT_MAX)
-                                                  fontAttributes:fontAttributes
-                                                     fontManager:nil
-                                                            text:@""
-                                                 traitCollection:[UITraitCollection traitCollectionWithDisplayScale:3.0]];
-    XCTAssertEqual(measured.width, 0.0);
-    XCTAssertEqual(measured.height, 0.0);
+    UITraitCollection *traits = [UITraitCollection traitCollectionWithDisplayScale:3.0];
+    const CGSize maxSize = CGSizeMake(300, CGFLOAT_MAX);
+
+    BOOL originalFlag = [SCValdiTextLayout fontLeadingInMeasureEnabled];
+    for (NSNumber *flag in @[ @YES, @NO ]) {
+        [SCValdiTextLayout setFontLeadingInMeasureEnabled:flag.boolValue];
+        for (UIFont *font in @[ [UIFont systemFontOfSize:20], [UIFont fontWithName:@"ArialMT" size:28] ]) {
+            SCValdiFontAttributes *fontAttributes = ParityFontAttributes(font);
+            CGSize empty = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+                                                      fontAttributes:fontAttributes
+                                                         fontManager:nil
+                                                                text:@""
+                                                     traitCollection:traits];
+            CGSize oneLine = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+                                                        fontAttributes:fontAttributes
+                                                           fontManager:nil
+                                                                  text:@"x"
+                                                       traitCollection:traits];
+
+            XCTAssertEqual(empty.width, 0.0, @"%@ leading=%d", font.fontName, flag.boolValue);
+            XCTAssertEqual(empty.height, oneLine.height,
+                           @"%@ leading=%d: empty text must measure one line tall, not collapse",
+                           font.fontName, flag.boolValue);
+        }
+    }
+    [SCValdiTextLayout setFontLeadingInMeasureEnabled:originalFlag];
 }
 
-- (void)testEmptyAttributedTextMeasuresZero
+/// nil and empty attributed values measure through the attributed-string branch, whose empty
+/// string carries no font runs for NSStringDrawing to read (it would fall back to its default
+/// font and measure shorter than the requested font's line). Every empty text type must measure
+/// the same one-line height as an empty NSString, so an input sized while empty covers the caret
+/// line it renders and doesn't jump when the first character arrives.
+- (void)testNilAndEmptyAttributedTextMeasureLikeEmptyString
 {
     SCValdiFontAttributes *fontAttributes = ParityFontAttributes([UIFont systemFontOfSize:20]);
-    NSAttributedString *empty = [[NSAttributedString alloc] initWithString:@""];
-    CGSize measured = [SCValdiTextLayout measureSizeWithMaxSize:CGSizeMake(300, CGFLOAT_MAX)
-                                                  fontAttributes:fontAttributes
-                                                     fontManager:nil
-                                                            text:empty
-                                                 traitCollection:[UITraitCollection traitCollectionWithDisplayScale:3.0]];
-    XCTAssertEqual(measured.width, 0.0);
-    XCTAssertEqual(measured.height, 0.0);
+    UITraitCollection *traits = [UITraitCollection traitCollectionWithDisplayScale:3.0];
+    const CGSize maxSize = CGSizeMake(300, CGFLOAT_MAX);
+
+    CGSize emptyString = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+                                                     fontAttributes:fontAttributes
+                                                        fontManager:nil
+                                                               text:@""
+                                                    traitCollection:traits];
+    XCTAssertEqual(emptyString.width, 0.0);
+    XCTAssertGreaterThan(emptyString.height, 0.0);
+
+    CGSize emptyAttributed = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+                                                        fontAttributes:fontAttributes
+                                                           fontManager:nil
+                                                                  text:[[NSAttributedString alloc] initWithString:@""]
+                                                       traitCollection:traits];
+    XCTAssertEqual(emptyAttributed.width, emptyString.width);
+    XCTAssertEqual(emptyAttributed.height, emptyString.height,
+                   @"empty attributed text must measure the requested font's line, not the default font's");
+
+    CGSize nilMeasured = [SCValdiTextLayout measureSizeWithMaxSize:maxSize
+                                                     fontAttributes:fontAttributes
+                                                        fontManager:nil
+                                                               text:nil
+                                                    traitCollection:traits];
+    XCTAssertEqual(nilMeasured.width, emptyString.width);
+    XCTAssertEqual(nilMeasured.height, emptyString.height,
+                   @"nil text must measure the requested font's line, not the default font's");
+}
+
+/// Same contract through the SCValdiLabel entry point, which is what the Drawing native
+/// module (TS Drawing.getFont().measureText — how stickers and captions size their
+/// containers) measures through.
+- (void)testEmptyTextMeasuresOneLineTallThroughLabelEntryPoint
+{
+    SCValdiFontAttributes *fontAttributes = ParityFontAttributes([UIFont systemFontOfSize:20]);
+    UITraitCollection *traits = [UITraitCollection traitCollectionWithDisplayScale:3.0];
+    const CGSize maxSize = CGSizeMake(300, CGFLOAT_MAX);
+
+    CGSize empty = [SCValdiLabel measureSizeWithMaxSize:maxSize
+                                         fontAttributes:fontAttributes
+                                            fontManager:nil
+                                                   text:@""
+                                        traitCollection:traits];
+    CGSize oneLine = [SCValdiLabel measureSizeWithMaxSize:maxSize
+                                           fontAttributes:fontAttributes
+                                              fontManager:nil
+                                                     text:@"x"
+                                          traitCollection:traits];
+
+    XCTAssertEqual(empty.width, 0.0);
+    XCTAssertGreaterThan(oneLine.height, 0.0);
+    XCTAssertEqual(empty.height, oneLine.height,
+                   @"an empty value measured through the Drawing/label path must not collapse");
 }
 
 /// The leading-inclusive measure ships behind a process-wide killswitch
