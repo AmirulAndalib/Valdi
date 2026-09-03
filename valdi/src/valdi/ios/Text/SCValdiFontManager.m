@@ -11,7 +11,23 @@
 - (NSString *)_lockFreeRegisterFontWithFontName:(NSString *)fontName data:(NSData *)data error:(NSError **)error
 {
     CGDataProviderRef fontDataProvider = CGDataProviderCreateWithCFData((CFDataRef)data);
-    CGFontRef newFont = CGFontCreateWithDataProvider(fontDataProvider);
+    CGFontRef newFont = fontDataProvider ? CGFontCreateWithDataProvider(fontDataProvider) : NULL;
+
+    // A truncated or corrupt font file yields a NULL CGFont, which CoreText and CFRelease below
+    // would both dereference.
+    if (!newFont) {
+        if (fontDataProvider) {
+            CGDataProviderRelease(fontDataProvider);
+        }
+        *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                     code:NSFileReadCorruptFileError
+                                 userInfo:@{
+                                     NSLocalizedDescriptionKey : [NSString
+                                         stringWithFormat:@"Font data for '%@' could not be decoded", fontName]
+                                 }];
+        return nil;
+    }
+
     NSString *resolvedFontFullName = (NSString *)CFBridgingRelease(CGFontCopyFullName(newFont));
     CFErrorRef cfError = nil;
     BOOL success = CTFontManagerRegisterGraphicsFont(newFont, &cfError);

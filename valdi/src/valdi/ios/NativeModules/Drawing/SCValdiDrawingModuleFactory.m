@@ -13,7 +13,7 @@
 #import "valdi/ios/Views/SCValdiLabel.h"
 #import "valdi/ios/Text/SCValdiAttributedText.h"
 
-#import "valdi_core/SCValdiError.h"
+#import "valdi_core/SCValdiLogger.h"
 
 #import <UIKit/UIKit.h>
 
@@ -159,12 +159,18 @@
     NSError *error = nil;
     NSData *fontData = [NSData dataWithContentsOfFile:filename options:0 error:&error];
 
-    if (fontData) {
-        if (![_fontManager registerFontWithFontName:fontName data:fontData error:&error]) {
-            SCValdiErrorThrow([error localizedDescription]);
-        }
-    } else {
-        SCValdiErrorThrow([error localizedDescription]);
+    // A downloaded font file can be evicted from the content cache before it gets registered, and
+    // this is a void bridge method, so throwing aborts the app instead of surfacing to JS. Report
+    // the failure and let callers fall back to a default font, as the Android module does.
+    if (!fontData) {
+        SCLogValdiWarning(@"Could not read font file for '%@', skipping registration: %@",
+                          fontName,
+                          [error localizedDescription]);
+        return;
+    }
+
+    if (![_fontManager registerFontWithFontName:fontName data:fontData error:&error]) {
+        SCLogValdiError(@"Failed to register font '%@': %@", fontName, [error localizedDescription]);
     }
 }
 
