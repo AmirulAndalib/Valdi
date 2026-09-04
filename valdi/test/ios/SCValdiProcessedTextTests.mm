@@ -924,6 +924,88 @@ static NSTextStorage *SCValdiConfigureLayoutManagerForProcessedText(SCValdiProce
     XCTAssertNil([layoutManager presentationForAnimationRange:NSMakeRange(20, 1)]);
 }
 
+- (void)testTextAnimationLayoutManagerAppliesExternallyDrivenTransformVerbatim
+{
+    Valdi::TextAttributeValue::Parts parts;
+    auto &animatedStyle = SCValdiTestAppendTextPart(parts, STRING_LITERAL("fade"));
+    // duration:0 with no per-part delay is externally driven: the owner re-commits each frame and
+    // the transform is applied verbatim, not settled toward rest over a duration.
+    animatedStyle.animationTransform = Valdi::TextAnimationTransform{
+        std::nullopt,
+        8,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+    };
+
+    SCValdiProcessedText *processedText =
+        SCValdiProcessedTextWithParts(std::move(parts), @{ NSFontAttributeName: [UIFont systemFontOfSize:20] }, nil);
+    SCValdiTextViewEffectsLayoutManager *layoutManager = [SCValdiTextViewEffectsLayoutManager new];
+    NSTextContainer *textContainer = [[NSTextContainer alloc] initWithSize:CGSizeMake(400, CGFLOAT_MAX)];
+    __unused NSTextStorage *textStorage =
+        SCValdiConfigureLayoutManagerForProcessedText(processedText, layoutManager, textContainer);
+    layoutManager.processedText = processedText;
+
+    BOOL hasActiveAnimationRanges = [layoutManager invalidateAnimatedTextProgress];
+    SCValdiTextAnimationPresentation *presentation =
+        [layoutManager presentationForAnimationRange:NSMakeRange(0, 4)];
+    XCTAssertNotNil(presentation);
+    XCTAssertEqualWithAccuracy(presentation.translationY, 8.0, 0.001);
+    // Externally-driven ranges stay active so the render keeps refreshing as the owner commits.
+    XCTAssertTrue(hasActiveAnimationRanges);
+
+    // Once the owner commits a rest transform (no visible offset) the range clears.
+    Valdi::TextAttributeValue::Parts restParts;
+    auto &restStyle = SCValdiTestAppendTextPart(restParts, STRING_LITERAL("fade"));
+    restStyle.animationTransform = Valdi::TextAnimationTransform{
+        std::nullopt,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+    };
+    layoutManager.processedText =
+        SCValdiProcessedTextWithParts(std::move(restParts), @{ NSFontAttributeName: [UIFont systemFontOfSize:20] }, nil);
+
+    BOOL stillActive = [layoutManager invalidateAnimatedTextProgress];
+    XCTAssertFalse(stillActive);
+    XCTAssertNil([layoutManager presentationForAnimationRange:NSMakeRange(0, 4)]);
+}
+
+- (void)testTextAnimationLayoutManagerRefreshesExternallyDrivenTransformPerCommit
+{
+    // The owner drives motion by re-committing the transform each frame. Native must reflect the
+    // latest committed value verbatim, not latch on the first commit (the regression this fixes).
+    Valdi::TextAttributeValue::Parts firstParts;
+    auto &firstStyle = SCValdiTestAppendTextPart(firstParts, STRING_LITERAL("fade"));
+    firstStyle.animationTransform = Valdi::TextAnimationTransform{std::nullopt, 8, 1, 1, 0, 0, 0, 0};
+
+    SCValdiProcessedText *firstProcessedText =
+        SCValdiProcessedTextWithParts(std::move(firstParts), @{ NSFontAttributeName: [UIFont systemFontOfSize:20] }, nil);
+    SCValdiTextViewEffectsLayoutManager *layoutManager = [SCValdiTextViewEffectsLayoutManager new];
+    NSTextContainer *textContainer = [[NSTextContainer alloc] initWithSize:CGSizeMake(400, CGFLOAT_MAX)];
+    __unused NSTextStorage *textStorage =
+        SCValdiConfigureLayoutManagerForProcessedText(firstProcessedText, layoutManager, textContainer);
+    layoutManager.processedText = firstProcessedText;
+    [layoutManager invalidateAnimatedTextProgress];
+    XCTAssertEqualWithAccuracy([layoutManager presentationForAnimationRange:NSMakeRange(0, 4)].translationY, 8.0, 0.001);
+
+    // Next frame: the owner commits a new value; the presented value must update, not stay at 8.
+    Valdi::TextAttributeValue::Parts secondParts;
+    auto &secondStyle = SCValdiTestAppendTextPart(secondParts, STRING_LITERAL("fade"));
+    secondStyle.animationTransform = Valdi::TextAnimationTransform{std::nullopt, -3, 1, 1, 0, 0, 0, 0};
+    layoutManager.processedText =
+        SCValdiProcessedTextWithParts(std::move(secondParts), @{ NSFontAttributeName: [UIFont systemFontOfSize:20] }, nil);
+    [layoutManager invalidateAnimatedTextProgress];
+    XCTAssertEqualWithAccuracy([layoutManager presentationForAnimationRange:NSMakeRange(0, 4)].translationY, -3.0, 0.001);
+}
+
 - (void)testTextLayoutViewAnimatesCustomUnderlinesWithTextTransform
 {
     UIFont *font = [UIFont systemFontOfSize:20];

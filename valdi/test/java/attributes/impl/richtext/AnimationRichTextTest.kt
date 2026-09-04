@@ -21,6 +21,8 @@ import com.snap.valdi.callable.ValdiFunction
 import com.snap.valdi.logger.Logger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
@@ -274,6 +276,68 @@ internal class AnimationRichTextTest {
         )
     }
 
+    @Test
+    fun externallyDrivenTransformIsAppliedVerbatim() {
+        val animator = AttributedTextAnimator()
+
+        // duration<=0 with no per-part delay is externally driven: the caller re-commits the
+        // transform each frame and it must be applied verbatim, never dropped or settled to rest.
+        animator.beginSync()
+        val first = animator.animationForPart(0, externallyDrivenTransform(translationY = 8f), 0, 1)
+        animator.endSync()
+
+        assertNotNull(first)
+        assertEquals(8f, first!!.translationY, 0f)
+        assertEquals(0f, first.progress, 0f)
+
+        // A later commit refreshes the same part with the new value (this is what drives motion).
+        animator.beginSync()
+        val second = animator.animationForPart(0, externallyDrivenTransform(translationY = -3f), 0, 1)
+        animator.endSync()
+
+        assertNotNull(second)
+        assertEquals(-3f, second!!.translationY, 0f)
+    }
+
+    @Test
+    fun staggeredInstantAnimationIsNotDrivenExternally() {
+        val animator = AttributedTextAnimator()
+
+        // duration 0 but a per-part offset is a normal staggered instant animation, not externally
+        // driven. The first part's resolved delay is 0, but the config still has a per-part offset,
+        // so it must not be treated as verbatim; it is skipped here and settles on the next frame.
+        val transform = TextAnimationTransform(
+            key = null,
+            translationY = 8f,
+            scale = 1f,
+            opacity = 1f,
+            duration = 0.0,
+            timeOffsetBetweenParts = 0.05,
+            groupIndex = 0,
+            partIndexInGroup = 0,
+            partPattern = null,
+        )
+
+        animator.beginSync()
+        val first = animator.animationForPart(0, transform, 0, 1)
+        animator.endSync()
+
+        assertNull(first)
+    }
+
+    @Test
+    fun externallyDrivenAnimationStaysActive() {
+        val animator = AttributedTextAnimator()
+
+        // An externally-driven transform never settles, so it stays active with no new commit; the
+        // render keeps refreshing until the transform is removed rather than latching and stopping.
+        animator.beginSync()
+        animator.animationForPart(0, externallyDrivenTransform(translationY = 8f), 0, 1)
+        animator.endSync()
+
+        assertTrue(animator.hasAnimationRuns())
+    }
+
     private fun parseWithAnimator(text: FakeAttributedText): ValdiProcessedText {
         val animator = AttributedTextAnimator()
         animator.beginSync()
@@ -330,6 +394,20 @@ private fun textAnimationTransform(
         groupIndex = 0,
         partIndexInGroup = 0,
         partPattern = partPattern,
+    )
+}
+
+private fun externallyDrivenTransform(translationY: Float): TextAnimationTransform {
+    return TextAnimationTransform(
+        key = null,
+        translationY = translationY,
+        scale = 1f,
+        opacity = 1f,
+        duration = 0.0,
+        timeOffsetBetweenParts = 0.0,
+        groupIndex = 0,
+        partIndexInGroup = 0,
+        partPattern = null,
     )
 }
 

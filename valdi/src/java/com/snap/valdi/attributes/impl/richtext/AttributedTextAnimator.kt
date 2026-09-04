@@ -145,7 +145,17 @@ class AttributedTextAnimator {
         check(isSyncing) { "AttributedTextAnimator.animationForPart() called outside beginSync()/endSync()" }
 
         val startDelayMillis = delayMillisFor(transform)
-        if (isNoOpStartTransform(transform) || (durationMillisFor(transform) == 0L && startDelayMillis == 0L)) {
+        // Externally-driven (duration<=0, no per-part delay): apply the committed transform verbatim
+        // each frame instead of settling it over a duration. The owner re-commits to drive motion,
+        // and the animation stays active (progress pinned at 0) until the transform is removed.
+        // Uses the configured time offset, not the resolved per-part delay (which is 0 for the first
+        // part of any animation), so a staggered zero-duration animation isn't misclassified.
+        val isExternallyDriven = durationMillisFor(transform) == 0L && timeOffsetMillisFor(transform) == 0L
+        // Skip a non-externally-driven instant part (the first part of a staggered instant
+        // animation), same as before, so it settles on the next frame instead of flickering.
+        if (isNoOpStartTransform(transform) ||
+            (!isExternallyDriven && durationMillisFor(transform) == 0L && startDelayMillis == 0L)
+        ) {
             return null
         }
 
@@ -156,6 +166,11 @@ class AttributedTextAnimator {
         if (existingAnimation != null) {
             existingAnimation.rangeStart = start
             existingAnimation.rangeEnd = end
+            if (isExternallyDriven) {
+                applyExternallyDrivenTransform(existingAnimation, transform)
+                recordPartAnimation(partIndex, existingAnimation)
+                return existingAnimation
+            }
             recordPartAnimation(partIndex, existingAnimation)
             recordExistingAnimationScheduledStartTime(existingAnimation)
             return existingAnimation
@@ -168,6 +183,13 @@ class AttributedTextAnimator {
         )
         animation.rangeStart = start
         animation.rangeEnd = end
+        if (isExternallyDriven) {
+            applyExternallyDrivenTransform(animation, transform)
+            animations[key] = animation
+            activeAnimations.add(animation)
+            recordPartAnimation(partIndex, animation)
+            return animation
+        }
         val storedStartTimeMillis = storedStartTimeMillisFor(key, transform)
         if (storedStartTimeMillis != null) {
             animation.startTimeMillis = storedStartTimeMillis
@@ -318,8 +340,14 @@ class AttributedTextAnimator {
         }
 
         val startDelayMillis = delayMillisFor(startTransform)
-        val delayedElapsedMillis = currentTimeMillis - animation.startTimeMillis - startDelayMillis
         val durationMillis = durationMillisFor(startTransform)
+        // Externally-driven transforms never settle; the caller re-commits them each frame. Gate on
+        // the configured time offset, not the resolved per-part delay (0 for the first part of any
+        // animation), so a staggered zero-duration animation's first part still settles.
+        if (durationMillis == 0L && timeOffsetMillisFor(startTransform) == 0L) {
+            return 0f
+        }
+        val delayedElapsedMillis = currentTimeMillis - animation.startTimeMillis - startDelayMillis
         if (durationMillis == 0L) {
             return if (delayedElapsedMillis >= 0L) 1f else 0f
         }
@@ -335,6 +363,16 @@ class AttributedTextAnimator {
         animation.translationY = start.translationY * (1f - progress)
         animation.scale = start.scale + (1f - start.scale) * progress
         animation.opacity = start.opacity + (1f - start.opacity) * progress
+    }
+
+    // Applies the transform's values verbatim (progress pinned at 0) and keeps the animation active
+    // so later per-frame commits refresh it. Used for externally-driven (duration<=0) transforms.
+    private fun applyExternallyDrivenTransform(animation: AttributedTextAnimation, transform: TextAnimationTransform) {
+        animation.translationY = transform.translationY
+        animation.scale = transform.scale
+        animation.opacity = transform.opacity
+        animation.progress = 0f
+        animation.active = true
     }
 
     private fun easeOut(progress: Float): Float {

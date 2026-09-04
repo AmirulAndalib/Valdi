@@ -41,9 +41,9 @@ INTERNED_STRING_CONST("valdi.textAnimationStartTimes", SCValdiTextAnimationStart
 @property (nonatomic, assign) BOOL hasStartTime;
 @property (nonatomic, assign) double startTime;
 // Externally-driven (duration<=0) transforms: translationY/scale/opacity are applied verbatim on
-// every commit and stay out of the native settle timeline. The caller re-commits each frame to
-// drive motion (e.g. SnapEditor animated captions).
-@property (nonatomic, assign) BOOL isStatic;
+// every commit and stay out of the native settle timeline. The owner re-commits each frame to
+// drive motion itself.
+@property (nonatomic, assign) BOOL isExternallyDriven;
 @end
 @implementation SCValdiTextViewAnimationRange
 @end
@@ -168,13 +168,16 @@ static BOOL SCValdiAnimationShouldTrack(SCValdiTextAnimationTransform *animation
 }
 
 // A transform with no native timeline (duration<=0 and no per-part delay) is driven externally: the
-// caller re-commits the current transform each frame and native applies translationY/scale/opacity
-// verbatim instead of settling to rest over a duration. Restores the pre-PR#107 contract that
-// SnapEditor animated captions depend on (they drive a per-frame JS timer and set duration:0).
-static BOOL SCValdiAnimationIsStatic(SCValdiTextAnimationTransform *animationTransform, double startDelay)
+// owner re-commits the current transform each frame, so native applies translationY/scale/opacity
+// verbatim instead of animating from them to rest over a duration. The range stays active (the
+// render keeps refreshing) until the transform is removed, letting the owner run its own timeline.
+static BOOL SCValdiAnimationIsExternallyDriven(SCValdiTextAnimationTransform *animationTransform)
 {
+    // Check the configured per-part offset, not the resolved per-part start delay: the latter is 0
+    // for the first part of every animation, which would misclassify the first part of a staggered
+    // zero-duration animation as externally driven.
     return SCValdiAnimationTransformIsVisible(animationTransform) &&
-           animationTransform.duration <= 0.0 && startDelay <= 0.0;
+           animationTransform.duration <= 0.0 && SCValdiAnimationTimeOffset(animationTransform) <= 0.0;
 }
 
 static SCValdiTextViewAnimationTimelineState *SCValdiAnimationTimelineStateForKey(
@@ -637,15 +640,18 @@ static NSArray<NSValue *> *SCValdiSubtractAnimationRanges(NSRange range,
         }
 
         double startDelay = SCValdiAnimationStartDelay(animationTransform, basePartIndex);
-        BOOL isStatic = SCValdiAnimationIsStatic(animationTransform, startDelay);
-        if (!isStatic && !SCValdiAnimationShouldTrack(animationTransform, startDelay)) {
+        BOOL isExternallyDriven = SCValdiAnimationIsExternallyDriven(animationTransform);
+        // A non-externally-driven instant part (duration<=0, resolved delay 0 — i.e. the first part
+        // of a staggered instant animation) is skipped here, same as before, so it settles on the
+        // next frame instead of briefly showing at its initial transform.
+        if (!isExternallyDriven && !SCValdiAnimationShouldTrack(animationTransform, startDelay)) {
             return;
         }
 
         SCValdiTextViewAnimationRange *animationEntry = [SCValdiTextViewAnimationRange new];
         animationEntry.range = range;
-        animationEntry.isStatic = isStatic;
-        if (isStatic) {
+        animationEntry.isExternallyDriven = isExternallyDriven;
+        if (isExternallyDriven) {
             // Externally driven: apply the committed transform verbatim and skip timeline
             // bookkeeping. Motion comes from the caller re-committing each frame.
             animationEntry.translationY = animationTransform.translationY;
@@ -729,7 +735,7 @@ static NSArray<NSValue *> *SCValdiSubtractAnimationRanges(NSRange range,
     }
 
     for (SCValdiTextViewAnimationRange *animationEntry in animationEntries) {
-        if (animationEntry.isStatic) {
+        if (animationEntry.isExternallyDriven) {
             // Verbatim transform already applied in _animationEntries. Keep the range active so the
             // display link keeps refreshing the overlay while the caller commits new per-frame
             // transforms; do not run it through the settle timeline.

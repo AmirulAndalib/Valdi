@@ -44,6 +44,12 @@ export interface AttributedTextAnimationTransform {
   /**
    * Duration, in seconds, for each part to animate from the initial transform
    * back to its normal text appearance.
+   *
+   * A value <= 0 (with no `timeOffsetBetweenParts`) opts out of the native
+   * animation timeline: the transform is applied verbatim and left applied
+   * rather than settling to rest, so the owner can drive motion itself by
+   * re-committing the transform each frame. In that mode the part stays active
+   * (the render keeps refreshing) until the transform is removed.
    */
   duration?: number;
 
