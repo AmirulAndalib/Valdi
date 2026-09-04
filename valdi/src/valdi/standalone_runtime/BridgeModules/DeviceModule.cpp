@@ -48,6 +48,7 @@ Valdi::Value DeviceModule::loadModule() {
     BIND_METHOD(module, getWindowWidth);
     BIND_METHOD(module, getWindowHeight);
     BIND_METHOD(module, getDisplayScale);
+    BIND_METHOD(module, getDynamicTypeScale);
     BIND_METHOD(module, getDisplayLeftInset);
     BIND_METHOD(module, getDisplayRightInset);
     BIND_METHOD(module, getDisplayBottomInset);
@@ -88,6 +89,11 @@ double DeviceModule::getWindowHeight() {
 double DeviceModule::getDisplayScale() {
     std::lock_guard<Valdi::Mutex> guard(_mutex);
     return _displayScale;
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+double DeviceModule::getDynamicTypeScale() {
+    return 1.0;
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

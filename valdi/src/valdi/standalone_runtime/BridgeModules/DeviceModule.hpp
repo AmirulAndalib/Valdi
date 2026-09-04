@@ -28,6 +28,7 @@ public:
     double getDisplayWidth();
     double getDisplayHeight();
     double getDisplayScale();
+    double getDynamicTypeScale();
 
     double getWindowWidth();
     double getWindowHeight();
