@@ -40,6 +40,10 @@ INTERNED_STRING_CONST("valdi.textAnimationStartTimes", SCValdiTextAnimationStart
 @property (nonatomic, assign) BOOL shouldStoreStartTime;
 @property (nonatomic, assign) BOOL hasStartTime;
 @property (nonatomic, assign) double startTime;
+// Externally-driven (duration<=0) transforms: translationY/scale/opacity are applied verbatim on
+// every commit and stay out of the native settle timeline. The caller re-commits each frame to
+// drive motion (e.g. SnapEditor animated captions).
+@property (nonatomic, assign) BOOL isStatic;
 @end
 @implementation SCValdiTextViewAnimationRange
 @end
@@ -110,13 +114,18 @@ INTERNED_STRING_CONST("valdi.textAnimationStartTimes", SCValdiTextAnimationStart
 
 @implementation SCValdiTextViewEffectsLayoutManager
 
-static BOOL SCValdiAnimationRangeHasVisibleTransform(SCValdiTextViewAnimationRange *animationRange)
+static BOOL SCValdiAnimationValuesHaveVisibleTransform(CGFloat translationY, CGFloat scale, CGFloat opacity)
 {
     // TODO(CREATE-86642): Define animation-state semantics once in shared Valdi code
     // (or bridge explicit state from TS) so Android/iOS stop duplicating thresholds.
-    return fabs(animationRange.translationY) > DBL_EPSILON ||
-           fabs(animationRange.scale - 1.0) > DBL_EPSILON ||
-           fabs(animationRange.opacity - 1.0) > DBL_EPSILON;
+    return fabs(translationY) > DBL_EPSILON ||
+           fabs(scale - 1.0) > DBL_EPSILON ||
+           fabs(opacity - 1.0) > DBL_EPSILON;
+}
+
+static BOOL SCValdiAnimationRangeHasVisibleTransform(SCValdiTextViewAnimationRange *animationRange)
+{
+    return SCValdiAnimationValuesHaveVisibleTransform(animationRange.translationY, animationRange.scale, animationRange.opacity);
 }
 
 static NSString *SCValdiAnimationRangeKey(SCValdiTextAnimationTransform *animationTransform)
@@ -145,12 +154,27 @@ static double SCValdiAnimationStartDelay(SCValdiTextAnimationTransform *animatio
     return SCValdiAnimationTimeOffset(animationTransform) * (basePartIndex + animationTransform.partIndexInGroup);
 }
 
+static BOOL SCValdiAnimationTransformIsVisible(SCValdiTextAnimationTransform *animationTransform)
+{
+    return SCValdiAnimationValuesHaveVisibleTransform(animationTransform.translationY,
+                                                      animationTransform.scale,
+                                                      animationTransform.opacity);
+}
+
 static BOOL SCValdiAnimationShouldTrack(SCValdiTextAnimationTransform *animationTransform, double startDelay)
 {
-    BOOL hasVisibleStartTransform = animationTransform.translationY != 0.0 ||
-                                    animationTransform.scale != 1.0 ||
-                                    animationTransform.opacity != 1.0;
-    return hasVisibleStartTransform && (animationTransform.duration > 0.0 || startDelay > 0.0);
+    return SCValdiAnimationTransformIsVisible(animationTransform) &&
+           (animationTransform.duration > 0.0 || startDelay > 0.0);
+}
+
+// A transform with no native timeline (duration<=0 and no per-part delay) is driven externally: the
+// caller re-commits the current transform each frame and native applies translationY/scale/opacity
+// verbatim instead of settling to rest over a duration. Restores the pre-PR#107 contract that
+// SnapEditor animated captions depend on (they drive a per-frame JS timer and set duration:0).
+static BOOL SCValdiAnimationIsStatic(SCValdiTextAnimationTransform *animationTransform, double startDelay)
+{
+    return SCValdiAnimationTransformIsVisible(animationTransform) &&
+           animationTransform.duration <= 0.0 && startDelay <= 0.0;
 }
 
 static SCValdiTextViewAnimationTimelineState *SCValdiAnimationTimelineStateForKey(
@@ -613,12 +637,23 @@ static NSArray<NSValue *> *SCValdiSubtractAnimationRanges(NSRange range,
         }
 
         double startDelay = SCValdiAnimationStartDelay(animationTransform, basePartIndex);
-        if (!SCValdiAnimationShouldTrack(animationTransform, startDelay)) {
+        BOOL isStatic = SCValdiAnimationIsStatic(animationTransform, startDelay);
+        if (!isStatic && !SCValdiAnimationShouldTrack(animationTransform, startDelay)) {
             return;
         }
 
         SCValdiTextViewAnimationRange *animationEntry = [SCValdiTextViewAnimationRange new];
         animationEntry.range = range;
+        animationEntry.isStatic = isStatic;
+        if (isStatic) {
+            // Externally driven: apply the committed transform verbatim and skip timeline
+            // bookkeeping. Motion comes from the caller re-committing each frame.
+            animationEntry.translationY = animationTransform.translationY;
+            animationEntry.scale = animationTransform.scale;
+            animationEntry.opacity = animationTransform.opacity;
+            [animationEntries addObject:animationEntry];
+            return;
+        }
         animationEntry.translationY = 0.0;
         animationEntry.scale = 1.0;
         animationEntry.opacity = 1.0;
@@ -694,6 +729,13 @@ static NSArray<NSValue *> *SCValdiSubtractAnimationRanges(NSRange range,
     }
 
     for (SCValdiTextViewAnimationRange *animationEntry in animationEntries) {
+        if (animationEntry.isStatic) {
+            // Verbatim transform already applied in _animationEntries. Keep the range active so the
+            // display link keeps refreshing the overlay while the caller commits new per-frame
+            // transforms; do not run it through the settle timeline.
+            hasActiveAnimationRanges = YES;
+            continue;
+        }
         if (!animationEntry.hasStartTime) {
             double startTime = currentTime;
             if (coordinator) {
