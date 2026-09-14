@@ -533,10 +533,10 @@ snap::valdi_core::HTTPRequest makeGetWithHeaders(const char* url, const Value& h
 
 snap::valdi_core::HTTPRequest makeRequestWithBody(const char* method, const char* url, const char* body) {
     return snap::valdi_core::HTTPRequest(StringBox::fromCString(url),
-                                        StringBox::fromCString(method),
-                                        Value(),
-                                        makeShared<ByteBuffer>(std::string(body))->toBytesView(),
-                                        0);
+                                         StringBox::fromCString(method),
+                                         Value(),
+                                         makeShared<ByteBuffer>(std::string(body))->toBytesView(),
+                                         0);
 }
 
 } // namespace
@@ -731,13 +731,11 @@ TEST(CurlHTTPRequestManagerTests, sendsHeadersInAnOrderThatDoesNotDependOnInsert
     auto completion = std::make_shared<RecordingCompletion>();
     // Inserted in an order that is neither alphabetical nor reverse alphabetical, so agreeing with
     // the map's own iteration order by chance is unlikely across five keys.
-    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(),
-                                              makeHeaders({{"X-Delta", "4"},
-                                                           {"X-Alpha", "1"},
-                                                           {"X-Echo", "5"},
-                                                           {"X-Bravo", "2"},
-                                                           {"X-Charlie", "3"}})),
-                            completion);
+    manager->performRequest(
+        makeGetWithHeaders(
+            server.url("/").c_str(),
+            makeHeaders({{"X-Delta", "4"}, {"X-Alpha", "1"}, {"X-Echo", "5"}, {"X-Bravo", "2"}, {"X-Charlie", "3"}})),
+        completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     ASSERT_EQ(completion->statusCode(), 200);
@@ -746,7 +744,8 @@ TEST(CurlHTTPRequestManagerTests, sendsHeadersInAnOrderThatDoesNotDependOnInsert
     ASSERT_EQ(requests.size(), 1u);
 
     std::vector<size_t> positions;
-    for (const auto* header : {"X-Alpha: 1\r\n", "X-Bravo: 2\r\n", "X-Charlie: 3\r\n", "X-Delta: 4\r\n", "X-Echo: 5\r\n"}) {
+    for (const auto* header :
+         {"X-Alpha: 1\r\n", "X-Bravo: 2\r\n", "X-Charlie: 3\r\n", "X-Delta: 4\r\n", "X-Echo: 5\r\n"}) {
         auto at = requests[0].find(header);
         EXPECT_NE(at, std::string::npos) << header << " never reached the wire. Request was:\n" << requests[0];
         positions.push_back(at);
@@ -765,8 +764,8 @@ TEST(CurlHTTPRequestManagerTests, overridesACurlDefaultHeader) {
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(
-        makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"Accept", "application/json"}})), completion);
+    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"Accept", "application/json"}})),
+                            completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     ASSERT_EQ(completion->statusCode(), 200);
@@ -805,8 +804,8 @@ TEST(CurlHTTPRequestManagerTests, overridesTheDefaultUserAgent) {
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(
-        makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"User-Agent", "Atolla/1.0"}})), completion);
+    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"User-Agent", "Atolla/1.0"}})),
+                            completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     ASSERT_EQ(completion->statusCode(), 200);
@@ -856,8 +855,8 @@ TEST(CurlHTTPRequestManagerTests, rejectsAHeaderValueContainingCrlf) {
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(
-        makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Test", "a\r\nX-Evil: 1"}})), completion);
+    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Test", "a\r\nX-Evil: 1"}})),
+                            completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     EXPECT_TRUE(completion->error().has_value()) << "a header value carrying CRLF was accepted";
@@ -902,8 +901,8 @@ TEST(CurlHTTPRequestManagerTests, rejectsAHeaderNameContainingCrlf) {
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(
-        makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Test\r\nX-Evil", "1"}})), completion);
+    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Test\r\nX-Evil", "1"}})),
+                            completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     EXPECT_TRUE(completion->error().has_value()) << "a header name carrying CRLF was accepted";
@@ -960,8 +959,7 @@ TEST(CurlHTTPRequestManagerTests, sendsAWhitespaceOnlyRequestHeaderAsEmpty) {
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Trace", "   "}})),
-                            completion);
+    manager->performRequest(makeGetWithHeaders(server.url("/").c_str(), makeHeaders({{"X-Trace", "   "}})), completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     ASSERT_EQ(completion->statusCode(), 200);
@@ -1059,8 +1057,7 @@ TEST(CurlHTTPRequestManagerTests, failsAResponseItCannotDecodeWhateverTheHeaderC
     ASSERT_TRUE(completion->error().has_value())
         << "a lowercase Content-Encoding went unnoticed, so the response was handed back undecoded";
     EXPECT_NE(completion->error().value().find("GZIP"), std::string::npos)
-        << "failed, but not over the encoding, so this passes for the wrong reason: "
-        << completion->error().value();
+        << "failed, but not over the encoding, so this passes for the wrong reason: " << completion->error().value();
 }
 
 TEST(CurlHTTPRequestManagerTests, acceptsAnIdentityContentEncoding) {
@@ -1077,8 +1074,7 @@ TEST(CurlHTTPRequestManagerTests, acceptsAnIdentityContentEncoding) {
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     EXPECT_FALSE(completion->error().has_value())
-        << "identity means the body is unencoded, so there is nothing to reject: "
-        << completion->error().value_or("");
+        << "identity means the body is unencoded, so there is nothing to reject: " << completion->error().value_or("");
     EXPECT_EQ(completion->statusCode(), 200);
     EXPECT_EQ(completion->bodySize(), 2u);
 }
@@ -1374,11 +1370,11 @@ TEST(CurlHTTPRequestManagerTests, withholdsCredentialHeadersFromARedirectToAnoth
 
     auto manager = makeCurlHTTPRequestManager();
     auto completion = std::make_shared<RecordingCompletion>();
-    manager->performRequest(makeGetWithHeaders(origin.url("/start").c_str(),
-                                               makeHeaders({{"Authorization", "Bearer secret"},
-                                                            {"Cookie", "session=abc"},
-                                                            {"X-Trace", "keep-me"}})),
-                            completion);
+    manager->performRequest(
+        makeGetWithHeaders(
+            origin.url("/start").c_str(),
+            makeHeaders({{"Authorization", "Bearer secret"}, {"Cookie", "session=abc"}, {"X-Trace", "keep-me"}})),
+        completion);
 
     ASSERT_TRUE(completion->waitForCompletion(std::chrono::seconds(10)));
     ASSERT_EQ(completion->statusCode(), 200);
@@ -1622,8 +1618,7 @@ TEST(CurlHTTPRequestManagerTests, doesNotHoldTheResponseBodyTwice) {
     // this catches, so the threshold sits between them.
     auto growth = peakResidentBytes() - before;
     EXPECT_LT(growth, kBodySize * 5 / 2)
-        << "peak memory grew by " << growth / (1024 * 1024) << " MiB to receive a "
-        << kBodySize / (1024 * 1024)
+        << "peak memory grew by " << growth / (1024 * 1024) << " MiB to receive a " << kBodySize / (1024 * 1024)
         << " MiB body, so the payload is accumulated in one buffer and then copied whole into another";
 }
 

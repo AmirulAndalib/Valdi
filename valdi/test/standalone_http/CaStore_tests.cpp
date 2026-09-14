@@ -32,8 +32,7 @@ protected:
     void SetUp() override {
         for (const char* variable : kVariables) {
             const char* value = std::getenv(variable);
-            _saved.emplace_back(variable,
-                                value != nullptr ? std::optional<std::string>(value) : std::nullopt);
+            _saved.emplace_back(variable, value != nullptr ? std::optional<std::string>(value) : std::nullopt);
             ::unsetenv(variable);
         }
     }
