@@ -1,6 +1,6 @@
 # Shim to use different dependencies for open source and internal valdi
 
-INTERNAL_BUILD = False
+INTERNAL_BUILD = True
 
 def valdi_compiler_companion_files():
     if INTERNAL_BUILD:
