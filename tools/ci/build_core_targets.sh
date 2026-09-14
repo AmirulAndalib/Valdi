@@ -10,12 +10,16 @@ set -x
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 # Build all core targets in a single invocation to avoid repeated Bazel startup
-# and allow maximum parallelism across the dependency graph.
+# and allow maximum parallelism across the dependency graph. Includes the testonly
+# Espresso/Hamcrest test bindings (valdi_android_test_support) so external CI builds
+# them and they don't silently bitrot — otherwise only the emulator-gated,
+# path-scoped instrumentation job builds them. No native libs, so no arm64 define.
 bzl build \
   //valdi:valdi \
   //valdi_core:valdi_core \
   //libs/dummy:dummy \
-  //libs/dummy:dummy_android
+  //libs/dummy:dummy_android \
+  //valdi:valdi_android_test_support
 
 # Android hello world AAR (NDK downloaded hermetically by Bazel)
 # Build just the AAR, not the full android_binary — aar_import filters for
