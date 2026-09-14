@@ -48,24 +48,38 @@ done
 # ---------------------------------------------------------------------------
 # 2. Copybara transform markers
 #
-# Verify the sentinel comments that Copybara's core.replace() keys on still
-# exist. If someone removes the "# use_local_compiler" comment or changes
-# "INTERNAL_BUILD = True", the outbound transform silently becomes a no-op
-# and the public repo gets the wrong flag value.
+# The internal↔open-source build flags both live in bzl/valdi/config.bzl, which
+# Copybara swaps for its config.bzl.copybara twin as a whole file (no longer via
+# core.replace on scattered markers). Verify the internal values are still present
+# so a rename/retype is caught before the mirror silently ships the wrong config.
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Copybara transform markers ---"
 
-if grep -q 'build_setting_default = False,  # use_local_compiler' "$OPEN_SOURCE_DIR/bzl/valdi/BUILD.bazel"; then
-    pass "use_local_compiler marker present (internal=False, copybara flips to True)"
+if grep -q 'use_local_compiler_default = False' "$OPEN_SOURCE_DIR/bzl/valdi/config.bzl"; then
+    pass "use_local_compiler_default marker present (internal=False, copybara twin flips to True)"
 else
-    fail "use_local_compiler marker missing or malformed in bzl/valdi/BUILD.bazel — copybara transform will silently fail"
+    fail "use_local_compiler_default marker missing or malformed in bzl/valdi/config.bzl — copybara .copybara swap will ship the wrong flag value"
 fi
 
-if grep -q 'INTERNAL_BUILD = True' "$OPEN_SOURCE_DIR/bzl/prebuilt_tools.bzl"; then
-    pass "INTERNAL_BUILD marker present (internal=True, copybara flips to False)"
+if grep -q 'INTERNAL_BUILD = True' "$OPEN_SOURCE_DIR/bzl/valdi/config.bzl"; then
+    pass "INTERNAL_BUILD marker present (internal=True, copybara twin flips to False)"
 else
-    fail "INTERNAL_BUILD marker missing or malformed in bzl/prebuilt_tools.bzl — copybara transform will silently fail"
+    fail "INTERNAL_BUILD marker missing or malformed in bzl/valdi/config.bzl — copybara .copybara swap will ship the wrong flag value"
+fi
+
+# The .copybara twin is what actually ships to public github.com (copy.bara.sky
+# swaps it over config.bzl), so validate it carries the flipped external values.
+# A twin left with the internal values would silently mirror the wrong config.
+CONFIG_TWIN="$OPEN_SOURCE_DIR/bzl/valdi/config.bzl.copybara"
+if [[ ! -f "$CONFIG_TWIN" ]]; then
+    fail "config.bzl.copybara missing — copybara will have nothing to swap over the external config.bzl"
+elif ! grep -q 'INTERNAL_BUILD = False' "$CONFIG_TWIN"; then
+    fail "config.bzl.copybara has wrong INTERNAL_BUILD (expected False for the external build) — public repo would ship internal tooling flags"
+elif ! grep -q 'use_local_compiler_default = True' "$CONFIG_TWIN"; then
+    fail "config.bzl.copybara has wrong use_local_compiler_default (expected True for the external build) — public repo would expect prebuilt tooling it doesn't have"
+else
+    pass "config.bzl.copybara carries the external values (INTERNAL_BUILD=False, use_local_compiler_default=True)"
 fi
 
 if [[ -f "$OPEN_SOURCE_DIR/bzl/additional_dependencies.bzl.copybara" ]]; then

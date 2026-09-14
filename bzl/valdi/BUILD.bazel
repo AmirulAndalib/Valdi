@@ -4,6 +4,7 @@ load("@valdi//bzl/valdi:valdi_toolchain.bzl", "valdi_toolchain")
 load("@valdi//bzl/valdi:valdi_toolchain_binary.bzl", "valdi_toolchain_binary")
 load("//bzl/valdi:common_test.bzl", "common_test_suite")
 load("//bzl/valdi:valdi_android_library_test.bzl", "valdi_android_library_test_suite")
+load(":config.bzl", "use_local_compiler_default")
 
 common_test_suite(name = "common_test")
 
@@ -370,7 +371,7 @@ config_setting(
 # still available as an out-of-band escape hatch.
 bool_flag(
     name = "use_local_compiler",
-    build_setting_default = False,  # use_local_compiler
+    build_setting_default = use_local_compiler_default,
     visibility = ["//visibility:public"],
 )
 

@@ -1,6 +1,6 @@
 # Shim to use different dependencies for open source and internal valdi
 
-INTERNAL_BUILD = True
+load("//bzl/valdi:config.bzl", "INTERNAL_BUILD")
 
 def valdi_compiler_companion_files():
     if INTERNAL_BUILD:
