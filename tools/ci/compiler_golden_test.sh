@@ -57,8 +57,15 @@ if [[ "$DO_BUILD" == "1" ]]; then
   for m in "${MODULES[@]}"; do targets+=("//${MODULE_PKG}/${m}"); done
   # Every Bazel ValdiCompile action already runs the companion with
   # --disable-disk-cache, so this is a clean, reproducible compile.
+  #
+  # --remote_download_all forces the emit outputs to be materialized on local
+  # disk. The capture below reads the generated .d.ts / *_native.c / .cpp /
+  # metadata straight from bazel-bin, but CI runs Bazel with
+  # Build-without-the-Bytes, so on a warm remote cache those cache-hit
+  # intermediates are never downloaded and the capture finds nothing. A
+  # command-line flag overrides that download policy.
   # shellcheck disable=SC2086 # GOLDEN_BUILD_FLAGS is intentionally word-split.
-  bzl build ${GOLDEN_BUILD_FLAGS:-} "${targets[@]}"
+  bzl build --remote_download_all ${GOLDEN_BUILD_FLAGS:-} "${targets[@]}"
 fi
 
 # Pass GOLDEN_BUILD_FLAGS to `info` too: a build setting can transition the
