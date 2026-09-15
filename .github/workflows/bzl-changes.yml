@@ -201,6 +201,8 @@ jobs:
             task: validate-registry
           - name: Hotreload Smoke
             task: hotreload-smoke
+          - name: Compiler Golden Diff
+            task: compiler-golden
 
     steps:
       - name: Checkout code
@@ -268,6 +270,24 @@ jobs:
       - name: "Run: Hotreload Smoke"
         if: matrix.task == 'hotreload-smoke'
         run: ./tools/ci/hotreload_smoke.sh
+
+      - name: "Run: Compiler Golden Diff"
+        if: matrix.task == 'compiler-golden'
+        # Force the from-source companion so the diff reflects companion source,
+        # not a pinned prebuilt. GOLDEN_REGEN_DIR captures the freshly-generated
+        # goldens so they can be uploaded on drift (see next step).
+        run: ./tools/ci/compiler_golden_test.sh
+        env:
+          GOLDEN_BUILD_FLAGS: --//bzl/valdi:use_prebuilt_companion=false
+          GOLDEN_REGEN_DIR: ${{ runner.temp }}/regenerated-compiler-goldens
+
+      - name: "Upload regenerated goldens (on drift)"
+        if: matrix.task == 'compiler-golden' && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-compiler-goldens
+          path: ${{ runner.temp }}/regenerated-compiler-goldens
+          if-no-files-found: warn
 
   snapshot-tests:
     name: Snapshot Tests

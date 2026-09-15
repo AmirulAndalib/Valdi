@@ -27,6 +27,27 @@ script in this directory; the GitHub Actions workflows under `.github/workflows/
 - macOS jobs install Bazel via bazelisk. Some scripts call `bazel` directly and fall back to `bzl`
   when only the wrapper is present.
 
+## Compiler emit golden test
+
+`compiler_golden_test.sh` is a characterization test: it compiles the
+`valdi/testdata/resources/modules/**` corpus and diffs the compiler's emitted
+TypeScript declarations, generated C++, and compilation metadata against
+checked-in goldens under `compiler_goldens/`. It exists to catch **silent**
+changes in compiler (`compiler/companion`) output — most importantly from a
+TypeScript dependency bump, which type-checks and unit specs do not cover.
+
+- **Runs as its own Linux matrix leg** (`compiler-golden`) in `bzl-changes.yml`.
+- **Always built from source companion.** The call site passes
+  `GOLDEN_BUILD_FLAGS=--//bzl/valdi:use_prebuilt_companion=false`; otherwise the
+  diff would reflect a prebuilt binary, not companion source. (The prebuilt and
+  source companions can emit different C++ formatting — this bit us once.)
+- **Regenerating goldens** when an emit change is intended:
+  `tools/ci/compiler_golden_test.sh --update`. On a Linux/host mismatch, the CI
+  leg uploads the freshly-generated set as the `regenerated-compiler-goldens`
+  artifact — download it into `compiler_goldens/` instead of rebuilding locally.
+- A regenerated golden in a PR triggers a **Sensitive File Notice** comment so
+  reviewers confirm the emit change is intended. See `compiler_goldens/README.md`.
+
 ## Guardrails
 
 - Reproduce CI's exact invocation when debugging; don't scope a run just to make it pass.

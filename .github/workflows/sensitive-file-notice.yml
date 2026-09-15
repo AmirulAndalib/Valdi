@@ -62,6 +62,12 @@ jobs:
                 label: 'Core runtime',
                 note: 'App-wide blast radius — touches the rendering core. Must be gated.',
               },
+              {
+                pattern: /^tools\/ci\/compiler_goldens\/.+\.golden$/,
+                emoji: '🧬',
+                label: 'Compiler emit goldens regenerated',
+                note: 'The Valdi compiler produced different output for the testdata corpus (e.g. a TypeScript bump or a transform change). Review the emit diff carefully and confirm it is intended — see tools/ci/compiler_goldens/README.md.',
+              },
             ];
 
             const notices = [];
