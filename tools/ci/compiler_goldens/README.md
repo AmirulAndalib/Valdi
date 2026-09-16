@@ -21,9 +21,17 @@ bump).
 Per module, keyed by the config-independent logical path `<module>/<rest>`:
 
 - **TypeScript declarations** — `.valdi_build/compile/typescript/output/<mod>/**/*.d.ts`
-- **Generated C++** — `cpp/release/src/valdi_modules/<mod>/<mod>.{cpp,hpp}` (the NativeCompiler C++ emitter)
+- **Generated C++** — `cpp/release/src/valdi_modules/<mod>/<mod>.{cpp,hpp}` (the NativeCompiler C++ emitter; release only — see below)
 - **Generated native C** — the per-flavor `*_native.c` (the TSN-atom emitter path)
 - **Compilation metadata** — `.valdi_build/compile/typescript/dumped_symbols/<mod>/compilation-metadata.json`
+- **Platform bindings (release)** — ObjC `ios/release/src/**/*.{h,m}` (the module
+  and its `<Mod>Types` sibling), Swift `ios/release/src/**/*.swift`, and Kotlin
+  `android/release/src/*.kt`. These are declaration-driven single-file outputs
+  (`single_file_codegen`), so the Android output is a plain `.kt`, not a
+  `.srcjar` archive. The `binding_lang_{objc,swift,both}` trio shares one minimal
+  bridgeable API and differs only in `ios_language`, so its goldens characterize
+  the ObjC, Swift, and hybrid emit paths from identical input. The rest of the
+  corpus exports nothing bridgeable and stays objc-only (empty stubs).
 
 Each file is stored with a `.golden` suffix (e.g. `test.cpp.golden`) so no
 language formatter (clang-format, eslint) matches and rewrites these verbatim
@@ -38,7 +46,9 @@ source maps (embed absolute paths), and **web-transpiled JS**
 (`web/release/assets/<mod>/**/*.js`). The web/Vue codegen is not reproducible
 across hosts today (macOS and Linux emit different generated member references
 for some `.vue` files), so it can't be a stable golden yet — tracked as a
-follow-up.
+follow-up. Likewise the **debug-flavor C++** (`cpp/debug`): the complex `test`
+module's debug C++ diverges macOS vs Linux (while `cpp/release` is byte-identical
+cross-host), so only the release flavor is pinned.
 
 ## Where it runs
 

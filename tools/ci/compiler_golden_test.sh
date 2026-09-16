@@ -4,8 +4,8 @@
 #
 # Characterizes the Valdi TSX->native compiler (compiler/companion) by compiling
 # a fixed corpus of testdata modules and diffing the emitted TypeScript
-# declarations, generated C++, and compilation metadata against checked-in
-# goldens under tools/ci/compiler_goldens/.
+# declarations, generated C++, native C, platform bindings (ObjC/Kotlin), and
+# compilation metadata against checked-in goldens under tools/ci/compiler_goldens/.
 #
 # Why this exists: the companion embeds the TypeScript compiler as a library and
 # drives its AST/checker APIs (including undocumented internals such as
@@ -48,7 +48,7 @@ done
 
 # The corpus: self-contained testdata modules (deps only on in-repo
 # valdi_core / valdi_tsx / worker), already compiled elsewhere in CI.
-MODULES=(test test2 local remote remote_assets startup_benchmark test_async_strict)
+MODULES=(test test2 local remote remote_assets startup_benchmark test_async_strict binding_lang_objc binding_lang_swift binding_lang_both)
 MODULE_PKG="valdi/testdata/resources/modules"
 GOLDEN_ROOT="tools/ci/compiler_goldens"
 
@@ -88,9 +88,25 @@ trap 'rm -rf "$STAGING" "$DIFF_BRIEF"' EXIT
 # free of absolute paths, timestamps, and arch/host strings, and byte-identical
 # between macOS and Linux CI):
 #   - TypeScript declaration files (.d.ts)
-#   - generated C++ (cpp/release; the NativeCompiler C++ emitter)
+#   - generated C++ (cpp/release; the NativeCompiler C++ emitter). The debug
+#     flavor is NOT captured: the debug C++ emit is not host-reproducible (the
+#     complex `test` module's cpp/debug diverges macOS vs Linux while cpp/release
+#     is byte-identical), so it can't be a stable golden.
 #   - generated native C (the per-flavor *_native.c; the TSN-atom emitter)
 #   - compilation metadata JSON
+#   - generated platform bindings, release flavor: ObjC (.h/.m under
+#     ios/release/src, both the module and its <Mod>Types sibling) and Kotlin
+#     (.kt under android/release/src). These are declaration-driven single-file
+#     outputs (single_file_codegen is always on), so despite the build rule's
+#     "srcjar" field name the Android output is a plain .kt, not an archive. We
+#     pin the release flavor for the bindings. Swift and the objc/swift/hybrid
+#     split are exercised by the purpose-built binding_lang_{objc,swift,both}
+#     trio: they share one minimal bridgeable API (an @ExportProxy interface +
+#     @ExportEnum, so the Types module is non-empty) and differ only in
+#     ios_language, so their goldens characterize each emit path from identical
+#     input. The rest of the corpus exports nothing bridgeable (empty ObjC
+#     stubs; swift codegen fails on them outright), so those modules stay
+#     objc-only.
 # Excluded:
 #   - the .valdimodule bytecode blob (a brittle binary)
 #   - .map.json source maps (can embed absolute paths)
@@ -115,6 +131,8 @@ collect_module() {
     find "${base}/cpp/release" \( -name '*.cpp' -o -name '*.hpp' \) 2>/dev/null || true
     find "${base}" -path '*/native/*' -name '*_native.c' 2>/dev/null || true
     find "${base}/.valdi_build/compile/typescript/dumped_symbols/${mod}" -name 'compilation-metadata.json' 2>/dev/null || true
+    find "${base}/ios/release/src" \( -name '*.h' -o -name '*.m' -o -name '*.swift' \) 2>/dev/null || true
+    find "${base}/android/release/src" -name '*.kt' 2>/dev/null || true
   )
 }
 
