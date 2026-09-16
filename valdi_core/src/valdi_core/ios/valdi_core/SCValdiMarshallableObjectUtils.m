@@ -97,23 +97,40 @@ SCValdiFieldValue *SCValdiGetMarshallableObjectFieldsStorage(__unsafe_unretained
     return *(SCValdiFieldValue **)((__bridge void *)instance + storageOffset);
 }
 
+/// Stores `newValue` into the object slot and returns whatever it replaced, as one indivisible step,
+/// so that concurrent writers each take ownership of a distinct outgoing pointer.
+///
+/// The slot stays a plain `const void *` because its type is part of the marshalling ABI and the
+/// scalar cases are written non-atomically, so the atomicity is applied here, at the one place
+/// ownership of a field changes hands, rather than by re-typing the union.
+static inline const void *SCValdiFieldValueExchangeObject(SCValdiFieldValue *fieldValue, const void *newValue)
+{
+    return __atomic_exchange_n(&fieldValue->o, newValue, __ATOMIC_SEQ_CST);
+}
+
 void SCValdiSetFieldsStorageObjectValue(SCValdiFieldValue *fieldsStorage, NSUInteger fieldIndex, BOOL isCopyable, __unsafe_unretained id value)
 {
     fieldsStorage += fieldIndex;
 
-    if (fieldsStorage->o) {
-        CFRelease(fieldsStorage->o);
-    }
-
+    const void *newValue = NULL;
     if (value) {
         if (isCopyable) {
             id valueCopy = [value copy];
-            fieldsStorage->o = CFBridgingRetain(valueCopy);
+            newValue = CFBridgingRetain(valueCopy);
         } else {
-            fieldsStorage->o = CFBridgingRetain(value);
+            newValue = CFBridgingRetain(value);
         }
-    } else {
-        fieldsStorage->o = nil;
+    }
+
+    // Retain the incoming value first, then swap it in atomically, and only then release what was
+    // there. Releasing up front made two distinct refcount bugs reachable: assigning a field to its
+    // own current value dropped the field's only reference before re-retaining it, and two threads
+    // setting one field could both read the same outgoing pointer and both release it. Both corrupt
+    // the refcount and surface later as a crash inside CFRelease.
+    const void *oldValue = SCValdiFieldValueExchangeObject(fieldsStorage, newValue);
+
+    if (oldValue) {
+        CFRelease(oldValue);
     }
 }
 
@@ -334,8 +351,11 @@ void SCValdiDeallocateFieldsStorage(SCValdiFieldValue *fieldsStorage,
                                        const SCValdiFieldValueDescriptor *fieldsDescriptors) {
     for (NSUInteger i = 0; i < fieldsCount; i++) {
         if (fieldsDescriptors[i].type == SCValdiFieldValueTypeObject) {
-            if (fieldsStorage[i].o) {
-                CFRelease(fieldsStorage[i].o);
+            // Clear each slot as it is released, for the same reason the setter does: a setter racing
+            // this teardown must not be handed a pointer this loop has already released.
+            const void *oldValue = SCValdiFieldValueExchangeObject(&fieldsStorage[i], NULL);
+            if (oldValue) {
+                CFRelease(oldValue);
             }
         }
     }
