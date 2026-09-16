@@ -151,6 +151,12 @@ void JavaScriptANRDetector::scheduleNextTick() {
 bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
                                   std::chrono::steady_clock::duration detectionThreshold,
                                   const std::atomic<bool>& ack) {
+    // Read the native-side attribution before waiting on the stack capture. The capture can take up
+    // to kCaptureStacktraceTimeoutSeconds, and a native call or module load that finishes during
+    // that wait clears its name, which would report the stall as unattributed. Both getters read
+    // saved native state, not JS, so they are safe to call while the JS thread is stuck.
+    auto loadingModule = taskScheduler.getCurrentlyLoadingModule();
+    auto attributionInfo = taskScheduler.getANRAttributionInfo();
     auto stacktraces = taskScheduler.captureStackTraces(std::chrono::seconds(kCaptureStacktraceTimeoutSeconds));
     StringBox moduleName;
     std::string message;
@@ -164,7 +170,7 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
     // otherwise be reported unattributed. Attribute it to the bundle being loaded instead.
     bool isLoadingModule = false;
     if (moduleName.isEmpty()) {
-        moduleName = taskScheduler.getCurrentlyLoadingModule();
+        moduleName = loadingModule;
         isLoadingModule = !moduleName.isEmpty();
     }
 
@@ -178,15 +184,15 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
         snap::utils::time::Duration<std::chrono::steady_clock>(detectionThreshold).toString();
     if (moduleName.isEmpty()) {
         message = fmt::format("Detected unattributed ANR after {}", detectionThresholdString);
-        // getANRAttributionInfo() reads saved native state, not JS, so it is safe to call while the
-        // ANR has the JS thread stuck.
-        message += taskScheduler.getANRAttributionInfo();
     } else if (isLoadingModule) {
         message =
             fmt::format("Detected ANR in '{}' after {} (while loading module)", moduleName, detectionThresholdString);
     } else {
         message = fmt::format("Detected ANR in '{}' after {}", moduleName, detectionThresholdString);
     }
+    // The bundle name says which module stalled; the stuck-in name says which file or bridge call,
+    // so attributed reports need the suffix as much as unattributed ones do.
+    message += attributionInfo;
 
     if (stacktraces.empty()) {
         message += " but unable to capture stack traces.";
