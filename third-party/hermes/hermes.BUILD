@@ -125,6 +125,7 @@ cmake_configure(
     cmake_vars = {
         "LLVM_HOST_TRIPLE": {
             "@valdi//bzl/conditions:ios_arm64": "arm-apple-darwin22.6.0",
+            "@valdi//bzl/conditions:ios_arm64e": "arm-apple-darwin22.6.0",
             "@valdi//bzl/conditions:ios_x86_64": "x86_64-apple-darwin23.0.0",
             "@valdi//bzl/conditions:ios_arm64_sim": "arm-apple-darwin22.6.0",
             "@valdi//bzl/conditions:macos_x86_64": "x86_64-apple-darwin23.0.0",

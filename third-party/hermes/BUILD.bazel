@@ -2,6 +2,7 @@ cc_library(
     name = "prepared_headers_platform_specific",
     hdrs = select({
         "@valdi//bzl/conditions:ios_arm64": glob(["prepared_include/apple/**/*.h"]),
+        "@valdi//bzl/conditions:ios_arm64e": glob(["prepared_include/apple/**/*.h"]),
         "@valdi//bzl/conditions:ios_x86_64": glob(["prepared_include/apple/**/*.h"]),
         "@valdi//bzl/conditions:ios_arm64_sim": glob(["prepared_include/apple/**/*.h"]),
         "@valdi//bzl/conditions:macos_x86_64": glob(["prepared_include/apple/**/*.h"]),
@@ -13,6 +14,7 @@ cc_library(
     }),
     strip_include_prefix = select({
         "@valdi//bzl/conditions:ios_arm64": "prepared_include/apple",
+        "@valdi//bzl/conditions:ios_arm64e": "prepared_include/apple",
         "@valdi//bzl/conditions:ios_x86_64": "prepared_include/apple",
         "@valdi//bzl/conditions:ios_arm64_sim": "prepared_include/apple",
         "@valdi//bzl/conditions:macos_x86_64": "prepared_include/apple",

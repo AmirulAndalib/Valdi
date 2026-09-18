@@ -140,6 +140,16 @@ config_setting(
 )
 
 config_setting(
+    name = "ios_arm64e",
+    constraint_values = [
+        "@platforms//os:ios",
+        "@platforms//cpu:arm64e",
+        "@build_bazel_apple_support//constraints:device",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
     name = "ios_x86_64",
     constraint_values = [
         "@platforms//os:ios",
