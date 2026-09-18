@@ -1,0 +1,12 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeCustomview1 = __Renderer.makeNodePrototype('custom-view', ['width', "100%", 'height', 120]);
+const AC = 'com.example.FooView';
+const IC = 'SCFooView';
+const MC = 'SCFooView';
+const WC = 'WebFooView';
+__Renderer.beginRender(__nodeCustomview1, undefined);
+__Renderer.setAttributeString('androidClass', AC);
+__Renderer.setAttributeString('iosClass', IC);
+__Renderer.setAttributeString('macosClass', MC);
+__Renderer.setAttributeString('webClass', WC);
+__Renderer.endRender();

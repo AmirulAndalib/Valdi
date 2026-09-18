@@ -1,0 +1,14 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __componentMyComponent1 = __Renderer.makeComponentPrototype();
+const __nodeLabel1 = __Renderer.makeNodePrototype('label', ['value', 'title']);
+const __nodeView1 = __Renderer.makeNodePrototype('view');
+__Renderer.beginComponent(MyComponent, __componentMyComponent1, undefined, undefined);
+__Renderer.setNamedSlot("header", () => {
+__Renderer.beginRender(__nodeLabel1, undefined);
+__Renderer.endRender();
+});
+__Renderer.setNamedSlot(viewModel.bodySlot, () => {
+__Renderer.beginRender(__nodeView1, undefined);
+__Renderer.endRender();
+});
+__Renderer.endComponent();

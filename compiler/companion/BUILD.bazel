@@ -1,4 +1,4 @@
-load("@aspect_rules_js//js:defs.bzl", "js_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
 load("@aspect_rules_js//npm:defs.bzl", "npm_link_package", "npm_package")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_config", "ts_project")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
@@ -135,6 +135,69 @@ ts_project(
         ":node_modules/xml-js",
         ":remotedebug-ios-webkit-adapter-package",
     ],
+)
+
+# golden.spec.ts is a *.spec.ts, so :lib excludes it. Compile it on its own,
+# depending on :lib for the compiled JS + declarations of the modules it imports.
+# tsconfig.golden.json extends tsconfig.base.json; declaring that via ts_config
+# makes the base a build input so tsc finds it under strict sandboxing / RE.
+ts_config(
+    name = "tsconfig_golden",
+    src = "tsconfig.golden.json",
+    deps = ["tsconfig.base.json"],
+)
+
+ts_project(
+    name = "golden_spec",
+    srcs = ["src/golden.spec.ts"],
+    allow_js = True,
+    composite = True,
+    declaration = True,
+    out_dir = "src",
+    root_dir = "src",
+    source_map = True,
+    transpiler = "tsc",
+    tsconfig = ":tsconfig_golden",
+    deps = [
+        ":lib",
+        ":node_modules/@types/jest",
+        ":node_modules/@types/node",
+        ":node_modules/ts-jest",
+        ":node_modules/typescript",
+    ],
+)
+
+# Runs the compiled golden.spec.js under plain Jest on Node. The in-process
+# compile API pulls in native deps (better-sqlite3) that valdi_test's standalone
+# runtime cannot load, so this runs on Node with the companion's node_modules.
+js_test(
+    name = "golden_test",
+    data = [
+        ":golden_spec",
+        ":lib",
+        ":node_modules/jest",
+        ":node_modules/ts-jest",
+    ] + glob(["golden_corpus/**"]),
+    entry_point = "golden_test_runner.js",
+)
+
+# Regeneration entry point. Run after an intended emit change:
+#   UPDATE_GOLDENS=1 bazel run //compiler/companion:golden_update
+# It writes refreshed goldens back to the source golden_corpus (via
+# BUILD_WORKSPACE_DIRECTORY), which the read-only test sandbox cannot do.
+js_binary(
+    name = "golden_update",
+    data = [
+        ":golden_spec",
+        ":lib",
+        ":node_modules/jest",
+        ":node_modules/ts-jest",
+    ] + glob(["golden_corpus/**"]),
+    entry_point = "golden_test_runner.js",
+    # Regeneration is the whole point of this target, so enable update mode by
+    # default (`bazel run` also sets BUILD_WORKSPACE_DIRECTORY, which the runner
+    # requires to write back to the source tree).
+    env = {"UPDATE_GOLDENS": "1"},
 )
 
 ts_config(

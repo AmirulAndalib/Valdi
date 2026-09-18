@@ -1,0 +1,10 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeView1 = __Renderer.makeNodePrototype('view');
+const __nodeLabel1 = __Renderer.makeNodePrototype('label', ['value', 'tap me']);
+__Renderer.beginRender(__nodeView1, undefined);
+__Renderer.setAttribute('onTap', handleTap);
+__Renderer.setAttributeFunction('onLongPress', () => doSomething());
+__Renderer.beginRender(__nodeLabel1, undefined);
+__Renderer.setAttribute('onTap', viewModel.onLabelTap);
+__Renderer.endRender();
+__Renderer.endRender();

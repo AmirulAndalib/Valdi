@@ -1,0 +1,10 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout', ['width', 42, 'enableFeature', true]);
+const __nodeLabel1 = __Renderer.makeNodePrototype('label', ['value', 'hello']);
+const __nodeLayout2 = __Renderer.makeNodePrototype('layout', ['height', 10]);
+__Renderer.beginRender(__nodeLayout1, undefined);
+__Renderer.beginRender(__nodeLabel1, undefined);
+__Renderer.endRender();
+__Renderer.beginRender(__nodeLayout2, undefined);
+__Renderer.endRender();
+__Renderer.endRender();

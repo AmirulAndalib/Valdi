@@ -1,0 +1,23 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout');
+const __nodeLabel1 = __Renderer.makeNodePrototype('label', ['value', 'yes']);
+const __nodeLabel2 = __Renderer.makeNodePrototype('label', ['value', 'no']);
+const __nodeView1 = __Renderer.makeNodePrototype('view');
+const __nodeView2 = __Renderer.makeNodePrototype('view');
+__Renderer.beginRender(__nodeLayout1, undefined);
+{someValue ? (() => {
+__Renderer.beginRender(__nodeLabel1, undefined);
+__Renderer.endRender();
+})() : (() => {
+__Renderer.beginRender(__nodeLabel2, undefined);
+__Renderer.endRender();
+})()}
+{!hideView || (() => {
+__Renderer.beginRender(__nodeView1, undefined);
+__Renderer.endRender();
+})()}
+{when(showExtra, () => {
+__Renderer.beginRender(__nodeView2, undefined);
+__Renderer.endRender();
+})}
+__Renderer.endRender();

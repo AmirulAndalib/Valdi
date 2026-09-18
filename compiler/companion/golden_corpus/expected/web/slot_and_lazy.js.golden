@@ -1,0 +1,12 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout', ['lazy', true]);
+const __nodeMap1 = __Renderer.makeNodePrototype('map');
+function onRender() {
+if (__Renderer.beginRenderIfNeeded(__nodeLayout1, undefined)) {
+__Renderer.renderNamedSlot("header", this);
+__Renderer.renderUnnamedSlot(this);
+__Renderer.beginRender(__nodeMap1, undefined);
+__Renderer.endRender();
+__Renderer.endRender();
+}
+}

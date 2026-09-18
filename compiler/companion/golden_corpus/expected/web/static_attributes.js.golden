@@ -1,0 +1,4 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout', ['width', 42, 'title', 'header', 'enableFeature', true]);
+__Renderer.beginRender(__nodeLayout1, undefined);
+__Renderer.endRender();

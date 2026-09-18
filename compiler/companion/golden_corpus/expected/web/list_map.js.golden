@@ -1,0 +1,24 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __nodeElement1 = __Renderer.makeNodePrototype('element');
+const __nodeLabel1 = __Renderer.makeNodePrototype('label');
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout');
+const __nodeView1 = __Renderer.makeNodePrototype('view');
+const items = ['a', 'b', 'c'];
+__Renderer.beginRender(__nodeElement1, undefined);
+__Renderer.setAttribute('sections', items.map((section) => {
+return {
+key: section,
+onRenderHeader: () => {
+__Renderer.beginRender(__nodeLabel1, undefined);
+__Renderer.setAttribute('value', section);
+__Renderer.endRender();
+},
+onRenderBody: () => {
+__Renderer.beginRender(__nodeLayout1, undefined);
+__Renderer.beginRender(__nodeView1, undefined);
+__Renderer.endRender();
+__Renderer.endRender();
+},
+};
+}));
+__Renderer.endRender();

@@ -275,8 +275,11 @@ jobs:
         if: matrix.task == 'compiler-golden'
         # Force the from-source companion so the diff reflects companion source,
         # not a pinned prebuilt. GOLDEN_REGEN_DIR captures the freshly-generated
-        # goldens so they can be uploaded on drift (see next step).
-        run: ./tools/ci/compiler_golden_test.sh
+        # goldens so they can be uploaded on drift (see next step). The second
+        # command is the in-process (jest) counterpart: Tier 2 golden diff.
+        run: |
+          ./tools/ci/compiler_golden_test.sh
+          bazel test //compiler/companion:golden_test --test_output=errors
         env:
           GOLDEN_BUILD_FLAGS: --//bzl/valdi:use_prebuilt_companion=false
           GOLDEN_REGEN_DIR: ${{ runner.temp }}/regenerated-compiler-goldens

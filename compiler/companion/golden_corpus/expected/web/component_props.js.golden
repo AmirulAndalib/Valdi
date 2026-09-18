@@ -1,0 +1,11 @@
+const __Renderer = require('valdi_core/src/JSX').jsx;
+const __componentMyComponent1 = __Renderer.makeComponentPrototype(['hello', "world", 'welcome', 42]);
+const __nodeLayout1 = __Renderer.makeNodePrototype('layout');
+__Renderer.beginComponent(MyComponent, __componentMyComponent1, viewModel.id, viewModel.myRef);
+__Renderer.setViewModelProperty('dynamic', compute() * 2);
+__Renderer.setViewModelProperties(extraProps);
+__Renderer.setUnnamedSlot(() => {
+__Renderer.beginRender(__nodeLayout1, undefined);
+__Renderer.endRender();
+});
+__Renderer.endComponent();

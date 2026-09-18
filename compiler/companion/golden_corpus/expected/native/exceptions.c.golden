@@ -1,0 +1,253 @@
+#include "tsn/tsn.h"
+#include <math.h>
+
+ // BEGIN ATOMS
+#define TSN_ATOM_RISKY 0
+#define TSN_ATOM_ERROR 1
+#define TSN_ATOM_PUSH 2
+#define TSN_ATOM_JOIN 3
+// END ATOMS
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+static tsn_value file_ts_risky(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    tsn_value object_var3 = tsn_undefined(ctx);
+    tsn_value object_var4 = tsn_undefined(ctx);
+    object_var2 = tsn_get_func_arg(ctx, argc, argv, 2);
+    /*
+        At line 2:0
+        export function risky(input: number): string {
+          c
+        [...]
+    */
+    tsn_set_pc(stackframe, 2, 0);
+    object_var3 = tsn_new_function(ctx, module, module->atoms[TSN_ATOM_RISKY], &file_ts_risky, 1);
+    if (tsn_is_exception(ctx, object_var3)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    object_var4 = tsn_retain_inline(ctx, object_var3);
+    if (tsn_set_property(ctx, &object_var2, module->atoms[TSN_ATOM_RISKY], &object_var3)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    goto target_file_ts__module_init___1_return;
+    target_file_ts__module_init___0_exception:
+    tsn_release_inline(ctx, object_var4);
+    object_var4 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var4);
+    target_file_ts__module_init___1_return:
+    tsn_release_inline(ctx, object_var4);
+    tsn_release_inline(ctx, object_var3);
+    tsn_release_inline(ctx, object_var2);
+    return retval_var1;
+}
+
+static tsn_value file_ts_risky(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    tsn_value object_var3 = tsn_undefined(ctx);
+    tsn_value object_var4 = tsn_undefined(ctx);
+    tsn_value number_var5 = tsn_undefined(ctx);
+    tsn_value bool_var6 = tsn_undefined(ctx);
+    tsn_value object_var7 = tsn_undefined(ctx);
+    object_var2 = tsn_get_func_arg(ctx, argc, argv, 0);
+    /*
+        At line 3:8
+        log: string[] = []
+    */
+    tsn_set_pc(stackframe, 3, 8);
+    /*
+        At line 3:24
+        []
+    */
+    object_var3 = tsn_new_array(ctx);
+    if (tsn_is_exception(ctx, object_var3)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    object_var4 = tsn_retain_inline(ctx, object_var3);
+    target_file_ts_risky_2_try:
+    /*
+        At line 5:4
+        if (input < 0) {
+              throw new Error('negative')
+        [...]
+    */
+    tsn_set_pc(stackframe, 5, 4);
+    target_file_ts_risky_5_condition:
+    /*
+        At line 5:8
+        input < 0
+    */
+    tsn_set_pc(stackframe, 5, 8);
+    number_var5 = tsn_int32(ctx, 0);
+    bool_var6 = tsn_op_lt(ctx, object_var2, number_var5);
+    if (tsn_is_exception(ctx, bool_var6)) {
+        goto target_file_ts_risky_3_catch;
+    }
+    if (tsn_truthy_bool(ctx, bool_var6)) {
+        goto target_file_ts_risky_6_true;
+    }
+    else {
+        goto target_file_ts_risky_7_false;
+    }
+    target_file_ts_risky_6_true:
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_get_global(ctx);
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_property(ctx, &object_var3, module->atoms[TSN_ATOM_ERROR], &object_var3, 0);
+    if (tsn_is_exception(ctx, object_var2)) {
+        goto target_file_ts_risky_3_catch;
+    }
+    /*
+        At line 6:12
+        new Error('negative')
+    */
+    tsn_set_pc(stackframe, 6, 12);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_get_module_const(ctx, module, 0);
+    object_var7 = tsn_call_constructor(ctx, object_var2, object_var2, 1, (tsn_value[]){object_var3});
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_risky_3_catch;
+    }
+    tsn_throw(ctx, object_var7);
+    goto target_file_ts_risky_3_catch;
+    goto target_file_ts_risky_8_exit;
+    target_file_ts_risky_7_false:
+    target_file_ts_risky_8_exit:
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_property(ctx, &object_var4, module->atoms[TSN_ATOM_PUSH], &object_var4, 0);
+    if (tsn_is_exception(ctx, object_var2)) {
+        goto target_file_ts_risky_3_catch;
+    }
+    /*
+        At line 8:4
+        log.push('ok')
+    */
+    tsn_set_pc(stackframe, 8, 4);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_get_module_const(ctx, module, 1);
+    tsn_release_inline(ctx, object_var7);
+    object_var7 = tsn_call(ctx, object_var2, object_var4, 1, (tsn_value[]){object_var3});
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_risky_3_catch;
+    }
+    goto target_file_ts_risky_4_finally;
+    target_file_ts_risky_3_catch:
+    /*
+        At line 9:4
+        catch (e) {
+            log.push('caught');
+          }
+    */
+    tsn_set_pc(stackframe, 9, 4);
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_exception(ctx);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_retain_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var7);
+    object_var7 = tsn_get_property(ctx, &object_var4, module->atoms[TSN_ATOM_PUSH], &object_var4, 0);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_risky_4_finally;
+    }
+    /*
+        At line 10:4
+        log.push('caught')
+    */
+    tsn_set_pc(stackframe, 10, 4);
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_module_const(ctx, module, 2);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_call(ctx, object_var7, object_var4, 1, (tsn_value[]){object_var2});
+    if (tsn_is_exception(ctx, object_var3)) {
+        goto target_file_ts_risky_4_finally;
+    }
+    goto target_file_ts_risky_4_finally;
+    target_file_ts_risky_4_finally:
+    tsn_release_inline(ctx, object_var7);
+    object_var7 = tsn_get_property(ctx, &object_var4, module->atoms[TSN_ATOM_PUSH], &object_var4, 0);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    /*
+        At line 12:4
+        log.push('done')
+    */
+    tsn_set_pc(stackframe, 12, 4);
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_module_const(ctx, module, 3);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_call(ctx, object_var7, object_var4, 1, (tsn_value[]){object_var2});
+    if (tsn_is_exception(ctx, object_var3)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    if (tsn_has_exception(ctx)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    tsn_release_inline(ctx, object_var7);
+    object_var7 = tsn_get_property(ctx, &object_var4, module->atoms[TSN_ATOM_JOIN], &object_var4, 0);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    /*
+        At line 14:9
+        log.join(',')
+    */
+    tsn_set_pc(stackframe, 14, 9);
+    tsn_release_inline(ctx, object_var2);
+    object_var2 = tsn_get_module_const(ctx, module, 4);
+    tsn_release_inline(ctx, object_var3);
+    object_var3 = tsn_call(ctx, object_var7, object_var4, 1, (tsn_value[]){object_var2});
+    if (tsn_is_exception(ctx, object_var3)) {
+        goto target_file_ts_risky_0_exception;
+    }
+    retval_var1 = tsn_retain_inline(ctx, object_var3);
+    goto target_file_ts_risky_1_return;
+    goto target_file_ts_risky_1_return;
+    target_file_ts_risky_0_exception:
+    tsn_release_inline(ctx, object_var4);
+    object_var4 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var4);
+    target_file_ts_risky_1_return:
+    tsn_release_inline(ctx, object_var7);
+    tsn_release_inline(ctx, object_var4);
+    tsn_release_inline(ctx, object_var3);
+    tsn_release_inline(ctx, object_var2);
+    return retval_var1;
+}
+
+
+ // BEGIN MODULE DEFINITION 'file_ts'
+static const tsn_string_def file_ts_module_atoms[] =  {
+    {"risky", 5},
+    {"Error", 5},
+    {"push", 4},
+    {"join", 4},
+};
+static const tsn_string_def file_ts_module_constants[] =  {
+    {"negative", 8},
+    {"ok", 2},
+    {"caught", 6},
+    {"done", 4},
+    {",", 1},
+};
+static tsn_value file_ts_create_module_func(tsn_vm *ctx) {
+    tsn_module *module;
+    module = tsn_new_module(ctx, 4, 5, 0);
+    tsn_assign_module_atoms(ctx, module, file_ts_module_atoms, 4);
+    tsn_assign_module_strings(ctx, module, file_ts_module_constants, 5);
+    tsn_value output;
+    output = tsn_new_module_init_fn(ctx, module, &file_ts__module_init__);
+    tsn_free_module(ctx, module);
+    return output;
+}
+
+__attribute__((constructor)) static void __do_register_module() {
+    tsn_register_module("file.ts", file_ts_create_module_func);
+}
+
