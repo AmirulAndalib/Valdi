@@ -1,4 +1,9 @@
-# Valdi
+<h1 id="valdi">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/docs/assets/branding/lockup-yellow-white.svg">
+    <img width="320" src="./docs/docs/assets/branding/lockup-black.svg" alt="Valdi" />
+  </picture>
+</h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE.md)
 [![Platforms](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20macOS-lightgrey)](./docs/INSTALL.md)
