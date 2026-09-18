@@ -17,7 +17,6 @@
 // SCCBindingLangBothMakeGreeter.h
 //
 
-#import <SCCBindingLangBoth/SCCBindingLangBoth.h>
 #import <valdi_core/SCValdiBridgeFunction.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
@@ -40,7 +39,6 @@
 // SCCBindingLangBothNativeApiModule.h
 //
 
-#import <SCCBindingLangBoth/SCCBindingLangBoth.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
 #import <SCCBindingLangBothTypes/SCCBindingLangBothTypes.h>
@@ -62,7 +60,6 @@ FOUNDATION_EXPORT NSInteger SCCBindingLangBothNativeApiModuleMarshall(SCValdiMar
 // SCCBindingLangBothIGreeter.h
 //
 
-#import <SCCBindingLangBoth/SCCBindingLangBoth.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
 #import <SCCBindingLangBothTypes/SCCBindingLangBothTypes.h>

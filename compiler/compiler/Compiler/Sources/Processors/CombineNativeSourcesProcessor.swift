@@ -76,6 +76,7 @@ final class CombineNativeSourcesProcessor: CompilationProcessor {
     /// drop those import lines here.
     static func filterSelfImports(from content: String, outputFilename: String) -> String {
         let stem = (outputFilename as NSString).deletingPathExtension
+        // Cover the three spellings the module's own umbrella import can take.
         let selfImports: Set<String> = [
             "#import <\(outputFilename)>",
             "#import \"\(outputFilename)\"",

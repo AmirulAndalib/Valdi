@@ -20,7 +20,6 @@ NSArray<NSNumber *> * _Nonnull SCCTestCalculatorToStringFormatGetAllCases();
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCTestTypes/SCCTestTypes.h>
 
 @protocol SCCTestICalculator;
 
@@ -59,7 +58,6 @@ typedef id<SCCTestICalculator> _Nonnull(^SCCTestMakeCalculatorBlock)();
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCTestTypes/SCCTestTypes.h>
 #import <valdi_core/SCValdiMarshallable.h>
 #import <valdi_core/SCValdiMarshallableObject.h>
 
@@ -85,7 +83,6 @@ typedef id<SCCTestICalculator> _Nonnull(^SCCTestMakeCalculatorBlock)();
 // SCCTestNativeCalculatorModuleFactory.h
 //
 
-#import "SCCTestTypes.h"
 #import <valdi_core/SCValdiGeneratedModuleFactory.h>
 
 /**
@@ -106,7 +103,6 @@ typedef id<SCCTestICalculator> _Nonnull(^SCCTestMakeCalculatorBlock)();
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCTestTypes/SCCTestTypes.h>
 #import <valdi_core/SCValdiMarshallable.h>
 #import <valdi_core/SCValdiMarshallableObject.h>
 

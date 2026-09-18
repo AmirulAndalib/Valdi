@@ -20,7 +20,6 @@ NSArray<NSNumber *> * _Nonnull SCCBindingLangBothGreetingGetAllCases();
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCBindingLangBothTypes/SCCBindingLangBothTypes.h>
 
 @protocol SCCBindingLangBothIGreeter;
 
@@ -32,7 +31,6 @@ typedef id<SCCBindingLangBothIGreeter> _Nonnull(^SCCBindingLangBothMakeGreeterBl
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCBindingLangBothTypes/SCCBindingLangBothTypes.h>
 #import <valdi_core/SCValdiMarshallable.h>
 #import <valdi_core/SCValdiMarshallableObject.h>
 
@@ -58,7 +56,6 @@ typedef id<SCCBindingLangBothIGreeter> _Nonnull(^SCCBindingLangBothMakeGreeterBl
 // SCCBindingLangBothNativeApiModuleFactory.h
 //
 
-#import "SCCBindingLangBothTypes.h"
 #import <valdi_core/SCValdiGeneratedModuleFactory.h>
 
 /**
@@ -79,7 +76,6 @@ typedef id<SCCBindingLangBothIGreeter> _Nonnull(^SCCBindingLangBothMakeGreeterBl
 //
 
 #import <Foundation/Foundation.h>
-#import <SCCBindingLangBothTypes/SCCBindingLangBothTypes.h>
 #import <valdi_core/SCValdiMarshallable.h>
 #import <valdi_core/SCValdiMarshallableObject.h>
 

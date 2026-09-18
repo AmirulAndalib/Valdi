@@ -54,8 +54,21 @@ cross-host), so only the release flavor is pinned.
 
 Its own `Compiler Golden Diff` leg (Linux) in `.github/workflows/bzl-changes.yml`.
 It builds the **source** companion (`--//bzl/valdi:use_prebuilt_companion=false`),
-so the diff reflects companion source rather than a prebuilt binary (the two can
-emit different C++ formatting).
+so the `.d.ts` / native-C / C++ emit reflects companion source rather than a
+prebuilt binary (the two can emit different C++ formatting).
+
+### Compiler provenance (matters for the platform bindings)
+
+The ObjC/Swift/Kotlin platform bindings are emitted by the Valdi **compiler**
+binary, not the companion. The harness forces the *companion* from source, but
+the *compiler* follows the build's default: from source here, but potentially a
+**prebuilt binary** in environments that ship one. A prebuilt that lags the
+compiler source will emit stale bindings, so the binding goldens track whatever
+compiler the build actually uses. When a landed compiler change affects binding
+emit, the prebuilt must be rebuilt to include it **before** these goldens are
+regenerated — otherwise the checked-in goldens characterize an emit path that no
+longer exists in source, and a from-source run (like this leg) will diff against
+them.
 
 ## Updating
 

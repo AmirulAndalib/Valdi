@@ -17,7 +17,6 @@
 // SCCTestMakeCalculator.h
 //
 
-#import <SCCTest/SCCTest.h>
 #import <valdi_core/SCValdiBridgeFunction.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
@@ -49,7 +48,6 @@
 // SCCTestNativeCalculatorModule.h
 //
 
-#import <SCCTest/SCCTest.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
 #import <SCCTestTypes/SCCTestTypes.h>
@@ -71,7 +69,6 @@ FOUNDATION_EXPORT NSInteger SCCTestNativeCalculatorModuleMarshall(SCValdiMarshal
 // SCCTestICalculator.h
 //
 
-#import <SCCTest/SCCTest.h>
 #import <valdi_core/SCValdiMarshaller.h>
 
 #import <SCCTestTypes/SCCTestTypes.h>
