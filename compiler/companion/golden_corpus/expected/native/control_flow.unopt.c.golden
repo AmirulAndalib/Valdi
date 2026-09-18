@@ -1,0 +1,588 @@
+#include "tsn/tsn.h"
+#include <math.h>
+
+ // BEGIN ATOMS
+#define TSN_ATOM_CLASSIFY 0
+// END ATOMS
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var4 = tsn_empty_var_ref(ctx);
+    tsn_value object_var3 = tsn_undefined(ctx);
+    tsn_var_ref vref_var5 = tsn_empty_var_ref(ctx);
+    tsn_value object_var6 = tsn_undefined(ctx);
+    tsn_value object_var7 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var4 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var4)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    object_var3 = tsn_get_func_arg(ctx, argc, argv, 2);
+    tsn_set_var_ref(ctx, vref_var4, object_var3);
+    vref_var5 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var5)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    /*
+        At line 2:0
+        export function classify(n: number): string {
+          le
+        [...]
+    */
+    tsn_set_pc(stackframe, 2, 0);
+    object_var6 = tsn_new_function(ctx, module, module->atoms[TSN_ATOM_CLASSIFY], &file_ts_classify, 1);
+    if (tsn_is_exception(ctx, object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var5, object_var6);
+    object_var7 = tsn_load_var_ref(ctx, vref_var4);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    if (tsn_set_property(ctx, &object_var7, module->atoms[TSN_ATOM_CLASSIFY], &object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    goto target_file_ts__module_init___1_return;
+    target_file_ts__module_init___0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts__module_init___1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var7);
+    tsn_release_inline(ctx, object_var6);
+    tsn_release_var_ref(ctx, vref_var5);
+    tsn_release_inline(ctx, object_var3);
+    tsn_release_var_ref(ctx, vref_var4);
+    return retval_var1;
+}
+
+static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var3 = tsn_empty_var_ref(ctx);
+    tsn_value object_var4 = tsn_undefined(ctx);
+    tsn_var_ref vref_var5 = tsn_empty_var_ref(ctx);
+    tsn_var_ref vref_var6 = tsn_empty_var_ref(ctx);
+    tsn_var_ref vref_var7 = tsn_empty_var_ref(ctx);
+    tsn_value object_var8 = tsn_undefined(ctx);
+    tsn_value number_var9 = tsn_undefined(ctx);
+    tsn_value object_var10 = tsn_undefined(ctx);
+    tsn_value bool_var11 = tsn_undefined(ctx);
+    tsn_value object_var12 = tsn_undefined(ctx);
+    tsn_value number_var13 = tsn_undefined(ctx);
+    tsn_value object_var14 = tsn_undefined(ctx);
+    tsn_value bool_var15 = tsn_undefined(ctx);
+    tsn_value object_var16 = tsn_undefined(ctx);
+    tsn_value object_var17 = tsn_undefined(ctx);
+    tsn_value number_var18 = tsn_undefined(ctx);
+    tsn_value object_var19 = tsn_undefined(ctx);
+    tsn_value number_var20 = tsn_undefined(ctx);
+    tsn_value bool_var21 = tsn_undefined(ctx);
+    tsn_value number_var22 = tsn_undefined(ctx);
+    tsn_value number_var23 = tsn_undefined(ctx);
+    tsn_value bool_var24 = tsn_undefined(ctx);
+    tsn_value number_var25 = tsn_undefined(ctx);
+    tsn_value number_var26 = tsn_undefined(ctx);
+    tsn_value number_var27 = tsn_undefined(ctx);
+    tsn_value number_var28 = tsn_undefined(ctx);
+    tsn_value number_var29 = tsn_undefined(ctx);
+    tsn_value number_var30 = tsn_undefined(ctx);
+    tsn_value number_var31 = tsn_undefined(ctx);
+    tsn_value number_var32 = tsn_undefined(ctx);
+    tsn_value number_var33 = tsn_undefined(ctx);
+    tsn_value bool_var34 = tsn_undefined(ctx);
+    tsn_var_ref vref_var35 = tsn_empty_var_ref(ctx);
+    tsn_value number_var36 = tsn_undefined(ctx);
+    tsn_value object_var37 = tsn_undefined(ctx);
+    tsn_value number_var38 = tsn_undefined(ctx);
+    tsn_value bool_var39 = tsn_undefined(ctx);
+    tsn_value number_var40 = tsn_undefined(ctx);
+    tsn_value number_var41 = tsn_undefined(ctx);
+    tsn_value number_var42 = tsn_undefined(ctx);
+    tsn_value number_var43 = tsn_undefined(ctx);
+    tsn_value bool_var44 = tsn_undefined(ctx);
+    tsn_value object_var45 = tsn_undefined(ctx);
+    tsn_value object_var46 = tsn_undefined(ctx);
+    tsn_value object_var47 = tsn_undefined(ctx);
+    tsn_value number_var48 = tsn_undefined(ctx);
+    tsn_value number_var49 = tsn_undefined(ctx);
+    tsn_value number_var50 = tsn_undefined(ctx);
+    tsn_value number_var52 = tsn_undefined(ctx);
+    tsn_value object_var53 = tsn_undefined(ctx);
+    tsn_value bool_var54 = tsn_undefined(ctx);
+    tsn_value object_var55 = tsn_undefined(ctx);
+    tsn_value object_var51 = tsn_undefined(ctx);
+    tsn_value object_var56 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var3 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var3)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    object_var4 = tsn_get_func_arg(ctx, argc, argv, 0);
+    tsn_set_var_ref(ctx, vref_var3, object_var4);
+    vref_var5 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var5)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    vref_var6 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var6)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    vref_var7 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var7)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    /*
+        At line 3:6
+        result = ''
+    */
+    tsn_set_pc(stackframe, 3, 6);
+    object_var8 = tsn_get_module_const(ctx, module, 0);
+    tsn_set_var_ref(ctx, vref_var5, object_var8);
+    /*
+        At line 4:2
+        if (n < 0) {
+            result = 'negative';
+          } else if 
+        [...]
+    */
+    tsn_set_pc(stackframe, 4, 2);
+    target_file_ts_classify_2_condition:
+    /*
+        At line 4:6
+        n < 0
+    */
+    tsn_set_pc(stackframe, 4, 6);
+    number_var9 = tsn_int32(ctx, 0);
+    object_var10 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var10)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var11 = tsn_op_lt(ctx, object_var10, number_var9);
+    if (tsn_is_exception(ctx, bool_var11)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    if (tsn_truthy_bool(ctx, bool_var11)) {
+        goto target_file_ts_classify_3_true;
+    }
+    else {
+        goto target_file_ts_classify_4_false;
+    }
+    target_file_ts_classify_3_true:
+    /*
+        At line 5:4
+        result = 'negative'
+    */
+    tsn_set_pc(stackframe, 5, 4);
+    object_var12 = tsn_get_module_const(ctx, module, 1);
+    tsn_set_var_ref(ctx, vref_var5, object_var12);
+    goto target_file_ts_classify_5_exit;
+    target_file_ts_classify_4_false:
+    /*
+        At line 6:9
+        if (n === 0) {
+            result = 'zero';
+          } else {
+           
+        [...]
+    */
+    tsn_set_pc(stackframe, 6, 9);
+    target_file_ts_classify_6_condition:
+    /*
+        At line 6:13
+        n === 0
+    */
+    tsn_set_pc(stackframe, 6, 13);
+    number_var13 = tsn_int32(ctx, 0);
+    object_var14 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var14)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var15 = tsn_op_eq_strict(ctx, object_var14, number_var13);
+    if (tsn_is_exception(ctx, bool_var15)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    if (tsn_truthy_bool(ctx, bool_var15)) {
+        goto target_file_ts_classify_7_true;
+    }
+    else {
+        goto target_file_ts_classify_8_false;
+    }
+    target_file_ts_classify_7_true:
+    /*
+        At line 7:4
+        result = 'zero'
+    */
+    tsn_set_pc(stackframe, 7, 4);
+    object_var16 = tsn_get_module_const(ctx, module, 2);
+    tsn_set_var_ref(ctx, vref_var5, object_var16);
+    goto target_file_ts_classify_9_exit;
+    target_file_ts_classify_8_false:
+    /*
+        At line 9:4
+        result = 'positive'
+    */
+    tsn_set_pc(stackframe, 9, 4);
+    object_var17 = tsn_get_module_const(ctx, module, 3);
+    tsn_set_var_ref(ctx, vref_var5, object_var17);
+    target_file_ts_classify_9_exit:
+    target_file_ts_classify_5_exit:
+    /*
+        At line 12:6
+        i = 0
+    */
+    tsn_set_pc(stackframe, 12, 6);
+    number_var18 = tsn_int32(ctx, 0);
+    tsn_set_var_ref(ctx, vref_var6, number_var18);
+    /*
+        At line 13:2
+        while (i < n) {
+            if (i === 5) {
+              break;
+          
+        [...]
+    */
+    tsn_set_pc(stackframe, 13, 2);
+    target_file_ts_classify_10_cond:
+    /*
+        At line 13:9
+        i < n
+    */
+    tsn_set_pc(stackframe, 13, 9);
+    tsn_release_inline(ctx, object_var19);
+    object_var19 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var19)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var20 = tsn_load_var_ref(ctx, vref_var6);
+    if (tsn_is_exception(ctx, number_var20)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var21 = tsn_op_lt(ctx, number_var20, object_var19);
+    if (tsn_is_exception(ctx, bool_var21)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    if (tsn_truthy_bool(ctx, bool_var21)) {
+        goto target_file_ts_classify_11_body;
+    }
+    else {
+        goto target_file_ts_classify_12_exit;
+    }
+    target_file_ts_classify_11_body:
+    /*
+        At line 14:4
+        if (i === 5) {
+              break;
+            }
+    */
+    tsn_set_pc(stackframe, 14, 4);
+    target_file_ts_classify_13_condition:
+    /*
+        At line 14:8
+        i === 5
+    */
+    tsn_set_pc(stackframe, 14, 8);
+    number_var22 = tsn_int32(ctx, 5);
+    number_var23 = tsn_load_var_ref(ctx, vref_var6);
+    if (tsn_is_exception(ctx, number_var23)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var24 = tsn_op_eq_strict(ctx, number_var23, number_var22);
+    if (tsn_truthy_bool(ctx, bool_var24)) {
+        goto target_file_ts_classify_14_true;
+    }
+    else {
+        goto target_file_ts_classify_15_false;
+    }
+    target_file_ts_classify_14_true:
+    goto target_file_ts_classify_12_exit;
+    goto target_file_ts_classify_16_exit;
+    target_file_ts_classify_15_false:
+    target_file_ts_classify_16_exit:
+    /*
+        At line 17:4
+        i++
+    */
+    tsn_set_pc(stackframe, 17, 4);
+    number_var25 = tsn_load_var_ref(ctx, vref_var6);
+    if (tsn_is_exception(ctx, number_var25)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var26 = number_var25;
+    number_var27 = tsn_op_inc(ctx, number_var25);
+    tsn_set_var_ref(ctx, vref_var6, number_var27);
+    goto target_file_ts_classify_10_cond;
+    target_file_ts_classify_12_exit:
+    /*
+        At line 20:6
+        j = 0
+    */
+    tsn_set_pc(stackframe, 20, 6);
+    number_var28 = tsn_int32(ctx, 0);
+    tsn_set_var_ref(ctx, vref_var7, number_var28);
+    /*
+        At line 21:2
+        do {
+            j++;
+          } while (j < 3);
+    */
+    tsn_set_pc(stackframe, 21, 2);
+    target_file_ts_classify_17_body:
+    /*
+        At line 22:4
+        j++
+    */
+    tsn_set_pc(stackframe, 22, 4);
+    number_var29 = tsn_load_var_ref(ctx, vref_var7);
+    if (tsn_is_exception(ctx, number_var29)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var30 = number_var29;
+    number_var31 = tsn_op_inc(ctx, number_var29);
+    tsn_set_var_ref(ctx, vref_var7, number_var31);
+    target_file_ts_classify_18_cond:
+    /*
+        At line 23:11
+        j < 3
+    */
+    tsn_set_pc(stackframe, 23, 11);
+    number_var32 = tsn_int32(ctx, 3);
+    number_var33 = tsn_load_var_ref(ctx, vref_var7);
+    if (tsn_is_exception(ctx, number_var33)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var34 = tsn_op_lt(ctx, number_var33, number_var32);
+    if (tsn_truthy_bool(ctx, bool_var34)) {
+        goto target_file_ts_classify_17_body;
+    }
+    else {
+        goto target_file_ts_classify_19_exit;
+    }
+    target_file_ts_classify_19_exit:
+    /*
+        At line 25:2
+        for (let k = 0; k < n; k++) {
+            if (k % 2 === 0)
+        [...]
+    */
+    tsn_set_pc(stackframe, 25, 2);
+    vref_var35 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var35)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    /*
+        At line 25:11
+        k = 0
+    */
+    tsn_set_pc(stackframe, 25, 11);
+    number_var36 = tsn_int32(ctx, 0);
+    tsn_set_var_ref(ctx, vref_var35, number_var36);
+    target_file_ts_classify_20_cond:
+    /*
+        At line 25:18
+        k < n
+    */
+    tsn_set_pc(stackframe, 25, 18);
+    tsn_release_inline(ctx, object_var37);
+    object_var37 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var37)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var38 = tsn_load_var_ref(ctx, vref_var35);
+    if (tsn_is_exception(ctx, number_var38)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var39 = tsn_op_lt(ctx, number_var38, object_var37);
+    if (tsn_is_exception(ctx, bool_var39)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    if (tsn_truthy_bool(ctx, bool_var39)) {
+        goto target_file_ts_classify_21_body;
+    }
+    else {
+        goto target_file_ts_classify_22_exit;
+    }
+    target_file_ts_classify_21_body:
+    /*
+        At line 26:4
+        if (k % 2 === 0) {
+              continue;
+            }
+    */
+    tsn_set_pc(stackframe, 26, 4);
+    target_file_ts_classify_23_condition:
+    /*
+        At line 26:8
+        k % 2 === 0
+    */
+    tsn_set_pc(stackframe, 26, 8);
+    number_var40 = tsn_int32(ctx, 0);
+    /*
+        At line 26:8
+        k % 2
+    */
+    number_var41 = tsn_int32(ctx, 2);
+    number_var42 = tsn_load_var_ref(ctx, vref_var35);
+    if (tsn_is_exception(ctx, number_var42)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var43 = tsn_op_mod(ctx, number_var42, number_var41);
+    bool_var44 = tsn_op_eq_strict(ctx, number_var43, number_var40);
+    if (tsn_truthy_bool(ctx, bool_var44)) {
+        goto target_file_ts_classify_24_true;
+    }
+    else {
+        goto target_file_ts_classify_25_false;
+    }
+    target_file_ts_classify_24_true:
+    /*
+        At line 27:6
+        continue;
+    */
+    tsn_set_pc(stackframe, 27, 6);
+    goto target_file_ts_classify_20_cond;
+    goto target_file_ts_classify_26_exit;
+    target_file_ts_classify_25_false:
+    target_file_ts_classify_26_exit:
+    /*
+        At line 29:4
+        result = result + 'x'
+    */
+    tsn_set_pc(stackframe, 29, 4);
+    /*
+        At line 29:13
+        result + 'x'
+    */
+    tsn_release_inline(ctx, object_var45);
+    object_var45 = tsn_get_module_const(ctx, module, 4);
+    tsn_release_inline(ctx, object_var46);
+    object_var46 = tsn_load_var_ref(ctx, vref_var5);
+    if (tsn_is_exception(ctx, object_var46)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    tsn_release_inline(ctx, object_var47);
+    object_var47 = tsn_op_add(ctx, object_var46, object_var45);
+    if (tsn_is_exception(ctx, object_var47)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var5, object_var47);
+    /*
+        At line 25:25
+        k++
+    */
+    tsn_set_pc(stackframe, 25, 25);
+    number_var48 = tsn_load_var_ref(ctx, vref_var35);
+    if (tsn_is_exception(ctx, number_var48)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    number_var49 = number_var48;
+    number_var50 = tsn_op_inc(ctx, number_var48);
+    tsn_set_var_ref(ctx, vref_var35, number_var50);
+    goto target_file_ts_classify_20_cond;
+    target_file_ts_classify_22_exit:
+    /*
+        At line 32:9
+        n > 10 ? 'big' : result
+    */
+    tsn_set_pc(stackframe, 32, 9);
+    target_file_ts_classify_27_condition:
+    /*
+        At line 32:9
+        n > 10
+    */
+    tsn_set_pc(stackframe, 32, 9);
+    number_var52 = tsn_int32(ctx, 10);
+    object_var53 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var53)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    bool_var54 = tsn_op_gt(ctx, object_var53, number_var52);
+    if (tsn_is_exception(ctx, bool_var54)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    if (tsn_truthy_bool(ctx, bool_var54)) {
+        goto target_file_ts_classify_28_condition_true;
+    }
+    else {
+        goto target_file_ts_classify_29_condition_false;
+    }
+    target_file_ts_classify_28_condition_true:
+    object_var55 = tsn_get_module_const(ctx, module, 5);
+    tsn_release_inline(ctx, object_var51);
+    object_var51 = tsn_retain_inline(ctx, object_var55);
+    goto target_file_ts_classify_30_exit;
+    target_file_ts_classify_29_condition_false:
+    object_var56 = tsn_load_var_ref(ctx, vref_var5);
+    if (tsn_is_exception(ctx, object_var56)) {
+        goto target_file_ts_classify_0_exception;
+    }
+    tsn_release_inline(ctx, object_var51);
+    object_var51 = tsn_retain_inline(ctx, object_var56);
+    goto target_file_ts_classify_30_exit;
+    target_file_ts_classify_30_exit:
+    retval_var1 = tsn_retain_inline(ctx, object_var51);
+    goto target_file_ts_classify_1_return;
+    goto target_file_ts_classify_1_return;
+    target_file_ts_classify_0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts_classify_1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var56);
+    tsn_release_inline(ctx, object_var51);
+    tsn_release_inline(ctx, object_var55);
+    tsn_release_inline(ctx, object_var53);
+    tsn_release_inline(ctx, object_var47);
+    tsn_release_inline(ctx, object_var46);
+    tsn_release_inline(ctx, object_var45);
+    tsn_release_inline(ctx, object_var37);
+    tsn_release_var_ref(ctx, vref_var35);
+    tsn_release_inline(ctx, object_var19);
+    tsn_release_inline(ctx, object_var17);
+    tsn_release_inline(ctx, object_var16);
+    tsn_release_inline(ctx, object_var14);
+    tsn_release_inline(ctx, object_var12);
+    tsn_release_inline(ctx, object_var10);
+    tsn_release_inline(ctx, object_var8);
+    tsn_release_var_ref(ctx, vref_var7);
+    tsn_release_var_ref(ctx, vref_var6);
+    tsn_release_var_ref(ctx, vref_var5);
+    tsn_release_inline(ctx, object_var4);
+    tsn_release_var_ref(ctx, vref_var3);
+    return retval_var1;
+}
+
+
+ // BEGIN MODULE DEFINITION 'file_ts'
+static const tsn_string_def file_ts_module_atoms[] =  {
+    {"classify", 8},
+};
+static const tsn_string_def file_ts_module_constants[] =  {
+    {"", 0},
+    {"negative", 8},
+    {"zero", 4},
+    {"positive", 8},
+    {"x", 1},
+    {"big", 3},
+};
+static tsn_value file_ts_create_module_func(tsn_vm *ctx) {
+    tsn_module *module;
+    module = tsn_new_module(ctx, 1, 6, 0);
+    tsn_assign_module_atoms(ctx, module, file_ts_module_atoms, 1);
+    tsn_assign_module_strings(ctx, module, file_ts_module_constants, 6);
+    tsn_value output;
+    output = tsn_new_module_init_fn(ctx, module, &file_ts__module_init__);
+    tsn_free_module(ctx, module);
+    return output;
+}
+
+__attribute__((constructor)) static void __do_register_module() {
+    tsn_register_module("file.ts", file_ts_create_module_func);
+}
+

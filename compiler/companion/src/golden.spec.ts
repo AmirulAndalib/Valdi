@@ -40,15 +40,26 @@ const NATIVE_OPTIONS: NativeCompilerOptions = {
   foldConstants: true,
 };
 
+// The same fixtures compiled with every optimization OFF, so the unfolded /
+// unoptimized emit -- a distinct EmitResolver / NativeCompiler path -- is pinned
+// alongside the folded one. A TypeScript bump could regress either path
+// independently.
+const NATIVE_OPTIONS_UNOPT: NativeCompilerOptions = {
+  optimizeSlots: false,
+  optimizeVarRefs: false,
+  foldConstants: false,
+};
+
 // Web/JSX path: pure source-string transpile, no Workspace or dependency
 // resolution needed.
 function compileWeb(src: string): string {
   return trimAllLines(JSXProcessor.createFromFile('File.jsx', src, false).process());
 }
 
-// Native path: compile through an in-memory Workspace (type-checks against
-// lib.es2015 only) to generated C.
-function compileNativeC(src: string): string {
+// An in-memory Workspace that type-checks against lib.es2015 only. rootPath '/'
+// keeps the file reference in any diagnostic/error text relative to '/', so
+// captured messages stay host-portable (no absolute path leaks).
+function nativeWorkspace(src: string): Workspace {
   const workspace = new Workspace(
     '/',
     false,
@@ -58,8 +69,47 @@ function compileNativeC(src: string): string {
   );
   workspace.registerInMemoryFile('file.ts', src);
   workspace.addSourceFileAtPath('file.ts');
-  const irs = compileFile(workspace, true, NATIVE_OPTIONS, 'file.ts', 'file.ts');
-  return compileIRsToC(irs, NATIVE_OPTIONS).source;
+  return workspace;
+}
+
+// Native path: compile through the in-memory Workspace to generated C.
+function compileNativeWith(src: string, options: NativeCompilerOptions): string {
+  const irs = compileFile(nativeWorkspace(src), true, options, 'file.ts', 'file.ts');
+  return compileIRsToC(irs, options).source;
+}
+function compileNativeC(src: string): string {
+  return compileNativeWith(src, NATIVE_OPTIONS);
+}
+function compileNativeCUnopt(src: string): string {
+  return compileNativeWith(src, NATIVE_OPTIONS_UNOPT);
+}
+
+// --- Error / diagnostic goldens ------------------------------------------------
+// Compile *invalid* input and pin the compiler's diagnostics / thrown message.
+// A TypeScript bump routinely changes error wording, codes, and what's rejected;
+// none of that is caught by the success-path goldens above.
+
+// Type-check diagnostics: getDiagnosticsSync returns structured diagnostics and
+// does NOT throw. Each `.text` is ts.formatDiagnostic output
+// (`file.ts(line,col): error TSxxxx: ...`); the TSxxxx code + wording are the
+// version-sensitive signal we want to pin.
+function compileTypecheckDiagnostics(src: string): string {
+  const result = nativeWorkspace(src).getDiagnosticsSync('file.ts');
+  const body = result.diagnostics.map((d) => d.text.trimEnd()).join('\n');
+  return `hasError=${result.hasError}\n${body}\n`;
+}
+
+// Native-lowering errors: an unsupported construct throws NativeCompilerError
+// with a stable location-tagged message. syntaxCheck=false skips the type-check
+// throw so we reach the lowering rather than stopping at a semantic error.
+function compileNativeError(src: string): string {
+  try {
+    const irs = compileFile(nativeWorkspace(src), false, NATIVE_OPTIONS, 'file.ts', 'file.ts');
+    compileIRsToC(irs, NATIVE_OPTIONS);
+    return 'UNEXPECTED: native compile did not throw\n';
+  } catch (e) {
+    return `${(e as Error).message}\n`;
+  }
 }
 
 interface GoldenCase {
@@ -69,7 +119,13 @@ interface GoldenCase {
   compile: (src: string) => string;
 }
 
-function collect(sub: string, srcExt: string, goldExt: string, compile: (s: string) => string): GoldenCase[] {
+function collect(
+  sub: string,
+  srcExt: string,
+  goldExt: string,
+  compile: (s: string) => string,
+  label: string = sub,
+): GoldenCase[] {
   const dir = path.join(CORPUS, 'fixtures', sub);
   if (!fs.existsSync(dir)) {
     return [];
@@ -79,7 +135,7 @@ function collect(sub: string, srcExt: string, goldExt: string, compile: (s: stri
     .filter((f) => f.endsWith(srcExt))
     .sort()
     .map((f) => ({
-      name: `${sub}/${f}`,
+      name: `${label}/${f}`,
       fixturePath: path.join(dir, f),
       goldenPath: path.join(CORPUS, 'expected', sub, f.slice(0, -srcExt.length) + goldExt),
       compile,
@@ -91,6 +147,11 @@ function collect(sub: string, srcExt: string, goldExt: string, compile: (s: stri
 const cases: GoldenCase[] = [
   ...collect('web', '.tsx', '.js.golden', compileWeb),
   ...collect('native', '.ts', '.c.golden', compileNativeC),
+  // Optimization-off variant of the same native fixtures (pins the unfolded path).
+  ...collect('native', '.ts', '.unopt.c.golden', compileNativeCUnopt, 'native-unopt'),
+  // Error goldens: invalid inputs, capturing diagnostics / thrown messages.
+  ...collect('error_typecheck', '.ts', '.diag.golden', compileTypecheckDiagnostics),
+  ...collect('error_native', '.ts', '.err.golden', compileNativeError),
 ];
 
 describe('compiler emit goldens (in-process)', () => {

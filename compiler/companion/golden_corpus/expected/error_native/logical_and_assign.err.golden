@@ -1,0 +1,1 @@
+in file.ts at 5,3: Operator not supported in processBinaryExpression (operator id: 77) of kind BinaryExpression at (5,3) (node content: result &&= b)

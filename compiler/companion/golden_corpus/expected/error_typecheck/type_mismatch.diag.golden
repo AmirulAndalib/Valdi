@@ -1,0 +1,2 @@
+hasError=true
+file.ts(2,14): error TS2322: Type 'string' is not assignable to type 'number'.

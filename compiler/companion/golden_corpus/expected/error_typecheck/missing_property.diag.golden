@@ -1,0 +1,2 @@
+hasError=true
+file.ts(8,18): error TS2339: Property 'z' does not exist on type 'Point'.

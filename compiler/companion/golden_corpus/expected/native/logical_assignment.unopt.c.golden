@@ -1,0 +1,259 @@
+#include "tsn/tsn.h"
+#include <math.h>
+
+ // BEGIN ATOMS
+#define TSN_ATOM_RESOLVEOPTIONS 0
+#define TSN_ATOM_COUNT 1
+#define TSN_ATOM_NAME 2
+#define TSN_ATOM_LENGTH 3
+// END ATOMS
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+static tsn_value file_ts_resolveOptions(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var4 = tsn_empty_var_ref(ctx);
+    tsn_value object_var3 = tsn_undefined(ctx);
+    tsn_var_ref vref_var5 = tsn_empty_var_ref(ctx);
+    tsn_value object_var6 = tsn_undefined(ctx);
+    tsn_value object_var7 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var4 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var4)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    object_var3 = tsn_get_func_arg(ctx, argc, argv, 2);
+    tsn_set_var_ref(ctx, vref_var4, object_var3);
+    vref_var5 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var5)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    /*
+        At line 2:0
+        export function resolveOptions(input: { count?: nu
+        [...]
+    */
+    tsn_set_pc(stackframe, 2, 0);
+    object_var6 = tsn_new_function(ctx, module, module->atoms[TSN_ATOM_RESOLVEOPTIONS], &file_ts_resolveOptions, 1);
+    if (tsn_is_exception(ctx, object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var5, object_var6);
+    object_var7 = tsn_load_var_ref(ctx, vref_var4);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    if (tsn_set_property(ctx, &object_var7, module->atoms[TSN_ATOM_RESOLVEOPTIONS], &object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    goto target_file_ts__module_init___1_return;
+    target_file_ts__module_init___0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts__module_init___1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var7);
+    tsn_release_inline(ctx, object_var6);
+    tsn_release_var_ref(ctx, vref_var5);
+    tsn_release_inline(ctx, object_var3);
+    tsn_release_var_ref(ctx, vref_var4);
+    return retval_var1;
+}
+
+static tsn_value file_ts_resolveOptions(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var3 = tsn_empty_var_ref(ctx);
+    tsn_value object_var4 = tsn_undefined(ctx);
+    tsn_var_ref vref_var5 = tsn_empty_var_ref(ctx);
+    tsn_var_ref vref_var6 = tsn_empty_var_ref(ctx);
+    tsn_value object_var7 = tsn_undefined(ctx);
+    tsn_value object_var8 = tsn_undefined(ctx);
+    tsn_value object_var9 = tsn_undefined(ctx);
+    tsn_value number_var10 = tsn_undefined(ctx);
+    tsn_value object_var11 = tsn_undefined(ctx);
+    tsn_value object_var12 = tsn_undefined(ctx);
+    tsn_value object_var13 = tsn_undefined(ctx);
+    tsn_value object_var14 = tsn_undefined(ctx);
+    tsn_value object_var15 = tsn_undefined(ctx);
+    tsn_value object_var16 = tsn_undefined(ctx);
+    tsn_value object_var17 = tsn_undefined(ctx);
+    tsn_value object_var18 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var3 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var3)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var4 = tsn_get_func_arg(ctx, argc, argv, 0);
+    tsn_set_var_ref(ctx, vref_var3, object_var4);
+    vref_var5 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var5)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    vref_var6 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var6)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    /*
+        At line 3:6
+        count = input.count
+    */
+    tsn_set_pc(stackframe, 3, 6);
+    /*
+        At line 3:14
+        input.count
+    */
+    object_var7 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var8 = tsn_get_property(ctx, &object_var7, module->atoms[TSN_ATOM_COUNT], &object_var7, 0);
+    if (tsn_is_exception(ctx, object_var8)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var5, object_var8);
+    /*
+        At line 4:2
+        count ??= 10
+    */
+    tsn_set_pc(stackframe, 4, 2);
+    target_file_ts_resolveOptions_2_lhs_value:
+    object_var9 = tsn_load_var_ref(ctx, vref_var5);
+    if (tsn_is_exception(ctx, object_var9)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    if (tsn_not_undefined_or_null(ctx, object_var9)) {
+        goto target_file_ts_resolveOptions_5_exit;
+    }
+    else {
+        goto target_file_ts_resolveOptions_3_rhs_value;
+    }
+    target_file_ts_resolveOptions_3_rhs_value:
+    number_var10 = tsn_int32(ctx, 10);
+    goto target_file_ts_resolveOptions_4_rhs_assign;
+    target_file_ts_resolveOptions_4_rhs_assign:
+    tsn_set_var_ref(ctx, vref_var5, number_var10);
+    tsn_set_var_ref(ctx, vref_var5, number_var10);
+    goto target_file_ts_resolveOptions_5_exit;
+    target_file_ts_resolveOptions_5_exit:
+    /*
+        At line 6:6
+        name = input.name
+    */
+    tsn_set_pc(stackframe, 6, 6);
+    /*
+        At line 6:13
+        input.name
+    */
+    object_var11 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, object_var11)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var12 = tsn_get_property(ctx, &object_var11, module->atoms[TSN_ATOM_NAME], &object_var11, 0);
+    if (tsn_is_exception(ctx, object_var12)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var6, object_var12);
+    /*
+        At line 7:2
+        name ||= 'default'
+    */
+    tsn_set_pc(stackframe, 7, 2);
+    target_file_ts_resolveOptions_6_lhs_condition:
+    object_var13 = tsn_load_var_ref(ctx, vref_var6);
+    if (tsn_is_exception(ctx, object_var13)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    if (tsn_to_bool(ctx, object_var13)) {
+        goto target_file_ts_resolveOptions_8_exit;
+    }
+    else {
+        goto target_file_ts_resolveOptions_7_lhs_false;
+    }
+    target_file_ts_resolveOptions_7_lhs_false:
+    object_var14 = tsn_get_module_const(ctx, module, 0);
+    tsn_set_var_ref(ctx, vref_var6, object_var14);
+    tsn_set_var_ref(ctx, vref_var6, object_var14);
+    goto target_file_ts_resolveOptions_8_exit;
+    target_file_ts_resolveOptions_8_exit:
+    /*
+        At line 9:9
+        count + name.length
+    */
+    tsn_set_pc(stackframe, 9, 9);
+    /*
+        At line 9:17
+        name.length
+    */
+    object_var15 = tsn_load_var_ref(ctx, vref_var6);
+    if (tsn_is_exception(ctx, object_var15)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var16 = tsn_get_property(ctx, &object_var15, module->atoms[TSN_ATOM_LENGTH], &object_var15, 0);
+    if (tsn_is_exception(ctx, object_var16)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var17 = tsn_load_var_ref(ctx, vref_var5);
+    if (tsn_is_exception(ctx, object_var17)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    object_var18 = tsn_op_add(ctx, object_var17, object_var16);
+    if (tsn_is_exception(ctx, object_var18)) {
+        goto target_file_ts_resolveOptions_0_exception;
+    }
+    retval_var1 = tsn_retain_inline(ctx, object_var18);
+    goto target_file_ts_resolveOptions_1_return;
+    goto target_file_ts_resolveOptions_1_return;
+    target_file_ts_resolveOptions_0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts_resolveOptions_1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var18);
+    tsn_release_inline(ctx, object_var17);
+    tsn_release_inline(ctx, object_var16);
+    tsn_release_inline(ctx, object_var15);
+    tsn_release_inline(ctx, object_var14);
+    tsn_release_inline(ctx, object_var13);
+    tsn_release_inline(ctx, object_var12);
+    tsn_release_inline(ctx, object_var11);
+    tsn_release_inline(ctx, object_var9);
+    tsn_release_inline(ctx, object_var8);
+    tsn_release_inline(ctx, object_var7);
+    tsn_release_var_ref(ctx, vref_var6);
+    tsn_release_var_ref(ctx, vref_var5);
+    tsn_release_inline(ctx, object_var4);
+    tsn_release_var_ref(ctx, vref_var3);
+    return retval_var1;
+}
+
+
+ // BEGIN MODULE DEFINITION 'file_ts'
+static const tsn_string_def file_ts_module_atoms[] =  {
+    {"resolveOptions", 14},
+    {"count", 5},
+    {"name", 4},
+    {"length", 6},
+};
+static const tsn_string_def file_ts_module_constants[] =  {
+    {"default", 7},
+};
+static tsn_value file_ts_create_module_func(tsn_vm *ctx) {
+    tsn_module *module;
+    module = tsn_new_module(ctx, 4, 1, 0);
+    tsn_assign_module_atoms(ctx, module, file_ts_module_atoms, 4);
+    tsn_assign_module_strings(ctx, module, file_ts_module_constants, 1);
+    tsn_value output;
+    output = tsn_new_module_init_fn(ctx, module, &file_ts__module_init__);
+    tsn_free_module(ctx, module);
+    return output;
+}
+
+__attribute__((constructor)) static void __do_register_module() {
+    tsn_register_module("file.ts", file_ts_create_module_func);
+}
+

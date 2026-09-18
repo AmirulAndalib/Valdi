@@ -1,0 +1,154 @@
+#include "tsn/tsn.h"
+#include <math.h>
+
+ // BEGIN ATOMS
+#define TSN_ATOM_COMPUTED 0
+// END ATOMS
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+static tsn_value file_ts_computed(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure);
+
+static tsn_value file_ts__module_init__(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var4 = tsn_empty_var_ref(ctx);
+    tsn_value object_var3 = tsn_undefined(ctx);
+    tsn_var_ref vref_var5 = tsn_empty_var_ref(ctx);
+    tsn_value object_var6 = tsn_undefined(ctx);
+    tsn_value object_var7 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var4 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var4)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    object_var3 = tsn_get_func_arg(ctx, argc, argv, 2);
+    tsn_set_var_ref(ctx, vref_var4, object_var3);
+    vref_var5 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var5)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    /*
+        At line 2:0
+        export function computed(): number {
+          const a = 2
+        [...]
+    */
+    tsn_set_pc(stackframe, 2, 0);
+    object_var6 = tsn_new_function(ctx, module, module->atoms[TSN_ATOM_COMPUTED], &file_ts_computed, 0);
+    if (tsn_is_exception(ctx, object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    tsn_set_var_ref(ctx, vref_var5, object_var6);
+    object_var7 = tsn_load_var_ref(ctx, vref_var4);
+    if (tsn_is_exception(ctx, object_var7)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    if (tsn_set_property(ctx, &object_var7, module->atoms[TSN_ATOM_COMPUTED], &object_var6)) {
+        goto target_file_ts__module_init___0_exception;
+    }
+    goto target_file_ts__module_init___1_return;
+    target_file_ts__module_init___0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts__module_init___1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_inline(ctx, object_var7);
+    tsn_release_inline(ctx, object_var6);
+    tsn_release_var_ref(ctx, vref_var5);
+    tsn_release_inline(ctx, object_var3);
+    tsn_release_var_ref(ctx, vref_var4);
+    return retval_var1;
+}
+
+static tsn_value file_ts_computed(tsn_vm *ctx, tsn_value_const this_val, tsn_stackframe *stackframe, int argc, tsn_value_const *argv, tsn_closure *closure)
+ {
+    tsn_module *module = closure->module;
+    tsn_value retval_var1 = tsn_undefined(ctx);
+    tsn_var_ref vref_var3 = tsn_empty_var_ref(ctx);
+    tsn_var_ref vref_var4 = tsn_empty_var_ref(ctx);
+    tsn_value number_var5 = tsn_undefined(ctx);
+    tsn_value number_var6 = tsn_undefined(ctx);
+    tsn_value number_var7 = tsn_undefined(ctx);
+    tsn_value number_var8 = tsn_undefined(ctx);
+    tsn_value number_var9 = tsn_undefined(ctx);
+    tsn_value number_var10 = tsn_undefined(ctx);
+    tsn_value number_var11 = tsn_undefined(ctx);
+    tsn_value object_var2 = tsn_undefined(ctx);
+    vref_var3 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var3)) {
+        goto target_file_ts_computed_0_exception;
+    }
+    vref_var4 = tsn_new_var_ref(ctx);
+    if (tsn_var_ref_is_exception(ctx, vref_var4)) {
+        goto target_file_ts_computed_0_exception;
+    }
+    /*
+        At line 3:8
+        a = 2
+    */
+    tsn_set_pc(stackframe, 3, 8);
+    number_var5 = tsn_int32(ctx, 2);
+    tsn_set_var_ref(ctx, vref_var3, number_var5);
+    /*
+        At line 4:8
+        b = 3
+    */
+    tsn_set_pc(stackframe, 4, 8);
+    number_var6 = tsn_int32(ctx, 3);
+    tsn_set_var_ref(ctx, vref_var4, number_var6);
+    /*
+        At line 5:9
+        a * b + 1
+    */
+    tsn_set_pc(stackframe, 5, 9);
+    number_var7 = tsn_int32(ctx, 1);
+    /*
+        At line 5:9
+        a * b
+    */
+    number_var8 = tsn_load_var_ref(ctx, vref_var4);
+    if (tsn_is_exception(ctx, number_var8)) {
+        goto target_file_ts_computed_0_exception;
+    }
+    number_var9 = tsn_load_var_ref(ctx, vref_var3);
+    if (tsn_is_exception(ctx, number_var9)) {
+        goto target_file_ts_computed_0_exception;
+    }
+    number_var10 = tsn_op_mult(ctx, number_var9, number_var8);
+    number_var11 = tsn_op_add(ctx, number_var10, number_var7);
+    retval_var1 = number_var11;
+    goto target_file_ts_computed_1_return;
+    goto target_file_ts_computed_1_return;
+    target_file_ts_computed_0_exception:
+    object_var2 = tsn_exception(ctx);
+    retval_var1 = tsn_retain_inline(ctx, object_var2);
+    target_file_ts_computed_1_return:
+    tsn_release_inline(ctx, object_var2);
+    tsn_release_var_ref(ctx, vref_var4);
+    tsn_release_var_ref(ctx, vref_var3);
+    return retval_var1;
+}
+
+
+ // BEGIN MODULE DEFINITION 'file_ts'
+static const tsn_string_def file_ts_module_atoms[] =  {
+    {"computed", 8},
+};
+static const tsn_string_def file_ts_module_constants[] =  {
+};
+static tsn_value file_ts_create_module_func(tsn_vm *ctx) {
+    tsn_module *module;
+    module = tsn_new_module(ctx, 1, 0, 0);
+    tsn_assign_module_atoms(ctx, module, file_ts_module_atoms, 1);
+    tsn_assign_module_strings(ctx, module, file_ts_module_constants, 0);
+    tsn_value output;
+    output = tsn_new_module_init_fn(ctx, module, &file_ts__module_init__);
+    tsn_free_module(ctx, module);
+    return output;
+}
+
+__attribute__((constructor)) static void __do_register_module() {
+    tsn_register_module("file.ts", file_ts_create_module_func);
+}
+

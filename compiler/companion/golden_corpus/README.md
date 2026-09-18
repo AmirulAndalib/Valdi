@@ -9,7 +9,19 @@ silent emitter changes, most importantly from a TypeScript dependency bump.
 
 ## Layout
 - `fixtures/web/*.tsx` → compiled to web JS, golden `expected/web/<name>.js.golden`
-- `fixtures/native/*.ts` → compiled to native C, golden `expected/native/<name>.c.golden`
+- `fixtures/native/*.ts` → compiled to native C with all optimizations ON, golden
+  `expected/native/<name>.c.golden`; the same fixtures are also compiled with all
+  optimizations OFF into `expected/native/<name>.unopt.c.golden`, pinning the
+  unfolded EmitResolver/NativeCompiler path alongside the folded one.
+- `fixtures/error_typecheck/*.ts` → *invalid* input; the type-check diagnostics
+  (`getDiagnosticsSync`) are captured into `expected/error_typecheck/<name>.diag.golden`.
+- `fixtures/error_native/*.ts` → input the native lowering rejects; the thrown
+  `NativeCompilerError` message is captured into `expected/error_native/<name>.err.golden`.
+
+The error goldens pin the compiler's *diagnostics* (codes, wording, rejected
+constructs) — a surface a TypeScript bump changes independently of successful
+emit. A fixture that unexpectedly compiles produces an `UNEXPECTED: ...` golden,
+which flags that it belongs elsewhere.
 
 Goldens carry a `.golden` suffix so no language formatter (clang-format, eslint)
 rewrites these verbatim compiler outputs.
@@ -32,13 +44,14 @@ fixtures must type-check against `lib.es2015` alone — no external imports), th
 regenerate. The runner discovers fixtures automatically.
 
 ## Coverage gaps (help wanted)
-The seed corpus is intentionally small and does not yet exercise the whole
-emitter. Known gaps to fill with targeted fixtures:
-- The `NativeCompiler` C emitter has the lowest branch coverage of the emitters;
-  add native fixtures for the branches it misses (control flow, exceptions,
-  async, classes/inheritance, closures).
-- More `EmitResolver` constant-resolution cases (const enums, cross-const refs).
-- Broader web/JSX shapes (conditionals, lists, view models, attributes).
+The corpus still does not exercise the whole emitter. Remaining gaps to fill:
+- More `error_native` fixtures for other rejected constructs (only the `&&=`
+  operator is pinned today).
+- Web/JSX error goldens: `JSXProcessor.process()` throws on bad templates, but no
+  `error_web` fixtures exist yet (the runner hook can be added the same way).
+- More `EmitResolver` constant-resolution cases (const enums, cross-const refs,
+  bigint / template-literal folding).
+- Measuring the emitter's *real* branch coverage (needs an instrumented companion
+  invoked by the swift driver, not just reasoned-missing fixtures).
 
-Expanding the corpus is tracked as a follow-up alongside measuring the emitter's
-real coverage; see the TypeScript-upgrade plan.
+Expanding the corpus is tracked in the TypeScript-upgrade plan.
