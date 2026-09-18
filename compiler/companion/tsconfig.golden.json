@@ -4,5 +4,6 @@
     "types": ["node", "jest"]
   },
   "include": ["src/golden.spec.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
+  "references": [{ "path": "./tsconfig.bazel.json" }]
 }
