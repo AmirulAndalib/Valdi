@@ -88,10 +88,6 @@ bool ValdiRuntimeTweaks::enableTSNForModule(const StringBox& moduleName) const {
     return true;
 }
 
-bool ValdiRuntimeTweaks::shouldCrashOnANR() const {
-    return getConfigKey("VALDI_ENABLE_CRASH_ON_ANR");
-}
-
 bool ValdiRuntimeTweaks::disableAnimationRemoveOnCompleteIos() const {
     return getConfigKey("VALDI_DISABLE_ANIMATION_REMOVE_ON_COMPLETE_IOS");
 }

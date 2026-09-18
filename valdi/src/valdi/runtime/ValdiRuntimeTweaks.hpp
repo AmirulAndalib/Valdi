@@ -26,7 +26,6 @@ public:
     bool disableSyncCallsInCallingThread() const;
     bool enableTSN() const;
     bool enableTSNForModule(const StringBox& moduleName) const;
-    bool shouldCrashOnANR() const;
     bool disableAnimationRemoveOnCompleteIos() const;
     bool shouldNudgeJSThread() const;
     bool enableScopedContextStackTraceCapture() const;

@@ -105,20 +105,11 @@ public:
             _runtimeMessageHandler->onJsCrash(anr.getModuleName(), anr.getMessage(), stackTrace, true);
         }
 
-        if (_shouldCrashOnANR && !anr.hasRunningStacktrace()) {
-            return JavaScriptANRBehavior::CRASH;
-        } else {
-            return JavaScriptANRBehavior::KEEP_GOING;
-        }
-    }
-
-    void setShouldCrashOnANR(bool shouldCrashOnANR) {
-        _shouldCrashOnANR = shouldCrashOnANR;
+        return JavaScriptANRBehavior::KEEP_GOING;
     }
 
 private:
     Shared<snap::valdi::RuntimeMessageHandler> _runtimeMessageHandler;
-    std::atomic_bool _shouldCrashOnANR = false;
 };
 
 RuntimeManager::RuntimeManager(const Ref<IMainThreadDispatcher>& mainThreadDispatcher,
@@ -639,11 +630,6 @@ void RuntimeManager::setTweakValueProvider(const Shared<ITweakValueProvider>& tw
         runtimes = getAllRuntimes(guard);
     }
 
-    auto anrDetectorListener = castOrNull<ANRDetectorListener>(_anrDetector->getListener());
-
-    if (anrDetectorListener != nullptr) {
-        anrDetectorListener->setShouldCrashOnANR(runtimeTweaks != nullptr ? runtimeTweaks->shouldCrashOnANR() : false);
-    }
     _anrDetector->setNudgeEnabled(runtimeTweaks != nullptr ? runtimeTweaks->shouldNudgeJSThread() : false);
 
     YGConfigSetExperimentalFeatureEnabled(_yogaConfig.get(),
