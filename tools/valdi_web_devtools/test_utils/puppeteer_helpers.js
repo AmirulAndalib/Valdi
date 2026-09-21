@@ -69,9 +69,12 @@ function createErrorCollector(page) {
   
   return {
     getErrors: () => errors,
-    getRealErrors: () => errors.filter(e => 
-      !e.includes('favicon.ico') && 
-      !e.includes('Failed to load resource: the server responded with a status of 404')
+    getRealErrors: () => errors.filter(e =>
+      !e.includes('favicon.ico') &&
+      !e.includes('Failed to load resource: the server responded with a status of 404') &&
+      // Benign browser notice fired when a ResizeObserver callback schedules more layout
+      // work; not an app error. Chrome surfaces it as an uncaught error in headless runs.
+      !e.includes('ResizeObserver loop')
     ),
   };
 }
