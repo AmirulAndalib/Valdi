@@ -291,6 +291,20 @@ class AsyncValdiRuntimeTests: XCTestCase {
         }
         wait(for: [coldCompletion], timeout: 1.0)
 
+        // Block the ValdiActor executor so the warm completion, which dispatches through the
+        // actor, cannot outrace the inline-vs-async read below. Without this the actor-queue task
+        // can set didComplete before the main thread reads it, spuriously failing under CI load.
+        // Same flake class as AssetsManager.failsConsumerOnResolveFail (public Valdi commit
+        // 37a61e2ce60d5000d59e96772c3b1b5aa7d4a413); surfaced by the "macOS: C++ & Platform Tests"
+        // job on Snapchat/Valdi main. Mirrors testWarmRuntimeAccessorDoesNotRequireActor.
+        let actorBlocked = self.expectation(description: "Actor executor blocked")
+        let unblock = DispatchSemaphore(value: 0)
+        Task { @ValdiActor in
+            actorBlocked.fulfill()
+            unblock.wait()
+        }
+        wait(for: [actorBlocked], timeout: 1.0)
+
         let warmCompletion = self.expectation(description: "Warm callback called")
         let lock = NSLock()
         var didComplete = false
@@ -307,6 +321,8 @@ class AsyncValdiRuntimeTests: XCTestCase {
             return didComplete
         }()
         XCTAssertFalse(completedInline)
+
+        unblock.signal()
         wait(for: [warmCompletion], timeout: 1.0)
     }
 }
