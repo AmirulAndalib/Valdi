@@ -23,7 +23,8 @@ class FontManager(val context: Context, private val typefaceResLoader: TypefaceR
          */
         fun onTypefaceRegistered(descriptor: FontDescriptor,
                                  isFallback: Boolean,
-                                 dataProvider: FontDataProvider)
+                                 dataProvider: FontDataProvider,
+                                 registerImmediatelyWithSnapDrawing: Boolean)
     }
 
     interface ModuleTypefaceDataProvider {
@@ -193,7 +194,8 @@ class FontManager(val context: Context, private val typefaceResLoader: TypefaceR
     fun loadSyncAndRegister(fontDescriptor: FontDescriptor,
                             context: Context,
                             resId: Int,
-                            isFallback: Boolean = false) {
+                            isFallback: Boolean = false,
+                            registerImmediatelyWithSnapDrawing: Boolean = false) {
         val fontLoader = object: FontLoader {
             override fun load(completion: LoadCompletion<Typeface>) {
                 val typeface = try {
@@ -222,7 +224,13 @@ class FontManager(val context: Context, private val typefaceResLoader: TypefaceR
             }
         }
 
-        registerWithDataProvider(fontDescriptor, fontDataProvider, fontLoader, isFallback)
+        registerWithDataProvider(
+            fontDescriptor,
+            fontDataProvider,
+            fontLoader,
+            isFallback,
+            registerImmediatelyWithSnapDrawing,
+        )
     }
 
     /**
@@ -252,9 +260,15 @@ class FontManager(val context: Context, private val typefaceResLoader: TypefaceR
     fun registerWithDataProvider(fontDescriptor: FontDescriptor,
                                  fontDataProvider: FontDataProvider?,
                                  fontLoader: FontLoader?,
-                                 isFallback: Boolean) {
+                                 isFallback: Boolean,
+                                 registerImmediatelyWithSnapDrawing: Boolean = false) {
         if (fontDataProvider != null) {
-            listener?.onTypefaceRegistered(fontDescriptor, isFallback, fontDataProvider)
+            listener?.onTypefaceRegistered(
+                fontDescriptor,
+                isFallback,
+                fontDataProvider,
+                registerImmediatelyWithSnapDrawing,
+            )
         }
 
         if (fontLoader != null) {

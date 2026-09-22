@@ -201,6 +201,7 @@ class ValdiRuntimeManager(context: Context,
     private val snapDrawingRenderBackendPrepared = AtomicBoolean(false)
     private val androidRenderBackendPrepared = AtomicBoolean(false)
     private val pendingRegisterFontsOperation = mutableListOf<Runnable>()
+    private val pendingImmediateRegisterFontsOperation = mutableListOf<Runnable>()
 
     private var runtimeStartupSpan: AsyncSpan? = null
 
@@ -439,6 +440,9 @@ class ValdiRuntimeManager(context: Context,
 
         if (useSnapDrawing) {
             synchronized(pendingRegisterFontsOperation) {
+                while (pendingImmediateRegisterFontsOperation.isNotEmpty()) {
+                    enqueueLoadOperation(pendingImmediateRegisterFontsOperation.removeAt(pendingImmediateRegisterFontsOperation.size - 1))
+                }
                 while (pendingRegisterFontsOperation.isNotEmpty()) {
                     enqueueLoadOperation(pendingRegisterFontsOperation.removeAt(pendingRegisterFontsOperation.size - 1))
                 }
@@ -449,6 +453,7 @@ class ValdiRuntimeManager(context: Context,
     fun ensureSnapDrawingReady() {
         flushPendingLoadOperations()
         prepareRenderBackend(RenderBackend.SNAP_DRAWING, PreloadingMode.DISABLED)
+        flushPendingLoadOperations()
     }
 
     private fun preloadSnapDrawing() {
@@ -875,8 +880,18 @@ class ValdiRuntimeManager(context: Context,
         }
     }
 
-    override fun onTypefaceRegistered(descriptor: FontDescriptor, isFallback: Boolean, dataProvider: FontDataProvider) {
+    override fun onTypefaceRegistered(
+        descriptor: FontDescriptor,
+        isFallback: Boolean,
+        dataProvider: FontDataProvider,
+        registerImmediatelyWithSnapDrawing: Boolean,
+    ) {
         val registerFontOperation = makeRegisterFontOperation(descriptor, isFallback, dataProvider)
+
+        if (registerImmediatelyWithSnapDrawing && snapDrawingRuntime != null) {
+            registerFontOperation.run()
+            return
+        }
 
         synchronized(pendingRegisterFontsOperation) {
             if (snapDrawingRenderBackendPrepared.get()) {
@@ -885,7 +900,11 @@ class ValdiRuntimeManager(context: Context,
                 enqueueLoadOperation(registerFontOperation)
             } else {
                 // Otherwise, we wait until prepare() is called for SnapDrawing
-                pendingRegisterFontsOperation.add(registerFontOperation)
+                if (registerImmediatelyWithSnapDrawing) {
+                    pendingImmediateRegisterFontsOperation.add(registerFontOperation)
+                } else {
+                    pendingRegisterFontsOperation.add(registerFontOperation)
+                }
             }
         }
     }
