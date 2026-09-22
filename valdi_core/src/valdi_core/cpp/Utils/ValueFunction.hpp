@@ -54,6 +54,23 @@ enum ValueFunctionFlags : uint8_t {
      is optional, such as touch event delivery.
      */
     ValueFunctionFlagsBoundedMainThreadSync = 1 << 4,
+    /**
+     For deadline-bounded calls: once the deadline has passed, the queued call may be
+     skipped instead of run late. Only meaningful for callers whose sole interest is the
+     return value, such as hit test and gesture predicates. Maps to
+     SyncCallTimeoutPolicy::SkipIfTimedOut for callers that pass flags as an integer.
+     */
+    ValueFunctionFlagsSkipIfTimedOut = 1 << 5,
+};
+
+/**
+ What happens to a deadline-bounded sync call whose deadline passed before it ran.
+ */
+enum class SyncCallTimeoutPolicy : uint8_t {
+    /** The call still runs when its thread gets to it; only the return value is dropped. */
+    RunLate,
+    /** The call is skipped: nobody is waiting for its result and it has no side effects worth running late. */
+    SkipIfTimedOut,
 };
 
 class ValueFunctionCallContext {
@@ -189,6 +206,9 @@ public:
      Try to call the function synchronously and get the result. But if the
      deadline is exceeded before the function is completed, drop the call and
      return an error.  This function implies `ValueFunctionFlagsCallSync`.
+     While an earlier bounded call is still overdue on the same thread, the
+     function fails fast without waiting at all. `timeoutPolicy` decides
+     whether a call that timed out still runs late (the default) or is skipped.
 
      The deadline is not implemented by all function types, but it is
      implemented by JS functions.
@@ -196,9 +216,10 @@ public:
     template<class R, class P>
     Result<Value> callSyncWithDeadline(const std::chrono::duration<R, P>& maxDispatchDelay,
                                        Value* parameters,
-                                       size_t size) noexcept {
+                                       size_t size,
+                                       SyncCallTimeoutPolicy timeoutPolicy = SyncCallTimeoutPolicy::RunLate) noexcept {
         auto deadline = std::chrono::steady_clock::now() + maxDispatchDelay;
-        return callSyncWithDeadline(deadline, parameters, size);
+        return callSyncWithDeadline(deadline, parameters, size, timeoutPolicy);
     }
 
     StringBox getDebugDescription() const;
@@ -206,7 +227,8 @@ public:
 protected:
     virtual Result<Value> callSyncWithDeadline(const std::chrono::steady_clock::time_point& deadline,
                                                Value* parameters,
-                                               size_t size) noexcept {
+                                               size_t size,
+                                               SyncCallTimeoutPolicy timeoutPolicy) noexcept {
         return call(ValueFunctionFlags::ValueFunctionFlagsCallSync, parameters, size);
     }
 };

@@ -41,7 +41,7 @@ static BOOL SCValdiCallTouchPredicate(UIGestureRecognizer *gestureRecognizer, id
                                              [gestureRecognizer locationInView:gestureRecognizer.view],
                                              gestureRecognizer.state,
                                              SCValdiGetPointerDataFromGestureRecognizer(gestureRecognizer));
-    return SCValdiCallPredicateWithEvent(predicate, gestureRecognizer.view, tapEvent, "touch_predicate");
+    return SCValdiTouchesCallPredicateWithEvent(predicate, gestureRecognizer.view, tapEvent, "touch_predicate");
 }
 
 static void SCValdiHandleTouchEvent(UIView *view,
@@ -457,7 +457,7 @@ Valdi::Value SCValdiMakeDragEvent(UIPanGestureRecognizer *gestureRecognizer) {
     }
 
     auto event = SCValdiMakeDragEvent(self);
-    return SCValdiCallPredicateWithEvent(_predicate, self.view, event, "drag_should_begin");
+    return SCValdiTouchesCallPredicateWithEvent(_predicate, self.view, event, "drag_should_begin");
 }
 
 - (void)_handleGestureRecognizer:(id)sender
@@ -572,7 +572,7 @@ Valdi::Value SCValdiMakePinchEvent(UIPinchGestureRecognizer *gestureRecognizer) 
     }
 
     auto event = SCValdiMakePinchEvent(self);
-    return SCValdiCallPredicateWithEvent(_predicate, self.view, event, "pinch_should_begin");
+    return SCValdiTouchesCallPredicateWithEvent(_predicate, self.view, event, "pinch_should_begin");
 }
 
 - (void)_handleGestureRecognizer:(id)sender
@@ -676,7 +676,7 @@ Valdi::Value SCValdiMakeRotationEvent(UIRotationGestureRecognizer *gestureRecogn
     }
 
     auto event = SCValdiMakeRotationEvent(self);
-    return SCValdiCallPredicateWithEvent(_predicate, self.view, event, "rotate_should_begin");
+    return SCValdiTouchesCallPredicateWithEvent(_predicate, self.view, event, "rotate_should_begin");
 }
 
 - (void)_handleGestureRecognizer:(id)sender

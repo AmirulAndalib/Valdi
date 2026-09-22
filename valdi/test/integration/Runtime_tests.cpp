@@ -19,6 +19,7 @@
 #include "valdi/runtime/Runtime.hpp"
 #include "valdi/runtime/ValdiRuntimeTweaks.hpp"
 #include "valdi_core/cpp/Attributes/TextAttributeValue.hpp"
+#include "valdi_core/cpp/Constants.hpp"
 #include "valdi_core/cpp/JavaScript/ModuleFactoryRegistry.hpp"
 #include "valdi_core/cpp/Schema/ValueSchemaRegistry.hpp"
 #include "valdi_core/cpp/Schema/ValueSchemaTypeResolver.hpp"
@@ -6987,6 +6988,154 @@ TEST_P(RuntimeFixture, jsFunctionReportsOwnerTearingDownAndSkipsSyncCallAfterRun
     ASSERT_TRUE(skippedResult.value().isUndefined());
 }
 
+namespace {
+struct DeadlineCircuitBreakerDisabledScope {
+    DeadlineCircuitBreakerDisabledScope() {
+        ValueFunctionWithJSValue::setDeadlineCircuitBreakerDisabled(true);
+    }
+    ~DeadlineCircuitBreakerDisabledScope() {
+        ValueFunctionWithJSValue::setDeadlineCircuitBreakerDisabled(false);
+    }
+};
+
+// Parks the JS thread until the returned promise is fulfilled.
+std::promise<void> stallJsThread(RuntimeWrapper& wrapper) {
+    std::promise<void> release;
+    auto released = release.get_future().share();
+    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThreadAsync(
+        nullptr, [released](auto& /*jsEntry*/) { released.wait(); });
+    return release;
+}
+
+// test/src/NativeModule's countSyncCall: returns how many times it has run, so a call that was
+// skipped after its deadline is distinguishable from one that ran late.
+Result<Ref<ValueFunction>> getCountSyncCallFunction(RuntimeWrapper& wrapper) {
+    return getJsModulePropertyAsUntypedFunction(wrapper.runtime, nullptr, "test/src/NativeModule", "countSyncCall");
+}
+
+double countSyncCalls(const Ref<ValueFunction>& function) {
+    auto result = function->callSyncWithDeadline(std::chrono::seconds(10), nullptr, 0);
+    EXPECT_TRUE(result) << result.description();
+    return result ? result.value().toDouble() : -1.0;
+}
+} // namespace
+
+// A deadline-bounded call whose JS thread is stalled must (1) time out, (2) make later bounded
+// calls fail without waiting while the timed-out call is still queued, and (3) with
+// SkipIfTimedOut, skip the abandoned calls when the JS thread finally drains, so a burst of
+// dropped input does not turn into a backlog of stale JS work. Regression coverage for the
+// PREVIEW-32262 shape: per-call deadlines held while the aggregate wait across a touch burst
+// exceeded the ANR threshold.
+TEST_P(RuntimeFixture, callSyncWithDeadlineFailsFastAndSkipsAbandonedCallsWhileJsThreadIsStalled) {
+    auto fnResult = getCountSyncCallFunction(wrapper);
+    ASSERT_TRUE(fnResult) << fnResult.description();
+    auto function = fnResult.value();
+    ASSERT_EQ(1.0, countSyncCalls(function));
+
+    auto release = stallJsThread(wrapper);
+
+    auto timedOut = function->callSyncWithDeadline(
+        std::chrono::milliseconds(50), nullptr, 0, SyncCallTimeoutPolicy::SkipIfTimedOut);
+    ASSERT_FALSE(timedOut);
+
+    // A generous deadline that must not be waited for: the breaker is open.
+    auto fastFailStart = std::chrono::steady_clock::now();
+    auto failedFast =
+        function->callSyncWithDeadline(std::chrono::seconds(10), nullptr, 0, SyncCallTimeoutPolicy::SkipIfTimedOut);
+    ASSERT_FALSE(failedFast);
+    ASSERT_LT(std::chrono::steady_clock::now() - fastFailStart, std::chrono::seconds(5));
+
+    release.set_value();
+    wrapper.flushJsQueue();
+
+    // Neither the abandoned nor the fast-failed call ran, and the JS thread is trusted again.
+    ASSERT_EQ(2.0, countSyncCalls(function));
+}
+
+// The default policy keeps the original contract: a call that timed out, and a call that failed
+// fast behind it, both still run once the JS thread drains. Only their return values are lost.
+TEST_P(RuntimeFixture, callSyncWithDeadlineRunsTimedOutCallsLateByDefault) {
+    auto fnResult = getCountSyncCallFunction(wrapper);
+    ASSERT_TRUE(fnResult) << fnResult.description();
+    auto function = fnResult.value();
+    ASSERT_EQ(1.0, countSyncCalls(function));
+
+    auto release = stallJsThread(wrapper);
+
+    ASSERT_FALSE(function->callSyncWithDeadline(std::chrono::milliseconds(50), nullptr, 0));
+
+    auto fastFailStart = std::chrono::steady_clock::now();
+    ASSERT_FALSE(function->callSyncWithDeadline(std::chrono::seconds(10), nullptr, 0));
+    ASSERT_LT(std::chrono::steady_clock::now() - fastFailStart, std::chrono::seconds(5));
+
+    release.set_value();
+    wrapper.flushJsQueue();
+
+    // Both queued calls ran late, so this is the fourth execution.
+    ASSERT_EQ(4.0, countSyncCalls(function));
+}
+
+// The bounded main-thread action arm (handlers exported with makeMainThreadCallback and called
+// with ValueFunctionFlagsBoundedMainThreadSync) fails fast like a predicate but must never drop a
+// side effect: every call still reaches JS.
+TEST_P(RuntimeFixture, boundedMainThreadSyncCallsFailFastButStillRunWhileJsThreadIsStalled) {
+    ASSERT_TRUE(wrapper.runtime->getMainThreadManager().currentThreadIsMainThread());
+
+    auto fnResult = getCountSyncCallFunction(wrapper);
+    ASSERT_TRUE(fnResult) << fnResult.description();
+    auto function = fnResult.value();
+    auto* jsFunction = dynamic_cast<ValueFunctionWithJSValue*>(function.get());
+    ASSERT_NE(nullptr, jsFunction);
+    jsFunction->setShouldBlockMainThread(true);
+    ASSERT_EQ(1.0, countSyncCalls(function));
+
+    auto release = stallJsThread(wrapper);
+
+    // First call parks for kInputSyncCallDeadline and gives up; the second must not wait.
+    auto first = function->call(ValueFunctionFlagsBoundedMainThreadSync, nullptr, 0);
+    ASSERT_TRUE(first) << first.description();
+    ASSERT_TRUE(first.value().isUndefined());
+
+    auto fastFailStart = std::chrono::steady_clock::now();
+    auto second = function->call(ValueFunctionFlagsBoundedMainThreadSync, nullptr, 0);
+    ASSERT_TRUE(second) << second.description();
+    ASSERT_TRUE(second.value().isUndefined());
+    ASSERT_LT(std::chrono::steady_clock::now() - fastFailStart, kInputSyncCallDeadline);
+
+    release.set_value();
+    wrapper.flushJsQueue();
+
+    // Both bounded calls ran despite being given up on.
+    ASSERT_EQ(4.0, countSyncCalls(function));
+}
+
+// With the killswitch on, the pre-breaker path is used unchanged: every bounded call waits its
+// own full deadline and every timed-out call runs late, whatever the policy says.
+TEST_P(RuntimeFixture, callSyncWithDeadlineWaitsFullDeadlineWhenCircuitBreakerDisabled) {
+    DeadlineCircuitBreakerDisabledScope breakerDisabled;
+
+    auto fnResult = getCountSyncCallFunction(wrapper);
+    ASSERT_TRUE(fnResult) << fnResult.description();
+    auto function = fnResult.value();
+    ASSERT_EQ(1.0, countSyncCalls(function));
+
+    auto release = stallJsThread(wrapper);
+
+    ASSERT_FALSE(function->callSyncWithDeadline(
+        std::chrono::milliseconds(20), nullptr, 0, SyncCallTimeoutPolicy::SkipIfTimedOut));
+
+    const auto secondDeadline = std::chrono::milliseconds(100);
+    auto secondStart = std::chrono::steady_clock::now();
+    ASSERT_FALSE(function->callSyncWithDeadline(secondDeadline, nullptr, 0, SyncCallTimeoutPolicy::SkipIfTimedOut));
+    ASSERT_GE(std::chrono::steady_clock::now() - secondStart, secondDeadline);
+
+    release.set_value();
+    wrapper.flushJsQueue();
+
+    // Both timed-out calls ran late.
+    ASSERT_EQ(4.0, countSyncCalls(function));
+}
+
 // The teardown case (resolving after the runtime is disposed reports the distinguishable
 // kResolutionSkippedDuringTeardownErrorCode) is covered end-to-end by the iOS
 // SCValdiJSRuntimeModuleErrorTests teardown regression, which induces disposal on the correct
@@ -9660,9 +9809,9 @@ TEST_P(RuntimeFixture, recordsTraceSpanTagForANRAttribution) {
 TEST(JavaScriptRuntimeANRAttribution, traceSpanNameKeepsStaticPrefixOnly) {
     EXPECT_EQ(STRING_LITERAL("renderComponent.SendToRecipientList"),
               JavaScriptRuntime::anrNativeCallNameForTraceSpan(STRING_LITERAL("renderComponent.SendToRecipientList")));
-    EXPECT_EQ(STRING_LITERAL("DatabaseSync - Save Sync Token"),
-              JavaScriptRuntime::anrNativeCallNameForTraceSpan(
-                  STRING_LITERAL("DatabaseSync - Save Sync Token: client-a")));
+    EXPECT_EQ(
+        STRING_LITERAL("DatabaseSync - Save Sync Token"),
+        JavaScriptRuntime::anrNativeCallNameForTraceSpan(STRING_LITERAL("DatabaseSync - Save Sync Token: client-a")));
     EXPECT_TRUE(JavaScriptRuntime::anrNativeCallNameForTraceSpan(STRING_LITERAL(": dynamic-only")).isEmpty());
     EXPECT_EQ(128u,
               JavaScriptRuntime::anrNativeCallNameForTraceSpan(StringBox::fromString(std::string(200, 'x'))).length());

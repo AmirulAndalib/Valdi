@@ -578,6 +578,7 @@ Result<Void> JavaScriptRuntime::initializeContext() {
     if (runtimeTweaks != nullptr) {
         Context::setDestroyedContextFixEnabled(runtimeTweaks->enableRenderRequestContextFix());
         MainThreadManager::setPreRasterFenceDisabled(runtimeTweaks->disablePreRasterFence());
+        ValueFunctionWithJSValue::setDeadlineCircuitBreakerDisabled(runtimeTweaks->disableSyncDeadlineCircuitBreaker());
     }
 
     VALDI_INFO(*_logger, "Creating JSContext from engine '{}'", _javaScriptBridge.getName());

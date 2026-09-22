@@ -33,7 +33,7 @@ object HitTestUtils {
                 0
             )
 
-            val hasValue = jsHitTest.performSyncWithTimeout(marshaller, false, HIT_TEST_TIMEOUT_MS)
+            val hasValue = jsHitTest.performSyncWithTimeout(marshaller, false, HIT_TEST_TIMEOUT_MS, skipIfTimedOut = true)
             if (hasValue) {
                 marshaller.getBoolean(-1)
             } else {

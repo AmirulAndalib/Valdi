@@ -33,7 +33,7 @@ object PredicateUtils {
 
             val disableDeadline = ViewUtils.findValdiContext(gesture.view)?.runtimeOrNull?.manager?.tweaks?.disableHitTestSyncDeadline == true
             val hasValue = if (timeoutMs != null && !disableDeadline) {
-                predicate.performSyncWithTimeout(it, false, timeoutMs)
+                predicate.performSyncWithTimeout(it, false, timeoutMs, skipIfTimedOut = true)
             } else {
                 predicate.performSync(it, false)
             }

@@ -49,6 +49,9 @@ public:
     bool joinJsThreadOnTeardown() const;
     bool applyManagedChildFramePadding() const;
     bool disableHitTestSyncDeadline() const;
+    // Killswitch for failing deadline-bounded sync JS calls fast while an earlier one is still
+    // overdue (ValueFunctionWithJSValue). Off restores one full deadline wait per call.
+    bool disableSyncDeadlineCircuitBreaker() const;
     // True when VALDI_MAX_VIEW_OPERATIONS_PROCESSING_TIME > 0 (throttling enabled). Gates top-down move order in TS.
     bool useTopDownMoveOrder() const;
     bool enableMmapModuleArchives() const;

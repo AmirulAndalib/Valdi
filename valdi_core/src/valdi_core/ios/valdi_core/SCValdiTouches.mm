@@ -7,15 +7,16 @@
 //
 
 #import "valdi_core/SCValdiTouches.h"
+#import "valdi_core/SCValdiError.h"
+#import "valdi_core/SCValdiFunctionWithCPPFunction+CPP.h"
+#import "valdi_core/SCValdiMarshaller+CPP.h"
+#import "valdi_core/SCValdiValueUtils.h"
 #import "valdi_core/cpp/Constants.hpp"
 #import "valdi_core/cpp/Events/TouchEvents.hpp"
-#import "valdi_core/SCValdiFunctionWithCPPFunction+CPP.h"
-#import "valdi_core/SCValdiValueUtils.h"
-#import "valdi_core/SCValdiMarshaller+CPP.h"
-#import "valdi_core/SCValdiError.h"
 
-BOOL SCValdiCallActionWithEvent(id<SCValdiFunction> action, const Valdi::Value &event, Valdi::ValueFunctionFlags flags)
-{
+BOOL SCValdiCallActionWithEvent(id<SCValdiFunction> action,
+                                const Valdi::Value& event,
+                                Valdi::ValueFunctionFlags flags) {
     Valdi::SimpleExceptionTracker exceptionTracker;
     Valdi::Marshaller params(exceptionTracker);
     params.push(event);
@@ -25,7 +26,7 @@ BOOL SCValdiCallActionWithEvent(id<SCValdiFunction> action, const Valdi::Value &
     if ([action respondsToSelector:@selector(performWithMarshaller:flags:)]) {
         // Bypass ObjC conversion if the action is implemented by C++
 
-        hasResult = [(SCValdiFunctionWithCPPFunction *)action performWithMarshaller:params flags:flags];
+        hasResult = [(SCValdiFunctionWithCPPFunction*)action performWithMarshaller:params flags:flags];
     } else {
         SCValdiMarshallerRef marshaller = SCValdiMarshallerWrap(&params);
         hasResult = [action performWithMarshaller:marshaller];
@@ -39,15 +40,14 @@ BOOL SCValdiCallActionWithEvent(id<SCValdiFunction> action, const Valdi::Value &
     return ret;
 }
 
-BOOL SCValdiForwardTouchAndCallAction(UIView *view,
-                                                UIEvent *uiEvent,
-                                                SCValdiGestureType gestureType,
-                                                UIGestureRecognizerState state,
-                                                id<SCValdiFunction> action,
-                                                const Valdi::Value &event,
-                                                Valdi::ValueFunctionFlags flags)
-{
-    BOOL result =  SCValdiCallActionWithEvent(action, event, flags);
+BOOL SCValdiForwardTouchAndCallAction(UIView* view,
+                                      UIEvent* uiEvent,
+                                      SCValdiGestureType gestureType,
+                                      UIGestureRecognizerState state,
+                                      id<SCValdiFunction> action,
+                                      const Valdi::Value& event,
+                                      Valdi::ValueFunctionFlags flags) {
+    BOOL result = SCValdiCallActionWithEvent(action, event, flags);
 
     if (uiEvent) {
         id<SCValdiGestureListener> gestureListener = view.valdiContext.gestureListener;
@@ -59,8 +59,7 @@ BOOL SCValdiForwardTouchAndCallAction(UIView *view,
     return result;
 }
 
-Valdi::TouchEventState SCValdiMakeTouchState(UIGestureRecognizerState state)
-{
+Valdi::TouchEventState SCValdiMakeTouchState(UIGestureRecognizerState state) {
     switch (state) {
         case UIGestureRecognizerStateBegan:
             return Valdi::TouchEventStateStarted;
@@ -75,8 +74,7 @@ Valdi::TouchEventState SCValdiMakeTouchState(UIGestureRecognizerState state)
     }
 }
 
-SCValdiGestureLocation SCValdiGetGestureLocation(UIView *view, CGPoint gestureLocation)
-{
+SCValdiGestureLocation SCValdiGetGestureLocation(UIView* view, CGPoint gestureLocation) {
     SCValdiGestureLocation location;
     location.relative = gestureLocation;
     location.absolute = gestureLocation;
@@ -91,8 +89,7 @@ SCValdiGestureLocation SCValdiGetGestureLocation(UIView *view, CGPoint gestureLo
     return location;
 }
 
-Valdi::ValueFunctionFlags SCValdiGetCallFlags(UIView *view, UIGestureRecognizerState gestureState)
-{
+Valdi::ValueFunctionFlags SCValdiGetCallFlags(UIView* view, UIGestureRecognizerState gestureState) {
     if (gestureState == UIGestureRecognizerStateChanged) {
         return Valdi::ValueFunctionFlagsAllowThrottling;
     }
@@ -108,25 +105,31 @@ Valdi::ValueFunctionFlags SCValdiGetCallFlags(UIView *view, UIGestureRecognizerS
     return Valdi::ValueFunctionFlagsBoundedMainThreadSync;
 }
 
-Valdi::Value SCValdiMakeTouchEvent(UIView *view, CGPoint gestureLocation, UIGestureRecognizerState gestureState, Valdi::TouchEvents::PointerLocations pointerLocations)
-{
+Valdi::Value SCValdiMakeTouchEvent(UIView* view,
+                                   CGPoint gestureLocation,
+                                   UIGestureRecognizerState gestureState,
+                                   Valdi::TouchEvents::PointerLocations pointerLocations) {
     auto state = SCValdiMakeTouchState(gestureState);
 
     SCValdiGestureLocation location = SCValdiGetGestureLocation(view, gestureLocation);
 
-    return Valdi::TouchEvents::makeTapEvent(state, location.relative.x, location.relative.y, location.absolute.x, location.absolute.y, pointerLocations.size(), pointerLocations);
+    return Valdi::TouchEvents::makeTapEvent(state,
+                                            location.relative.x,
+                                            location.relative.y,
+                                            location.absolute.x,
+                                            location.absolute.y,
+                                            pointerLocations.size(),
+                                            pointerLocations);
 }
 
-Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromEvent(UIEvent *uiEvent)
-{
+Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromEvent(UIEvent* uiEvent) {
     Valdi::TouchEvents::PointerLocations pointerLocations;
 
-    // we filter out historical touches - touches in UITouchPhaseCancelled/UITouchPhaseEnded, as they aren't active pointers
-    for (UITouch *touch in [uiEvent allTouches]) {
-        if (touch.phase == UITouchPhaseBegan ||
-               touch.phase == UITouchPhaseMoved ||
-               touch.phase == UITouchPhaseStationary
-            ) {
+    // we filter out historical touches - touches in UITouchPhaseCancelled/UITouchPhaseEnded, as they aren't active
+    // pointers
+    for (UITouch* touch in [uiEvent allTouches]) {
+        if (touch.phase == UITouchPhaseBegan || touch.phase == UITouchPhaseMoved ||
+            touch.phase == UITouchPhaseStationary) {
             CGPoint location = [touch locationInView:touch.view];
             // use memory address of the touch as an unique ID - they are stable across a continous touch event
             pointerLocations.emplace_back(Valdi::TouchEvents::PointerData(location.x, location.y, (uintptr_t)touch));
@@ -136,8 +139,8 @@ Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromEvent(UIEvent *uiE
     return pointerLocations;
 }
 
- Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromGestureRecognizer(UIGestureRecognizer *gestureRecognizer)
- {
+Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromGestureRecognizer(
+    UIGestureRecognizer* gestureRecognizer) {
     Valdi::TouchEvents::PointerLocations pointerLocations;
 
     NSUInteger numTouches = [gestureRecognizer numberOfTouches];
@@ -150,24 +153,25 @@ Valdi::TouchEvents::PointerLocations SCValdiGetPointerDataFromEvent(UIEvent *uiE
     }
 
     return pointerLocations;
-
 }
 
-BOOL SCValdiCallPredicateWithEvent(id<SCValdiFunction> predicate,
-                                   UIView *view,
-                                   const Valdi::Value &event,
-                                   const char *callContext)
-{
+BOOL SCValdiTouchesCallPredicateWithEvent(id<SCValdiFunction> predicate,
+                                   UIView* view,
+                                   const Valdi::Value& event,
+                                   const char* callContext) {
     if ([predicate respondsToSelector:@selector(performWithMarshaller:flags:)]) {
         // Use callSyncWithDeadline instead of dispatch_sync to prevent the main thread from
         // blocking indefinitely when the JS queue is busy. On timeout, returning NO safely
         // drops the hit test or gesture begin. VALDI_DISABLE_HIT_TEST_SYNC_DEADLINE reverts
         // to the legacy path.
         if (!view.valdiContext.disableHitTestSyncDeadline) {
-            const auto& fn = [(SCValdiFunctionWithCPPFunction *)predicate getFunction];
+            const auto& fn = [(SCValdiFunctionWithCPPFunction*)predicate getFunction];
 
-            Valdi::Value params[] = { event };
-            auto result = fn->callSyncWithDeadline(Valdi::kInputSyncCallDeadline, params, 1);
+            Valdi::Value params[] = {event};
+            // Nobody consumes a predicate's answer once the deadline has passed, so let the runtime
+            // skip it rather than run it late behind the stall that made it time out.
+            auto result = fn->callSyncWithDeadline(
+                Valdi::kInputSyncCallDeadline, params, 1, Valdi::SyncCallTimeoutPolicy::SkipIfTimedOut);
             return result.success() ? result.value().toBool() : NO;
         }
     }
@@ -176,9 +180,12 @@ BOOL SCValdiCallPredicateWithEvent(id<SCValdiFunction> predicate,
     return SCValdiCallActionWithEvent(predicate, event, Valdi::ValueFunctionFlagsCallSync);
 }
 
-BOOL SCValdiCallHitTestActionWithUIEventAndView(id<SCValdiFunction> action, CGPoint location, UIEvent* uiEvent, UIView* view)
-{
-    auto event = SCValdiMakeTouchEvent(view, location, UIGestureRecognizerStatePossible, SCValdiGetPointerDataFromEvent(uiEvent));
+BOOL SCValdiCallHitTestActionWithUIEventAndView(id<SCValdiFunction> action,
+                                                CGPoint location,
+                                                UIEvent* uiEvent,
+                                                UIView* view) {
+    auto event = SCValdiMakeTouchEvent(
+        view, location, UIGestureRecognizerStatePossible, SCValdiGetPointerDataFromEvent(uiEvent));
 
-    return SCValdiCallPredicateWithEvent(action, view, event, "hit_test");
+    return SCValdiTouchesCallPredicateWithEvent(action, view, event, "hit_test");
 }

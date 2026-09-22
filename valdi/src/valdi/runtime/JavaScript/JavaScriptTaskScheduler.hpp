@@ -13,6 +13,7 @@
 #include "valdi_core/cpp/Utils/Function.hpp"
 #include "valdi_core/cpp/Utils/Shared.hpp"
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -109,6 +110,35 @@ public:
     virtual StringBox getCurrentlyLoadingModule() const {
         return {};
     }
+
+    /**
+     Bookkeeping for deadline-bounded sync calls into this scheduler's JS thread (see
+     ValueFunctionWithJSValue::dispatchAndWaitOnJsThread). A call that timed out while its task
+     is still queued is "overdue". While any call is overdue the JS thread is provably not keeping
+     up, so further bounded calls fail fast instead of each parking the caller for a full deadline.
+     The overdue count only drops when the JS thread finally runs the task, which is the only
+     evidence that it is responsive again.
+     */
+    bool hasOverdueDeadlineCalls() const {
+        return _overdueDeadlineCalls.load(std::memory_order_acquire) > 0;
+    }
+    void onDeadlineCallTimedOut() {
+        _overdueDeadlineCalls.fetch_add(1, std::memory_order_acq_rel);
+    }
+    /** Returns the number of calls still overdue. */
+    uint32_t onOverdueDeadlineCallCompleted() {
+        return _overdueDeadlineCalls.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    }
+    void onDeadlineCallFailedFast() {
+        _fastFailedDeadlineCalls.fetch_add(1, std::memory_order_relaxed);
+    }
+    uint32_t takeFastFailedDeadlineCalls() {
+        return _fastFailedDeadlineCalls.exchange(0, std::memory_order_relaxed);
+    }
+
+private:
+    std::atomic<uint32_t> _overdueDeadlineCalls{0};
+    std::atomic<uint32_t> _fastFailedDeadlineCalls{0};
 };
 
 } // namespace Valdi

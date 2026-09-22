@@ -1,1 +1,2 @@
 export declare function compute(): number;
+export declare function countSyncCall(): number;

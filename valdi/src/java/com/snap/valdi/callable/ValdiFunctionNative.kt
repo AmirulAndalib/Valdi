@@ -55,6 +55,8 @@ internal class ValdiFunctionNative(ptr: Long): ValdiCPPAction(ptr), ValdiFunctio
         const val FLAGS_ALLOW_THROTTLING = 1 shl 2
         const val FLAGS_PROPAGATES_ERROR = 1 shl 3
         const val FLAGS_BOUNDED_MAIN_THREAD_SYNC = 1 shl 4
+        // Mirrors ValueFunctionFlagsSkipIfTimedOut; only read by performWithTimeout.
+        const val FLAGS_SKIP_IF_TIMED_OUT = 1 shl 5
 
         @JvmStatic
         private external fun nativePerform(ptr: Long, flags: Int, marshallerHandle: Long): Boolean

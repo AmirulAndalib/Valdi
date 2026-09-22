@@ -24,18 +24,23 @@ fun ValdiFunction.performSync(marshaller: ValdiMarshaller, propagatesError: Bool
  * @param marshaller The marshaller containing the parameters
  * @param propagatesError Whether to propagate errors from the function
  * @param timeoutMs Maximum time to wait for the function to complete (in milliseconds)
+ * @param skipIfTimedOut Whether a call that timed out may be skipped instead of run late. Only
+ *   set this when the caller wants nothing but the return value (e.g. hit test predicates).
  * @return true if the function completed successfully and returned a value, false otherwise
  */
 fun ValdiFunction.performSyncWithTimeout(
     marshaller: ValdiMarshaller,
     propagatesError: Boolean,
-    timeoutMs: Long
+    timeoutMs: Long,
+    skipIfTimedOut: Boolean = false
 ): Boolean {
     return if (this is ValdiFunctionNative) {
-        val flags = if (propagatesError) {
-            ValdiFunctionNative.FLAGS_CALL_SYNC or ValdiFunctionNative.FLAGS_PROPAGATES_ERROR
-        } else {
-            ValdiFunctionNative.FLAGS_CALL_SYNC
+        var flags = ValdiFunctionNative.FLAGS_CALL_SYNC
+        if (propagatesError) {
+            flags = flags or ValdiFunctionNative.FLAGS_PROPAGATES_ERROR
+        }
+        if (skipIfTimedOut) {
+            flags = flags or ValdiFunctionNative.FLAGS_SKIP_IF_TIMED_OUT
         }
         return this.performWithTimeout(flags, marshaller, timeoutMs)
     } else {

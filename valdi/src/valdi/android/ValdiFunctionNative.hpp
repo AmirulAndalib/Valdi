@@ -58,8 +58,8 @@ public:
             return static_cast<jboolean>(false);
         }
 
-        // Note: callSyncWithDeadline does not take the caller's exception tracker and ignores the flags
-        // parameter. This means:
+        // Note: callSyncWithDeadline does not take the caller's exception tracker and, apart from
+        // FLAGS_SKIP_IF_TIMED_OUT, ignores the flags parameter. This means:
         // 1. The FLAGS_PROPAGATES_ERROR flag (if set) is not honored - errors will not be propagated as exceptions
         // 2. We cannot check marshaller->getExceptionTracker() because it's not used by callSyncWithDeadline
         //
@@ -69,8 +69,11 @@ public:
         // TODO: Enhance callSyncWithDeadline to accept ValueFunctionCallContext to support full flag/exception
         // handling.
         auto timeout = std::chrono::milliseconds(timeoutMs);
+        auto timeoutPolicy = (flags & Valdi::ValueFunctionFlagsSkipIfTimedOut) != 0 ?
+                                 Valdi::SyncCallTimeoutPolicy::SkipIfTimedOut :
+                                 Valdi::SyncCallTimeoutPolicy::RunLate;
         auto result = function->callSyncWithDeadline(
-            timeout, const_cast<Valdi::Value*>(marshaller->getValues()), marshaller->size());
+            timeout, const_cast<Valdi::Value*>(marshaller->getValues()), marshaller->size(), timeoutPolicy);
 
         if (!result) {
             // Timeout or error occurred. Return false (default/safe value for hit test callbacks).
