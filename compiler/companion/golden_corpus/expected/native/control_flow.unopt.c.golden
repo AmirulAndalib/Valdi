@@ -406,7 +406,7 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
         goto target_file_ts_classify_21_body;
     }
     else {
-        goto target_file_ts_classify_22_exit;
+        goto target_file_ts_classify_23_exit;
     }
     target_file_ts_classify_21_body:
     /*
@@ -416,7 +416,7 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
             }
     */
     tsn_set_pc(stackframe, 26, 4);
-    target_file_ts_classify_23_condition:
+    target_file_ts_classify_24_condition:
     /*
         At line 26:8
         k % 2 === 0
@@ -435,21 +435,21 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
     number_var43 = tsn_op_mod(ctx, number_var42, number_var41);
     bool_var44 = tsn_op_eq_strict(ctx, number_var43, number_var40);
     if (tsn_truthy_bool(ctx, bool_var44)) {
-        goto target_file_ts_classify_24_true;
+        goto target_file_ts_classify_25_true;
     }
     else {
-        goto target_file_ts_classify_25_false;
+        goto target_file_ts_classify_26_false;
     }
-    target_file_ts_classify_24_true:
+    target_file_ts_classify_25_true:
     /*
         At line 27:6
         continue;
     */
     tsn_set_pc(stackframe, 27, 6);
-    goto target_file_ts_classify_20_cond;
-    goto target_file_ts_classify_26_exit;
-    target_file_ts_classify_25_false:
-    target_file_ts_classify_26_exit:
+    goto target_file_ts_classify_22_incrementor;
+    goto target_file_ts_classify_27_exit;
+    target_file_ts_classify_26_false:
+    target_file_ts_classify_27_exit:
     /*
         At line 29:4
         result = result + 'x'
@@ -472,6 +472,7 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
         goto target_file_ts_classify_0_exception;
     }
     tsn_set_var_ref(ctx, vref_var5, object_var47);
+    target_file_ts_classify_22_incrementor:
     /*
         At line 25:25
         k++
@@ -485,13 +486,13 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
     number_var50 = tsn_op_inc(ctx, number_var48);
     tsn_set_var_ref(ctx, vref_var35, number_var50);
     goto target_file_ts_classify_20_cond;
-    target_file_ts_classify_22_exit:
+    target_file_ts_classify_23_exit:
     /*
         At line 32:9
         n > 10 ? 'big' : result
     */
     tsn_set_pc(stackframe, 32, 9);
-    target_file_ts_classify_27_condition:
+    target_file_ts_classify_28_condition:
     /*
         At line 32:9
         n > 10
@@ -507,25 +508,25 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
         goto target_file_ts_classify_0_exception;
     }
     if (tsn_truthy_bool(ctx, bool_var54)) {
-        goto target_file_ts_classify_28_condition_true;
+        goto target_file_ts_classify_29_condition_true;
     }
     else {
-        goto target_file_ts_classify_29_condition_false;
+        goto target_file_ts_classify_30_condition_false;
     }
-    target_file_ts_classify_28_condition_true:
+    target_file_ts_classify_29_condition_true:
     object_var55 = tsn_get_module_const(ctx, module, 5);
     tsn_release_inline(ctx, object_var51);
     object_var51 = tsn_retain_inline(ctx, object_var55);
-    goto target_file_ts_classify_30_exit;
-    target_file_ts_classify_29_condition_false:
+    goto target_file_ts_classify_31_exit;
+    target_file_ts_classify_30_condition_false:
     object_var56 = tsn_load_var_ref(ctx, vref_var5);
     if (tsn_is_exception(ctx, object_var56)) {
         goto target_file_ts_classify_0_exception;
     }
     tsn_release_inline(ctx, object_var51);
     object_var51 = tsn_retain_inline(ctx, object_var56);
-    goto target_file_ts_classify_30_exit;
-    target_file_ts_classify_30_exit:
+    goto target_file_ts_classify_31_exit;
+    target_file_ts_classify_31_exit:
     retval_var1 = tsn_retain_inline(ctx, object_var51);
     goto target_file_ts_classify_1_return;
     goto target_file_ts_classify_1_return;

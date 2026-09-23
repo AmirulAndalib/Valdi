@@ -1042,18 +1042,28 @@ export class NativeCompilerBlockBuilder implements INativeCompilerBlockBuilder {
     return variable;
   }
 
-  buildLoop(): INativeCompilerLoopBuilder {
+  buildLoop(hasIncrementor: boolean = false): INativeCompilerLoopBuilder {
     const builderLoop = this.buildSubBuilder(true);
 
     const builderLoopInitializer = builderLoop.buildSubBuilder(false);
     const builderLoopMain = builderLoop.buildSubBuilder(true);
     const builderLoopMainCondition = builderLoopMain.buildJumpTarget('cond');
     const builderLoopMainBody = builderLoopMain.buildJumpTarget('body');
+    // For a C-style `for`, the incrementor is its own block after the body so
+    // the body falls through into it and `continue` can jump to it. Without it,
+    // a `continue` that targets the condition would skip the incrementor and
+    // never advance the loop variable. Emitted between body and the loop-back
+    // jump below, so control flows cond -> body -> incrementor -> cond.
+    const builderLoopMainIncrementor = hasIncrementor ? builderLoopMain.buildJumpTarget('incrementor') : undefined;
     builderLoop.buildJump(builderLoopMainCondition.target);
     const exitBuilder = builderLoop.buildJumpTarget('exit');
 
     builderLoopMainBody.builder.registerExitTargetInScope(exitBuilder.target);
-    builderLoopMainBody.builder.registerContinueTargetInScope(builderLoopMainCondition.target);
+    // `continue` goes to the incrementor when there is one, else the condition
+    // (while / for-of have no incrementor and correctly continue to the cond).
+    builderLoopMainBody.builder.registerContinueTargetInScope(
+      builderLoopMainIncrementor ? builderLoopMainIncrementor.target : builderLoopMainCondition.target,
+    );
 
     return {
       initBuilder: builderLoopInitializer,
@@ -1062,6 +1072,7 @@ export class NativeCompilerBlockBuilder implements INativeCompilerBlockBuilder {
         builder: builderLoopMainBody.builder,
         target: builderLoopMainBody.target,
       },
+      incrementorBuilder: builderLoopMainIncrementor?.builder,
       exitTarget: exitBuilder.target,
     };
   }

@@ -184,6 +184,10 @@ export interface INativeCompilerLoopBuilder {
   readonly initBuilder: INativeCompilerBlockBuilder;
   readonly condBuilder: INativeCompilerBlockBuilder;
   readonly bodyJumpTargetBuilder: INativeCompilerJumpTargetBuilder;
+  // The incrementor block of a C-style `for` loop; undefined for while / for-of
+  // and for a `for` with no update expression. When present, `continue` targets
+  // this block (not the condition) so the incrementor still runs on `continue`.
+  readonly incrementorBuilder?: INativeCompilerBlockBuilder;
   readonly exitTarget: NativeCompilerBuilderJumpTargetID;
 }
 
@@ -406,7 +410,7 @@ export interface INativeCompilerBlockBuilder {
     falseTarget: NativeCompilerBuilderJumpTargetID | undefined,
   ): void;
 
-  buildLoop(): INativeCompilerLoopBuilder;
+  buildLoop(hasIncrementor?: boolean): INativeCompilerLoopBuilder;
   buildTryCatch(hasCatchBlock: boolean, hasFinallyBlock: boolean): INativeCompilerTryCatchBuilder;
 
   buildIterator(value: NativeCompilerBuilderVariableID): NativeCompilerBuilderVariableID;

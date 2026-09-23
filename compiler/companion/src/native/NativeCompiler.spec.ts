@@ -1126,6 +1126,7 @@ jumptarget 'body'
 getpropvalue @5 @12 @20
 add @6 @20 @22
 assign @22 @6
+jumptarget 'incrementor'
 assign @12 @24
 inc @12 @25
 assign @25 @12
@@ -1220,13 +1221,14 @@ mod @7 @14 @16
 eqstrict @16 @13 @17
 branch @17 'true' 'false'
 jumptarget 'true'
-jump 'cond'
+jump 'incrementor'
 jump 'exit'
 jumptarget 'false'
 jumptarget 'exit'
 getpropvalue @4 @7 @20
 add @5 @20 @22
 assign @22 @5
+jumptarget 'incrementor'
 assign @7 @24
 inc @7 @25
 assign @25 @7
@@ -1239,6 +1241,34 @@ jumptarget 'return'
 function_end @1
         `.trim(),
     );
+  });
+
+  // Regression: `continue` in a C-style `for` must jump to the
+  // incrementor block (which runs the update expression), NOT the loop
+  // condition. Jumping to the condition skips the update, so the loop variable
+  // never advances and the loop spins forever. Asserted structurally so the
+  // test does not depend on unrelated IR details.
+  it('routes `continue` in a for loop through the incrementor', () => {
+    const result = compileSimplified(
+      `
+    function run(n: number): void {
+      for (let i = 0; i < n; i++) {
+        if (i % 2 === 0) {
+          continue;
+        }
+      }
+    }
+        `,
+      ['file_ts_run'],
+    );
+
+    // The incrementor is its own jump target, and `continue` jumps to it
+    // (the loop back-edge still targets 'cond', which is correct).
+    expect(result).toContain("jumptarget 'incrementor'");
+    expect(result).toContain("jump 'incrementor'");
+    // The update (i++) is emitted inside that incrementor block.
+    const incrementorBlock = result.slice(result.indexOf("jumptarget 'incrementor'"));
+    expect(incrementorBlock).toContain('inc @');
   });
 
   it('compiles while loops', () => {
@@ -3397,6 +3427,7 @@ getprop @4 'length' @8
 lt @5 @8 @10
 branch @10 'body' 'exit'
 jumptarget 'body'
+jumptarget 'incrementor'
 assign @5 @12
 inc @5 @13
 assign @13 @5
