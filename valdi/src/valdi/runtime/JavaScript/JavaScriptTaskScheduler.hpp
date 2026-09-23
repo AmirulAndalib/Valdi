@@ -100,18 +100,6 @@ public:
     }
 
     /**
-     Bundle name of the JS module currently being loaded on the JS thread (the innermost of
-     nested loads), or empty when no load is in flight. Module evaluation runs under the global
-     context — which has no bundle name — and no JS stack exists yet while a bundle is being
-     parsed, so an ANR that fires mid-load cannot be attributed from the captured stacktraces.
-     The detector uses this as the fallback attribution. Must be safe to call from any thread
-     while the JS thread is busy.
-     */
-    virtual StringBox getCurrentlyLoadingModule() const {
-        return {};
-    }
-
-    /**
      Bookkeeping for deadline-bounded sync calls into this scheduler's JS thread (see
      ValueFunctionWithJSValue::dispatchAndWaitOnJsThread). A call that timed out while its task
      is still queued is "overdue". While any call is overdue the JS thread is provably not keeping

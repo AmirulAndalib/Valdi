@@ -47,7 +47,6 @@ public:
     std::vector<JavaScriptCapturedStacktrace> captureStackTraces(std::chrono::steady_clock::duration timeout) override {
         if (_clearAttributionOnCapture) {
             _anrAttributionInfo.clear();
-            _currentlyLoadingModule = StringBox();
         }
         return {JavaScriptCapturedStacktrace(
             JavaScriptCapturedStacktrace::Status::RUNNING, STRING_LITERAL("A fake stacktrace"), nullptr)};
@@ -59,10 +58,6 @@ public:
 
     bool isReadyForANRDetection() const override {
         return _readyForANRDetection;
-    }
-
-    StringBox getCurrentlyLoadingModule() const override {
-        return _currentlyLoadingModule;
     }
 
     int getLastTaskId() {
@@ -81,11 +76,7 @@ public:
         _readyForANRDetection = ready;
     }
 
-    void setCurrentlyLoadingModule(StringBox module) {
-        _currentlyLoadingModule = std::move(module);
-    }
-
-    /** Simulates the native call or module load returning while the detector waits on the capture. */
+    /** Simulates the native call returning while the detector waits on the capture. */
     void setClearAttributionOnCapture() {
         _clearAttributionOnCapture = true;
     }
@@ -96,7 +87,6 @@ private:
     std::atomic_bool _clearAttributionOnCapture = false;
     std::atomic_int _taskIdSequence = 0;
     std::string _anrAttributionInfo;
-    StringBox _currentlyLoadingModule;
 };
 
 struct ANRDetectorTestHelper {
@@ -197,26 +187,6 @@ TEST(ANRDetector, doesNotDetectANRWhileSchedulerIsNotReadyForDetection) {
     ASSERT_EQ("Detected unattributed ANR after 1.0 ms", anr->getMessage());
 }
 
-TEST(ANRDetector, attributesANRToCurrentlyLoadingModule) {
-    ANRDetectorTestHelper helper;
-
-    helper.taskScheduler->setShouldSimulateANR();
-    helper.taskScheduler->setCurrentlyLoadingModule(STRING_LITERAL("memories"));
-
-    helper.anrDetector->onEnterForeground();
-    helper.anrDetector->start(std::chrono::milliseconds(1));
-
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-
-    auto anr = helper.getLastANR();
-    ASSERT_TRUE(anr.has_value());
-
-    ASSERT_EQ("Detected ANR in 'memories' after 1.0 ms (while loading module)", anr->getMessage());
-    ASSERT_EQ(STRING_LITERAL("memories"), anr->getModuleName());
-}
-
 TEST(ANRDetector, givesStaleInFlightSynAFreshBudgetOnEnterForeground) {
     ANRDetectorTestHelper helper;
 
@@ -266,31 +236,6 @@ TEST(ANRDetector, includesANRAttributionInfoInMessageWhenSet) {
         anr->getMessage());
 }
 
-TEST(ANRDetector, includesANRAttributionInfoWhenAttributedToLoadingModule) {
-    ANRDetectorTestHelper helper;
-
-    helper.taskScheduler->setShouldSimulateANR();
-    helper.taskScheduler->setCurrentlyLoadingModule(STRING_LITERAL("coreui"));
-    helper.taskScheduler->setANRAttributionInfo(
-        " [stuck-in: runtime.loadJsModule(coreui/src/InitSemanticColors)] [module: music]");
-
-    helper.anrDetector->onEnterForeground();
-    helper.anrDetector->start(std::chrono::milliseconds(1));
-
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-
-    auto anr = helper.getLastANR();
-    ASSERT_TRUE(anr.has_value());
-
-    ASSERT_EQ(
-        "Detected ANR in 'coreui' after 1.0 ms (while loading module)"
-        " [stuck-in: runtime.loadJsModule(coreui/src/InitSemanticColors)] [module: music]",
-        anr->getMessage());
-    ASSERT_EQ(STRING_LITERAL("coreui"), anr->getModuleName());
-}
-
 TEST(ANRDetector, keepsANRAttributionInfoWhenNativeCallEndsDuringCapture) {
     ANRDetectorTestHelper helper;
 
@@ -310,26 +255,6 @@ TEST(ANRDetector, keepsANRAttributionInfoWhenNativeCallEndsDuringCapture) {
 
     ASSERT_EQ("Detected unattributed ANR after 1.0 ms [stuck-in: runtime.loadJsModule(coreui/src/InitSemanticColors)]",
               anr->getMessage());
-}
-
-TEST(ANRDetector, keepsLoadingModuleAttributionWhenLoadEndsDuringCapture) {
-    ANRDetectorTestHelper helper;
-
-    helper.taskScheduler->setShouldSimulateANR();
-    helper.taskScheduler->setCurrentlyLoadingModule(STRING_LITERAL("coreui"));
-    helper.taskScheduler->setClearAttributionOnCapture();
-
-    helper.anrDetector->onEnterForeground();
-    helper.anrDetector->start(std::chrono::milliseconds(1));
-
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-    helper.waitForNextTick();
-
-    auto anr = helper.getLastANR();
-    ASSERT_TRUE(anr.has_value());
-
-    ASSERT_EQ("Detected ANR in 'coreui' after 1.0 ms (while loading module)", anr->getMessage());
 }
 
 } // namespace ValdiTest

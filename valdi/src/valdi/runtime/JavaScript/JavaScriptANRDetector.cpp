@@ -152,10 +152,9 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
                                   std::chrono::steady_clock::duration detectionThreshold,
                                   const std::atomic<bool>& ack) {
     // Read the native-side attribution before waiting on the stack capture. The capture can take up
-    // to kCaptureStacktraceTimeoutSeconds, and a native call or module load that finishes during
-    // that wait clears its name, which would report the stall as unattributed. Both getters read
-    // saved native state, not JS, so they are safe to call while the JS thread is stuck.
-    auto loadingModule = taskScheduler.getCurrentlyLoadingModule();
+    // to kCaptureStacktraceTimeoutSeconds, and a native call that finishes during that wait clears
+    // its name, which would report the stall as unattributed. The getter reads saved native state,
+    // not JS, so it is safe to call while the JS thread is stuck.
     auto attributionInfo = taskScheduler.getANRAttributionInfo();
     auto stacktraces = taskScheduler.captureStackTraces(std::chrono::seconds(kCaptureStacktraceTimeoutSeconds));
     StringBox moduleName;
@@ -163,15 +162,6 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
 
     if (!stacktraces.empty() && stacktraces[0].getContext() != nullptr) {
         moduleName = stacktraces[0].getContext()->getPath().getResourceId().bundleName;
-    }
-
-    // Module loads run under the global context (no bundle name) and expose no JS stack while the
-    // bundle is being parsed, so a load that holds the JS thread past the threshold would
-    // otherwise be reported unattributed. Attribute it to the bundle being loaded instead.
-    bool isLoadingModule = false;
-    if (moduleName.isEmpty()) {
-        moduleName = loadingModule;
-        isLoadingModule = !moduleName.isEmpty();
     }
 
     if (!hasRunningStacktrace(stacktraces) && ack.load()) {
@@ -184,9 +174,6 @@ bool JavaScriptANRDetector::onANR(JavaScriptTaskScheduler& taskScheduler,
         snap::utils::time::Duration<std::chrono::steady_clock>(detectionThreshold).toString();
     if (moduleName.isEmpty()) {
         message = fmt::format("Detected unattributed ANR after {}", detectionThresholdString);
-    } else if (isLoadingModule) {
-        message =
-            fmt::format("Detected ANR in '{}' after {} (while loading module)", moduleName, detectionThresholdString);
     } else {
         message = fmt::format("Detected ANR in '{}' after {}", moduleName, detectionThresholdString);
     }
