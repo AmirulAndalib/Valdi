@@ -12,26 +12,12 @@ class ValdiFunctionTrampoline {
     companion object {
         @JvmStatic
         private fun resolveInvokeMethod(cls: Class<*>, arity: Int): Method {
-            val methods = cls.declaredMethods
-            for (method in methods) {
-                if (method.returnType != Object::class.java) {
-                    continue
-                }
-
-                val parameterTypes = method.parameterTypes
-                if (parameterTypes.size != arity) {
-                    continue
-                }
-                for (parameterType in parameterTypes) {
-                    if (parameterType != Object::class.java) {
-                        continue
-                    }
-                }
-
-                return method
+            // Older Android runtimes can sign-extend DEX type indices during method enumeration.
+            return try {
+                cls.getDeclaredMethod("invoke", *Array(arity) { Object::class.java })
+            } catch (exception: NoSuchMethodException) {
+                ValdiFatalException.handleFatal("Could not resolve invoke function for Class ${cls} with arity ${arity}")
             }
-
-            ValdiFatalException.handleFatal("Could not resolve invoke function for Class ${cls} with arity ${arity}")
         }
 
         @JvmStatic

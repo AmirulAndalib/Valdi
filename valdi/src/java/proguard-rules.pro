@@ -17,6 +17,11 @@
 # Keep Kotlin Function interfaces, as they are used through reflections
 -keepclassmembers,includedescriptorclasses,allowobfuscation interface kotlin.jvm.functions.* { *; }
 
+# Valdi resolves invoke by name to avoid method enumeration on older Android runtimes.
+-keepclassmembers interface kotlin.jvm.functions.Function* {
+    java.lang.Object invoke(...);
+}
+
 # Keep the Valdi runtime annotations
 -keep,allowobfuscation @interface com.snap.valdi.schema.ValdiClass { *; }
 -keep,allowobfuscation @interface com.snap.valdi.schema.ValdiInterface { *; }
