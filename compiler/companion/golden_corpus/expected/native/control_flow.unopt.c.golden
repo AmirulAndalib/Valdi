@@ -515,7 +515,6 @@ static tsn_value file_ts_classify(tsn_vm *ctx, tsn_value_const this_val, tsn_sta
     }
     target_file_ts_classify_29_condition_true:
     object_var55 = tsn_get_module_const(ctx, module, 5);
-    tsn_release_inline(ctx, object_var51);
     object_var51 = tsn_retain_inline(ctx, object_var55);
     goto target_file_ts_classify_31_exit;
     target_file_ts_classify_30_condition_false:

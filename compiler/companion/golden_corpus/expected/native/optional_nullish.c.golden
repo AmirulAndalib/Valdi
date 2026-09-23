@@ -90,6 +90,7 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var4 = tsn_retain_inline(ctx, object_var3);
     goto target_file_ts_resolve_12_value_exit;
     target_file_ts_resolve_11_value_false:
+    tsn_release_inline(ctx, object_var4);
     object_var4 = undefined_var5;
     goto target_file_ts_resolve_12_value_exit;
     target_file_ts_resolve_12_value_exit:
@@ -153,6 +154,7 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var7 = tsn_retain_inline(ctx, object_var4);
     goto target_file_ts_resolve_23_value_exit;
     target_file_ts_resolve_22_value_false:
+    tsn_release_inline(ctx, object_var7);
     object_var7 = undefined_var5;
     goto target_file_ts_resolve_19_optional_chain_exit;
     target_file_ts_resolve_23_value_exit:

@@ -352,6 +352,7 @@ static tsn_value file_ts_rearrange(tsn_vm *ctx, tsn_value_const this_val, tsn_st
     object_var45 = number_var48;
     goto target_file_ts_rearrange_5_exit;
     target_file_ts_rearrange_4_condition_false:
+    tsn_release_inline(ctx, object_var45);
     object_var45 = tsn_retain_inline(ctx, object_var44);
     goto target_file_ts_rearrange_5_exit;
     target_file_ts_rearrange_5_exit:

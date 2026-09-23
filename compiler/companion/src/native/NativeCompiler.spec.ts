@@ -1271,6 +1271,44 @@ function_end @1
     expect(incrementorBlock).toContain('inc @');
   });
 
+  // Regression for the retain/release pass: a reassigned value must be released
+  // before it is re-retained. The pass previously tested
+  // membership with `in` on a number[] (an array-index check), so a variable
+  // whose id exceeded the assigned-count so far had its release skipped, leaking
+  // a reference. A multi-step optional chain that follows an earlier chain
+  // (bumping the variable count) reproduces the high-id case. Every self-retain
+  // `X = tsn_retain_inline(ctx, X)` is inherently a reassignment, so it must be
+  // immediately preceded by a release of X. Compiled with optimizations off so
+  // variable renumbering doesn't mask the id condition.
+  it('releases before re-retaining a reassigned value', () => {
+    const c = compileAsC(
+      `
+      interface Nested { retries: number; }
+      interface Config { timeout?: number; nested?: Nested; }
+      function resolve(config: Config | undefined): number {
+        const timeout = config?.timeout ?? 30;
+        const retries = config?.nested?.retries ?? 3;
+        return timeout + retries;
+      }
+      `,
+      { optimizeSlots: false, optimizeVarRefs: false, foldConstants: false },
+      'resolve',
+      undefined,
+    );
+    const lines = c.split('\n').map((l) => l.trim());
+    const selfRetain = /^(object_var\d+) = tsn_retain_inline\(ctx, \1\);$/;
+    let sawSelfRetain = false;
+    for (let i = 0; i < lines.length; i++) {
+      const match = lines[i].match(selfRetain);
+      if (!match) {
+        continue;
+      }
+      sawSelfRetain = true;
+      expect(lines[i - 1]).toBe(`tsn_release_inline(ctx, ${match[1]});`);
+    }
+    expect(sawSelfRetain).toBe(true);
+  });
+
   it('compiles while loops', () => {
     const result = compileSimplified(`
         let current = 0;

@@ -168,6 +168,7 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var12 = tsn_retain_inline(ctx, object_var13);
     goto target_file_ts_resolve_12_value_exit;
     target_file_ts_resolve_11_value_false:
+    tsn_release_inline(ctx, object_var12);
     object_var12 = undefined_var14;
     goto target_file_ts_resolve_12_value_exit;
     target_file_ts_resolve_12_value_exit:
@@ -180,7 +181,6 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
         goto target_file_ts_resolve_4_rhs_value;
     }
     target_file_ts_resolve_3_lhs_assign:
-    tsn_release_inline(ctx, object_var9);
     object_var9 = tsn_retain_inline(ctx, object_var10);
     goto target_file_ts_resolve_6_exit;
     target_file_ts_resolve_4_rhs_value:
@@ -232,9 +232,11 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var17 = tsn_retain_inline(ctx, object_var19);
     goto target_file_ts_resolve_23_value_exit;
     target_file_ts_resolve_22_value_false:
+    tsn_release_inline(ctx, object_var17);
     object_var17 = undefined_var14;
     goto target_file_ts_resolve_19_optional_chain_exit;
     target_file_ts_resolve_23_value_exit:
+    tsn_release_inline(ctx, object_var17);
     object_var17 = tsn_retain_inline(ctx, object_var17);
     target_file_ts_resolve_24_value_condition:
     if (tsn_not_undefined_or_null(ctx, object_var17)) {
@@ -251,6 +253,7 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var20 = tsn_retain_inline(ctx, object_var21);
     goto target_file_ts_resolve_27_value_exit;
     target_file_ts_resolve_26_value_false:
+    tsn_release_inline(ctx, object_var20);
     object_var20 = undefined_var14;
     goto target_file_ts_resolve_27_value_exit;
     target_file_ts_resolve_27_value_exit:
@@ -264,7 +267,6 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
         goto target_file_ts_resolve_15_rhs_value;
     }
     target_file_ts_resolve_14_lhs_assign:
-    tsn_release_inline(ctx, object_var16);
     object_var16 = tsn_retain_inline(ctx, object_var17);
     goto target_file_ts_resolve_17_exit;
     target_file_ts_resolve_15_rhs_value:
@@ -373,10 +375,10 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var32 = tsn_retain_inline(ctx, object_var33);
     goto target_file_ts_resolve_48_value_exit;
     target_file_ts_resolve_47_value_false:
+    tsn_release_inline(ctx, object_var32);
     object_var32 = undefined_var14;
     goto target_file_ts_resolve_48_value_exit;
     target_file_ts_resolve_48_value_exit:
-    tsn_release_inline(ctx, object_var30);
     object_var30 = tsn_retain_inline(ctx, object_var32);
     target_file_ts_resolve_44_optional_chain_exit:
     if (tsn_not_undefined_or_null(ctx, object_var30)) {
@@ -386,7 +388,6 @@ static tsn_value file_ts_resolve(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
         goto target_file_ts_resolve_40_rhs_value;
     }
     target_file_ts_resolve_39_lhs_assign:
-    tsn_release_inline(ctx, object_var29);
     object_var29 = tsn_retain_inline(ctx, object_var30);
     goto target_file_ts_resolve_42_exit;
     target_file_ts_resolve_40_rhs_value:

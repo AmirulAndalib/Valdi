@@ -782,6 +782,7 @@ static tsn_value file_ts_compute(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     object_var93 = tsn_retain_inline(ctx, object_var95);
     goto target_file_ts_compute_33_exit;
     target_file_ts_compute_32_lhs_false:
+    tsn_release_inline(ctx, object_var93);
     object_var93 = tsn_retain_inline(ctx, object_var94);
     goto target_file_ts_compute_33_exit;
     target_file_ts_compute_33_exit:
@@ -796,7 +797,6 @@ static tsn_value file_ts_compute(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     if (tsn_is_exception(ctx, object_var96)) {
         goto target_file_ts_compute_0_exception;
     }
-    tsn_release_inline(ctx, object_var92);
     object_var92 = tsn_retain_inline(ctx, object_var96);
     goto target_file_ts_compute_29_exit;
     target_file_ts_compute_28_condition_false:
@@ -824,6 +824,7 @@ static tsn_value file_ts_compute(tsn_vm *ctx, tsn_value_const this_val, tsn_stac
     if (tsn_is_exception(ctx, object_var99)) {
         goto target_file_ts_compute_0_exception;
     }
+    tsn_release_inline(ctx, object_var97);
     object_var97 = tsn_retain_inline(ctx, object_var99);
     goto target_file_ts_compute_37_exit;
     target_file_ts_compute_37_exit:

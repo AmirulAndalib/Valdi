@@ -38,9 +38,13 @@ export namespace NativeCompilerTransformerInsertRetainRelease {
     // free before the instruction.
     const reentrantIRIndexes: boolean[] = [];
 
-    // Keep track of assigned variables
-    // There is no need to emit a release before the first assignment
-    const assignedVariables: number[] = [];
+    // Keep track of assigned variables (by variable id).
+    // There is no need to emit a release before the first assignment; on a
+    // reassignment we must release the previous value first. A Set is used for
+    // membership: a number[] tested with `in` checks array *indices*, not
+    // values, so a variable whose id exceeded the count of distinct assigned
+    // variables had its release skipped (a leak).
+    const assignedVariables = new Set<number>();
 
     for (let i = 0; i < irs.length; i++) {
       reentrantIRIndexes.push(false);
@@ -79,10 +83,10 @@ export namespace NativeCompilerTransformerInsertRetainRelease {
           {
             let typedIR = ir as NativeCompilerIR.Assignment;
 
-            const assigned = typedIR.left.variable in assignedVariables;
+            const assigned = assignedVariables.has(typedIR.left.variable);
             if (!assigned) {
               // record first assign
-              assignedVariables.push(typedIR.left.variable);
+              assignedVariables.add(typedIR.left.variable);
             }
             // skip release when safe
             // 1. not assigned
@@ -103,9 +107,9 @@ export namespace NativeCompilerTransformerInsertRetainRelease {
           }
           break;
         default: {
-          if (isBaseWithReturn(ir) && !(ir.variable.variable in assignedVariables)) {
+          if (isBaseWithReturn(ir) && !assignedVariables.has(ir.variable.variable)) {
             // record first assign
-            assignedVariables.push(ir.variable.variable);
+            assignedVariables.add(ir.variable.variable);
           }
           if (reentrantIRIndexes[irIndex] && isBaseWithReturn(ir)) {
             // Our IR is re-entrant, so we should insert a free before

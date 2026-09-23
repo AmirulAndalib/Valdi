@@ -817,6 +817,7 @@ static tsn_value file_ts_Circle(tsn_vm *ctx, tsn_value_const new_target, tsn_sta
     if (tsn_is_exception(ctx, number_var19)) {
         goto target_file_ts_Circle_0_exception;
     }
+    tsn_release_inline(ctx, object_var17);
     object_var17 = number_var19;
     if (tsn_set_property(ctx, &object_var16, module->atoms[TSN_ATOM_COUNT], &number_var19)) {
         goto target_file_ts_Circle_0_exception;

@@ -84,6 +84,7 @@ static tsn_value file_ts_resolveOptions(tsn_vm *ctx, tsn_value_const this_val, t
     number_var5 = tsn_int32(ctx, 10);
     goto target_file_ts_resolveOptions_4_rhs_assign;
     target_file_ts_resolveOptions_4_rhs_assign:
+    tsn_release_inline(ctx, object_var4);
     object_var4 = number_var5;
     tsn_release_inline(ctx, object_var4);
     object_var4 = number_var5;

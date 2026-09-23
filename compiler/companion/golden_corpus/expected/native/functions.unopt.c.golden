@@ -312,6 +312,7 @@ static tsn_value file_ts_greet(tsn_vm *ctx, tsn_value_const this_val, tsn_stackf
     goto target_file_ts_greet_5_exit;
     target_file_ts_greet_4_condition_false:
     object_var10 = tsn_get_module_const(ctx, module, 0);
+    tsn_release_inline(ctx, object_var7);
     object_var7 = tsn_retain_inline(ctx, object_var10);
     goto target_file_ts_greet_5_exit;
     target_file_ts_greet_5_exit:
