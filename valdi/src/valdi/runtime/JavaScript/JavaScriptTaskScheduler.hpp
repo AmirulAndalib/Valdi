@@ -34,6 +34,51 @@ struct JavaScriptThreadTask : public Valdi::Function<void(JavaScriptEntryParamet
     using Valdi::Function<void(JavaScriptEntryParameters&)>::Function;
 };
 
+/** Identifies ownerless JS-thread work in ANR [stuck-in:] diagnostics. */
+enum class JsThreadDispatchReason {
+    SetValueToGlobalObject,
+    PerformGc,
+    DumpMemoryStatistics,
+    UnloadAllModules,
+    UnloadUnusedModules,
+    ReevalUnloadedModules,
+    UnloadModulesAndDependents,
+    IsJsModuleLoaded,
+    EvaluateScript,
+    EvalModuleSync,
+    RegisterModuleFactory,
+    RegisterTypeConverter,
+    CallModuleFunction,
+    PushModuleToMarshaller,
+    AddModuleUnloadObserver,
+    PreloadModule,
+    PreloadModules,
+    ScheduleWorkItem,
+    WarmUpValueMarshaller,
+    ExclusiveJsThreadLock,
+    WorkerPostInit,
+    WorkerPostMessage,
+    MessagePortReleaseHandle,
+    MessagePortDispatch,
+    ErrorStackTrace,
+    TypedArrayConversion,
+    JavaScriptRunLoopFlush,
+    DebuggerTickle,
+    ANRDetectorAcknowledgement,
+    ANRDetectorNudge,
+    HotReloadStashData,
+    HotReloadRestoreData,
+    LockAllJSContexts,
+    DaemonClientConnected,
+    DaemonClientDisconnected,
+    DaemonClientPayload,
+    SetDefaultViewManagerContext,
+    DumpLogs,
+    DumpHeap,
+    StartProfiling,
+    StopProfiling,
+};
+
 enum JavaScriptTaskScheduleType {
     // Will be sync if the JS thread is current or the call is made
     // from the main thread and a main thread batch is current, async otherwise
@@ -47,6 +92,11 @@ enum JavaScriptTaskScheduleType {
 class JavaScriptTaskScheduler : public SharedPtrRefCountable {
 public:
     virtual void dispatchOnJsThread(Ref<Context> ownerContext,
+                                    JavaScriptTaskScheduleType scheduleType,
+                                    uint32_t delayMs,
+                                    JavaScriptThreadTask&& function) = 0;
+    /** Schedules JS-thread work without an owning component context and records why it was scheduled. */
+    virtual void dispatchOnJsThread(JsThreadDispatchReason reason,
                                     JavaScriptTaskScheduleType scheduleType,
                                     uint32_t delayMs,
                                     JavaScriptThreadTask&& function) = 0;
@@ -65,6 +115,20 @@ public:
 
     inline void dispatchOnJsThreadSync(Ref<Context> ownerContext, JavaScriptThreadTask&& function) {
         dispatchOnJsThread(std::move(ownerContext), JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
+    }
+
+    inline void dispatchOnJsThreadAsync(JsThreadDispatchReason reason, JavaScriptThreadTask&& function) {
+        dispatchOnJsThread(reason, JavaScriptTaskScheduleTypeDefault, 0, std::move(function));
+    }
+
+    inline void dispatchOnJsThreadAsyncAfter(JsThreadDispatchReason reason,
+                                             uint32_t delayMs,
+                                             JavaScriptThreadTask&& function) {
+        dispatchOnJsThread(reason, JavaScriptTaskScheduleTypeAlwaysAsync, delayMs, std::move(function));
+    }
+
+    inline void dispatchOnJsThreadSync(JsThreadDispatchReason reason, JavaScriptThreadTask&& function) {
+        dispatchOnJsThread(reason, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
     }
 
     virtual bool isDisposed() const {

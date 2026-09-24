@@ -593,8 +593,8 @@ Ref<ValueTypedArray> jsTypedArrayToValueTypedArray(IJavaScriptContext& jsContext
 
     if (source == nullptr) {
         if (jsContext.getTaskScheduler() != nullptr) {
-            // Schedule an unattributed task, so that we can retain the js array using the global native refs
-            jsContext.getTaskScheduler()->dispatchOnJsThreadSync(nullptr, [&](auto& jsEntry) {
+            constexpr auto reason = JsThreadDispatchReason::TypedArrayConversion;
+            jsContext.getTaskScheduler()->dispatchOnJsThreadSync(reason, [&](auto& jsEntry) {
                 source = jsValueToValdiObject(
                     jsEntry.jsContext, result.arrayBuffer.get(), referenceInfoBuilder, exceptionTracker);
             });

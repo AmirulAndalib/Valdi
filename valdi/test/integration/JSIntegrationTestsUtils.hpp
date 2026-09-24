@@ -96,6 +96,13 @@ struct TaskSchedulerImpl : public Valdi::JavaScriptTaskScheduler {
         }
     }
 
+    void dispatchOnJsThread(Valdi::JsThreadDispatchReason,
+                            Valdi::JavaScriptTaskScheduleType scheduleType,
+                            uint32_t delayMs,
+                            Valdi::JavaScriptThreadTask&& function) override {
+        dispatchOnJsThread(Valdi::Ref<Valdi::Context>(), scheduleType, delayMs, std::move(function));
+    }
+
     bool isInJsThread() override {
         return dispatchQueue == nullptr || dispatchQueue->isCurrent();
     }

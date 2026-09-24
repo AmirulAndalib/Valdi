@@ -242,7 +242,7 @@ void JavaScriptANRDetector::checkForANRs() {
             if (!entry->synScheduledTime || entry->ack) {
                 entry->synScheduledTime = timepoint;
                 entry->ack = false;
-                entry->taskScheduler->dispatchOnJsThreadAsync(nullptr,
+                entry->taskScheduler->dispatchOnJsThreadAsync(JsThreadDispatchReason::ANRDetectorAcknowledgement,
                                                               [entry](const auto& /*jsEntry*/) { entry->ack = true; });
             } else if (!entry->taskScheduler->isReadyForANRDetection()) {
                 // Bootstrap can legitimately hold the JS thread past the threshold on slow
@@ -255,7 +255,8 @@ void JavaScriptANRDetector::checkForANRs() {
                 entryToProcess.entry = entry;
                 entryToProcess.taskScheduler = Ref(entry->taskScheduler);
             } else if (_nudgeEnabled) {
-                entry->taskScheduler->dispatchOnJsThreadAsync(nullptr, [](const auto& /*jsEntry*/) {});
+                entry->taskScheduler->dispatchOnJsThreadAsync(JsThreadDispatchReason::ANRDetectorNudge,
+                                                              [](const auto& /*jsEntry*/) {});
             }
         }
     }

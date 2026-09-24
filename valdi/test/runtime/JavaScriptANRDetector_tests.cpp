@@ -36,6 +36,13 @@ public:
         }
     }
 
+    void dispatchOnJsThread(JsThreadDispatchReason,
+                            JavaScriptTaskScheduleType scheduleType,
+                            uint32_t delayMs,
+                            JavaScriptThreadTask&& function) override {
+        dispatchOnJsThread(Ref<Context>(), scheduleType, delayMs, std::move(function));
+    }
+
     bool isInJsThread() override {
         return false;
     }
@@ -231,9 +238,8 @@ TEST(ANRDetector, includesANRAttributionInfoInMessageWhenSet) {
     auto anr = helper.getLastANR();
     ASSERT_TRUE(anr.has_value());
 
-    ASSERT_EQ(
-        "Detected unattributed ANR after 1.0 ms [stuck-in: Graphene.partitionMakeMetric] [module: search_v2]",
-        anr->getMessage());
+    ASSERT_EQ("Detected unattributed ANR after 1.0 ms [stuck-in: Graphene.partitionMakeMetric] [module: search_v2]",
+              anr->getMessage());
 }
 
 TEST(ANRDetector, keepsANRAttributionInfoWhenNativeCallEndsDuringCapture) {

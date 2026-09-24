@@ -45,6 +45,7 @@
 #include "valdi_core/cpp/Utils/Function.hpp"
 #include <atomic>
 #include <future>
+#include <optional>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -84,6 +85,7 @@ enum DaemonClientEventType {
 class ValdiRuntimeTweaks;
 
 class JavaScriptRuntime;
+
 class IJavaScriptRuntimeListener {
 public:
     IJavaScriptRuntimeListener() = default;
@@ -271,6 +273,8 @@ public:
     // True when ANR diagnostics are on and the caller is on this runtime's JS thread. Guards the
     // native-call activity writes so worker threads never touch the JS thread's slot.
     bool anrDiagnosticsActiveOnJsThread();
+    // Safe to read from any thread so bridges can skip attribution conversion before dispatch.
+    bool anrDiagnosticsEnabled() const;
 
     // Breadcrumb name for an ANR inside a runtime.trace span: the tag cut at its first ':' (tags put
     // dynamic payloads after it) and capped, so one span is one group.
@@ -330,7 +334,26 @@ public:
                             JavaScriptTaskScheduleType scheduleType,
                             uint32_t delayMs,
                             JavaScriptThreadTask&& function) final;
+    void dispatchOnJsThread(JsThreadDispatchReason reason,
+                            JavaScriptTaskScheduleType scheduleType,
+                            uint32_t delayMs,
+                            JavaScriptThreadTask&& function) final;
+    /** `attribution` must be a stable, nonempty, low-cardinality identifier for the scheduling callsite. */
+    void dispatchOnJsThread(const StringBox& attribution,
+                            JavaScriptTaskScheduleType scheduleType,
+                            uint32_t delayMs,
+                            JavaScriptThreadTask&& function);
+    using JavaScriptTaskScheduler::dispatchOnJsThreadAsync;
+    using JavaScriptTaskScheduler::dispatchOnJsThreadSync;
+    void dispatchOnJsThreadAsync(const StringBox& attribution, JavaScriptThreadTask&& function) {
+        dispatchOnJsThread(attribution, JavaScriptTaskScheduleTypeDefault, 0, std::move(function));
+    }
+    void dispatchOnJsThreadSync(const StringBox& attribution, JavaScriptThreadTask&& function) {
+        dispatchOnJsThread(attribution, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
+    }
     void dispatchSynchronouslyOnJsThread(JavaScriptThreadTask&& function);
+    void dispatchSynchronouslyOnJsThread(JsThreadDispatchReason reason, JavaScriptThreadTask&& function);
+    void dispatchSynchronouslyOnJsThread(const StringBox& attribution, JavaScriptThreadTask&& function);
     bool isInJsThread() final;
     Ref<Context> getLastDispatchedContext() const final;
     std::string getANRAttributionInfo() const final;
@@ -482,7 +505,7 @@ private:
     // name kept from the earlier module-load diagnostics for config continuity). The mutex guards
     // the in-flight native call name: written on the JS thread around JS->native bridge calls,
     // read by the ANR detector without running JS.
-    bool _anrDiagnosticsEnabled = false;
+    std::atomic<bool> _anrDiagnosticsEnabled = false;
     mutable Mutex _nativeCallActivityMutex;
     StringBox _currentNativeCallName;
     // A lock that will block the JS thread until postInit() is called and the initialization has completed
@@ -720,9 +743,15 @@ private:
     void onRecoverableError(std::string_view failingAction, JSExceptionTracker& exceptionTracker);
     void onRecoverableError(std::string_view failingAction, const Error& error);
 
-    DispatchFunction makeJsThreadDispatchFunction(Ref<Context>&& ownerContext, JavaScriptThreadTask&& jsTask);
+    DispatchFunction makeJsThreadDispatchFunction(Ref<Context>&& ownerContext,
+                                                  JavaScriptThreadTask&& jsTask,
+                                                  StringBox dispatchAttribution = StringBox());
 
-    void dispatchOnJsThreadUnattributed(JavaScriptThreadTask&& function);
+    void dispatchOnJsThreadImpl(Ref<Context> ownerContext,
+                                JavaScriptTaskScheduleType scheduleType,
+                                uint32_t delayMs,
+                                StringBox dispatchAttribution,
+                                JavaScriptThreadTask&& function);
 
     void handleUncaughtJsError(IJavaScriptContext& jsContext,
                                const Ref<Context>& ownerContext,

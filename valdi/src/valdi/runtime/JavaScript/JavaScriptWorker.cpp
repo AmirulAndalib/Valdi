@@ -35,8 +35,9 @@ static JSValueRef getGlobalOnMessage(JavaScriptEntryParameters& entry) {
 }
 
 void JavaScriptWorker::postInit() {
+    constexpr auto reason = JsThreadDispatchReason::WorkerPostInit;
     _workerRuntime->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeDefault, 0, [self = strongSmallRef(this)](JavaScriptEntryParameters& entry) {
+        reason, JavaScriptTaskScheduleTypeDefault, 0, [self = strongSmallRef(this)](JavaScriptEntryParameters& entry) {
             if (self->isRunning()) {
                 self->doPostInit();
             }
@@ -56,7 +57,7 @@ Shared<JSValueRefHolder> JavaScriptWorker::getHostOnMessage() const {
 }
 
 void JavaScriptWorker::postMessage(const Ref<JavaScriptMessage>& message) {
-    _workerRuntime->dispatchOnJsThread(nullptr,
+    _workerRuntime->dispatchOnJsThread(JsThreadDispatchReason::WorkerPostMessage,
                                        JavaScriptTaskScheduleTypeDefault,
                                        0,
                                        [self = strongSmallRef(this), message](JavaScriptEntryParameters& entry) {

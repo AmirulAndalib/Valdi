@@ -172,8 +172,9 @@ void JavaScriptMessagePortEndpoint::onPeerClosed() {
     // Not on the owner thread: release the ContextAttached handle on its JavaScript thread. Re-check state
     // inside the task: the port may have received more messages or been closed/transferred before it runs.
     auto self = strongSmallRef(this);
+    constexpr auto reason = JsThreadDispatchReason::MessagePortReleaseHandle;
     runtime->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysAsync, 0, [self](JavaScriptEntryParameters& /*entry*/) {
+        reason, JavaScriptTaskScheduleTypeAlwaysAsync, 0, [self](JavaScriptEntryParameters& /*entry*/) {
             Ref<RefCountable> taskRetainedHandle;
             {
                 std::lock_guard<Mutex> lock(self->_mutex);
@@ -215,8 +216,9 @@ void JavaScriptMessagePortEndpoint::scheduleNextMessage(std::unique_lock<Mutex>&
     _scheduledGeneration = generation;
     auto self = strongSmallRef(this);
     lock.unlock();
+    constexpr auto reason = JsThreadDispatchReason::MessagePortDispatch;
     runtime->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysAsync, 0, [self, generation](JavaScriptEntryParameters& entry) {
+        reason, JavaScriptTaskScheduleTypeAlwaysAsync, 0, [self, generation](JavaScriptEntryParameters& entry) {
             self->dispatchNextMessage(entry, generation);
         });
 }

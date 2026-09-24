@@ -48,6 +48,13 @@ struct MockJavaScriptTaskScheduler : public JavaScriptTaskScheduler {
         task.function = std::move(function);
     }
 
+    void dispatchOnJsThread(JsThreadDispatchReason,
+                            JavaScriptTaskScheduleType scheduleType,
+                            uint32_t delayMs,
+                            JavaScriptThreadTask&& function) override {
+        dispatchOnJsThread(Ref<Context>(), scheduleType, delayMs, std::move(function));
+    }
+
     bool isInJsThread() override {
         return isInJsThreadValue;
     }

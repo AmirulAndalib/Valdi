@@ -26,7 +26,8 @@ StringBox JavaScriptErrorStackTrace::getStackTrace() {
     if (_stackTrace.isEmpty()) {
         auto taskScheduler = _error.getTaskScheduler();
         if (taskScheduler != nullptr) {
-            taskScheduler->dispatchOnJsThreadSync(nullptr, [&](const JavaScriptEntryParameters& jsEntry) {
+            constexpr auto reason = JsThreadDispatchReason::ErrorStackTrace;
+            taskScheduler->dispatchOnJsThreadSync(reason, [&](const JavaScriptEntryParameters& jsEntry) {
                 auto& exceptionTracker = jsEntry.exceptionTracker;
                 auto jsError = _error.getJsValue(jsEntry.jsContext, exceptionTracker);
 

@@ -30,7 +30,8 @@ public:
     }
 
     void tickleJs() final {
-        _taskScheduler->dispatchOnJsThreadAsync(nullptr, [](JavaScriptEntryParameters& entryParameters) {
+        constexpr auto reason = JsThreadDispatchReason::DebuggerTickle;
+        _taskScheduler->dispatchOnJsThreadAsync(reason, [](JavaScriptEntryParameters& entryParameters) {
             auto globalObject = entryParameters.jsContext.getGlobalObject(entryParameters.exceptionTracker);
             JSFunctionCallContext callContext(entryParameters.jsContext, nullptr, 0, entryParameters.exceptionTracker);
             entryParameters.jsContext.callObjectProperty(globalObject.get(), "__tickleJs", callContext);

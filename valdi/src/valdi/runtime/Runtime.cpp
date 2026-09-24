@@ -557,7 +557,8 @@ void Runtime::onViewNodeTreeLayoutBecameDirty(ViewNodeTree& viewNodeTree) {
 
 void Runtime::runWithExclusiveJsThreadLock(DispatchFunction&& cb) {
     if (_didInit) {
-        _javaScriptRuntime->dispatchOnJsThreadAsync(nullptr, [cb = std::move(cb)](auto& /*jsEntry*/) { cb(); });
+        _javaScriptRuntime->dispatchOnJsThreadAsync(JsThreadDispatchReason::ExclusiveJsThreadLock,
+                                                    [cb = std::move(cb)](auto& /*jsEntry*/) { cb(); });
     } else {
         _mainThreadManager->dispatch(nullptr, std::move(cb));
     }

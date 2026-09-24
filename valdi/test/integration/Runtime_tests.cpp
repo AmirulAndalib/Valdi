@@ -302,7 +302,8 @@ TEST_P(RuntimeFixture, traceProxyRetainsCallbackAcrossGC) {
     ASSERT_TRUE(setupResult) << setupResult.description();
 
     // Force GC: pre-fix the unrooted closure is collected and its slot recycled.
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
 
     // Invoke through the proxy: it must still resolve to the original callback.
     std::string callBody = "return __traceProxy();";
@@ -1575,7 +1576,7 @@ TEST_P(RuntimeFixture, messagePortListenerKeepsReceivingPortAliveUntilClosed) {
     auto* javaScriptRuntime = wrapper.runtime->getJavaScriptRuntime();
     Weak<JavaScriptMessagePort> receivingPort;
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         auto portValue = jsEntry.jsContext.evaluate(R"""(
             (() => {
                 const channel = new MessageChannel();
@@ -1596,10 +1597,11 @@ TEST_P(RuntimeFixture, messagePortListenerKeepsReceivingPortAliveUntilClosed) {
         receivingPort = weakRef(port.get());
     });
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     ASSERT_NE(nullptr, receivingPort.lock());
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         jsEntry.jsContext.evaluate("globalThis.messagePortSender.postMessage('still alive')",
                                    "message-port-send.js",
                                    jsEntry.exceptionTracker);
@@ -1607,7 +1609,7 @@ TEST_P(RuntimeFixture, messagePortListenerKeepsReceivingPortAliveUntilClosed) {
     });
     wrapper.flushQueues();
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         auto message = jsEntry.jsContext.evaluate(
             "globalThis.receivedPortMessages[0]", "message-port-receive.js", jsEntry.exceptionTracker);
         ASSERT_TRUE(jsEntry.exceptionTracker);
@@ -1620,7 +1622,8 @@ TEST_P(RuntimeFixture, messagePortListenerKeepsReceivingPortAliveUntilClosed) {
         port->close();
     });
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     EXPECT_EQ(nullptr, receivingPort.lock());
 }
 
@@ -1628,7 +1631,7 @@ TEST_P(RuntimeFixture, messagePortReleasedWhenListenerCleared) {
     auto* javaScriptRuntime = wrapper.runtime->getJavaScriptRuntime();
     Weak<JavaScriptMessagePort> receivingPort;
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         auto portValue = jsEntry.jsContext.evaluate(R"""(
             (() => {
                 const channel = new MessageChannel();
@@ -1648,18 +1651,20 @@ TEST_P(RuntimeFixture, messagePortReleasedWhenListenerCleared) {
         receivingPort = weakRef(port.get());
     });
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     ASSERT_NE(nullptr, receivingPort.lock());
 
     // Clearing the listener must release the endpoint's retained handle so the port can be collected,
     // otherwise a port that sets and then clears onmessage would leak for the lifetime of the context.
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         auto port = Ref<JavaScriptMessagePort>(receivingPort.lock());
         ASSERT_NE(nullptr, port);
         port->setOnMessage(nullptr);
     });
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     EXPECT_EQ(nullptr, receivingPort.lock());
 }
 
@@ -1674,7 +1679,7 @@ TEST_P(RuntimeFixture, messagePortReleasedWhenPeerCloses) {
     auto* javaScriptRuntime = wrapper.runtime->getJavaScriptRuntime();
     Weak<JavaScriptMessagePort> receivingPort;
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         auto portValue = jsEntry.jsContext.evaluate(R"""(
             (() => {
                 const channel = new MessageChannel();
@@ -1694,19 +1699,21 @@ TEST_P(RuntimeFixture, messagePortReleasedWhenPeerCloses) {
         receivingPort = weakRef(port.get());
     });
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     ASSERT_NE(nullptr, receivingPort.lock());
 
     // Closing the peer means the receiving port can never receive again, so its listener-based retention
     // must be released (the peer notifies it via onPeerClosed) and the port becomes collectible.
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
         jsEntry.jsContext.evaluate(
             "globalThis.messagePortSender.close()", "message-port-peer-close-call.js", jsEntry.exceptionTracker);
         ASSERT_TRUE(jsEntry.exceptionTracker);
     });
     wrapper.flushQueues();
 
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                       [](auto& jsEntry) { jsEntry.jsContext.garbageCollect(); });
     EXPECT_EQ(nullptr, receivingPort.lock());
 }
 
@@ -7168,9 +7175,10 @@ TEST_P(RuntimeFixture, cooperativeTeardownDrainsInFlightWorkAggressiveSkipsIt) {
     // Cooperative (default): disposed-but-context-alive work runs.
     {
         bool ran = false;
-        javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) {
+        javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto&) {
             javaScriptRuntime->setDisposedForTesting(true);
-            javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) { ran = true; });
+            javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                               [&](auto&) { ran = true; });
             javaScriptRuntime->setDisposedForTesting(false);
         });
         EXPECT_TRUE(ran) << "cooperative mode must drain in-flight work during the teardown window";
@@ -7180,9 +7188,10 @@ TEST_P(RuntimeFixture, cooperativeTeardownDrainsInFlightWorkAggressiveSkipsIt) {
     javaScriptRuntime->setCooperativeTermination(false);
     {
         bool ran = false;
-        javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) {
+        javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto&) {
             javaScriptRuntime->setDisposedForTesting(true);
-            javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) { ran = true; });
+            javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"),
+                                                               [&](auto&) { ran = true; });
             javaScriptRuntime->setDisposedForTesting(false);
         });
         EXPECT_FALSE(ran) << "aggressive mode skips disposed work";
@@ -7201,9 +7210,9 @@ TEST_P(RuntimeFixture, initFailedRuntimeSkipsQueuedWorkWhileContextAlive) {
     auto* javaScriptRuntime = wrapper.runtime->getJavaScriptRuntime();
 
     bool ran = false;
-    javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) {
+    javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto&) {
         javaScriptRuntime->setRunningForTesting(false);
-        javaScriptRuntime->dispatchSynchronouslyOnJsThread([&](auto&) { ran = true; });
+        javaScriptRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto&) { ran = true; });
         javaScriptRuntime->setRunningForTesting(true);
     });
     EXPECT_FALSE(ran) << "queued work must be skipped while _running is cleared (module-loader init failed) even "
@@ -7228,7 +7237,7 @@ TEST_P(RuntimeFixture, DISABLED_moduleResourceTrackerFreedUnderJsThreadIsUseAfte
     std::promise<void> freed;
 
     std::thread jsSide([&] {
-        jsRuntime->dispatchSynchronouslyOnJsThread([&](auto&) {
+        jsRuntime->dispatchSynchronouslyOnJsThread(STRING_LITERAL("test.runtime"), [&](auto&) {
             auto* elem = jsRuntime->mutateAndGetModuleResourceTrackerBackForTesting();
             parked.set_value();
             freed.get_future().wait();
@@ -7388,10 +7397,11 @@ TEST_P(RuntimeFixture, supportsUserCreatedNativeObjects) {
 
     // Now we dispose the objects manager
 
-    wrapper.runtime->getJavaScriptRuntime()->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
-        wrapper.runtime->getJavaScriptRuntime()->destroyNativeObjectsManager(objectsManager);
-        return;
-    });
+    wrapper.runtime->getJavaScriptRuntime()->dispatchSynchronouslyOnJsThread(
+        STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
+            wrapper.runtime->getJavaScriptRuntime()->destroyNativeObjectsManager(objectsManager);
+            return;
+        });
 
     // The reference should have been released
     ASSERT_EQ(1, nativeObject.use_count());
@@ -7982,10 +7992,11 @@ TEST_P(RuntimeFixture, scopeNameAppearsInDisposedReferenceError) {
     };
 
     // Dispose the objectsManager
-    wrapper.runtime->getJavaScriptRuntime()->dispatchSynchronouslyOnJsThread([&](auto& jsEntry) {
-        wrapper.runtime->getJavaScriptRuntime()->destroyNativeObjectsManager(objectsManager);
-        return;
-    });
+    wrapper.runtime->getJavaScriptRuntime()->dispatchSynchronouslyOnJsThread(
+        STRING_LITERAL("test.runtime"), [&](auto& jsEntry) {
+            wrapper.runtime->getJavaScriptRuntime()->destroyNativeObjectsManager(objectsManager);
+            return;
+        });
 
     // Try to unwrap - should trigger error with scopeName (error is logged, not thrown)
     unwrapObject();
@@ -8432,7 +8443,7 @@ TEST_P(RuntimeFixture, canSymbolicateError) {
     auto finalError = Error("Invalid error");
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+        STRING_LITERAL("test.runtime"), JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
             auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
             if (!entry.exceptionTracker) {
                 return;
@@ -8463,7 +8474,7 @@ TEST_P(RuntimeFixture, handlesFailureSafelyInSymbolication) {
     ASSERT_EQ(static_cast<size_t>(0), messageHandler->messages().errors.size());
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+        STRING_LITERAL("test.runtime"), JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
             auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
             if (!entry.exceptionTracker) {
                 return;
@@ -8486,7 +8497,7 @@ TEST_P(RuntimeFixture, convertJSErrorFallsBackToValueStringForEmptyMessage) {
     auto finalError = Error("Invalid error");
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+        STRING_LITERAL("test.runtime"), JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
             auto error = entry.jsContext.newError("", std::nullopt, entry.exceptionTracker);
             if (!entry.exceptionTracker) {
                 return;
@@ -8512,7 +8523,7 @@ TEST_P(RuntimeFixture, convertJSErrorFallsBackToValueStringWhenMessageGetterThro
     auto finalError = Error("Invalid error");
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+        STRING_LITERAL("test.runtime"), JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
             auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
             if (!entry.exceptionTracker) {
                 return;
@@ -8541,7 +8552,7 @@ TEST_P(RuntimeFixture, convertJSErrorReportsValueTypeWhenUnstringifiable) {
     auto finalError = Error("Invalid error");
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThread(
-        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
+        STRING_LITERAL("test.runtime"), JavaScriptTaskScheduleTypeAlwaysSync, 0, [&](JavaScriptEntryParameters& entry) {
             auto error = entry.jsContext.newError("This is an error", std::nullopt, entry.exceptionTracker);
             if (!entry.exceptionTracker) {
                 return;
@@ -9806,6 +9817,24 @@ TEST_P(RuntimeFixture, recordsTraceSpanTagForANRAttribution) {
     EXPECT_EQ(std::string::npos, jsRuntime->getANRAttributionInfo().find("[stuck-in:"));
 }
 
+TEST_P(RuntimeFixture, recordsScheduledWorkItemForANRAttribution) {
+    wrapper.teardown();
+
+    auto tweakModule = makeShared<TestTweakValueProvider>().toShared();
+    tweakModule->config.setMapValue("VALDI_ENABLE_MODULE_LOAD_DIAGNOSTICS", Valdi::Value(static_cast<bool>(true)));
+    wrapper = RuntimeWrapper(getJsBridge(), getTSNMode(), false, tweakModule);
+
+    std::string spinBody = "runtime.scheduleWorkItem(() => {"
+                           "  while (!runtime.isModuleLoaded('anr_attribution_gate_work_item')) {}"
+                           "}, 0);"
+                           "return 0;";
+    const std::string expected = "[stuck-in: runtime.scheduleWorkItem]";
+    auto observed = observeANRAttributionWhileSpinning(wrapper, spinBody, "anr_attribution_gate_work_item", expected);
+
+    EXPECT_NE(std::string::npos, observed.find(expected)) << "observed: '" << observed << "'";
+    EXPECT_EQ(std::string::npos, wrapper.runtime->getJavaScriptRuntime()->getANRAttributionInfo().find("[stuck-in:"));
+}
+
 TEST(JavaScriptRuntimeANRAttribution, traceSpanNameKeepsStaticPrefixOnly) {
     EXPECT_EQ(STRING_LITERAL("renderComponent.SendToRecipientList"),
               JavaScriptRuntime::anrNativeCallNameForTraceSpan(STRING_LITERAL("renderComponent.SendToRecipientList")));
@@ -9815,6 +9844,75 @@ TEST(JavaScriptRuntimeANRAttribution, traceSpanNameKeepsStaticPrefixOnly) {
     EXPECT_TRUE(JavaScriptRuntime::anrNativeCallNameForTraceSpan(STRING_LITERAL(": dynamic-only")).isEmpty());
     EXPECT_EQ(128u,
               JavaScriptRuntime::anrNativeCallNameForTraceSpan(StringBox::fromString(std::string(200, 'x'))).length());
+}
+
+TEST_P(RuntimeFixture, acceptsEmptyOwnerlessAttributionWhenDiagnosticsAreDisabled) {
+    auto* jsRuntime = wrapper.runtime->getJavaScriptRuntime();
+    ASSERT_FALSE(jsRuntime->anrDiagnosticsEnabled());
+
+    bool ran = false;
+    jsRuntime->dispatchSynchronouslyOnJsThread(StringBox(), [&](JavaScriptEntryParameters& /*entry*/) { ran = true; });
+
+    EXPECT_TRUE(ran);
+}
+
+TEST_P(RuntimeFixture, recordsAttributionForOwnerlessJsThreadDispatch) {
+    wrapper.teardown();
+
+    auto tweakModule = makeShared<TestTweakValueProvider>().toShared();
+    tweakModule->config.setMapValue("VALDI_ENABLE_MODULE_LOAD_DIAGNOSTICS", Valdi::Value(static_cast<bool>(true)));
+
+    wrapper = RuntimeWrapper(getJsBridge(), getTSNMode(), false, tweakModule);
+
+    auto* jsRuntime = wrapper.runtime->getJavaScriptRuntime();
+
+    EXPECT_DEATH(
+        {
+            jsRuntime->dispatchOnJsThread(
+                StringBox(), JavaScriptTaskScheduleTypeDefault, 0, [](JavaScriptEntryParameters& /*entry*/) {});
+        },
+        ".*");
+
+    auto verifyAttribution = [&](const std::string& expected, const auto& dispatch) {
+        std::atomic<bool> taskStarted = false;
+        std::atomic<bool> releaseTask = false;
+
+        std::thread dispatchThread([&] {
+            dispatch([&](JavaScriptEntryParameters& /*entry*/) {
+                taskStarted = true;
+                while (!releaseTask) {
+                    std::this_thread::yield();
+                }
+            });
+        });
+
+        std::string observed;
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        while (std::chrono::steady_clock::now() < deadline) {
+            auto attributionInfo = jsRuntime->getANRAttributionInfo();
+            if (taskStarted && attributionInfo.find(expected) != std::string::npos) {
+                observed = std::move(attributionInfo);
+                break;
+            }
+            std::this_thread::yield();
+        }
+
+        releaseTask = true;
+        dispatchThread.join();
+
+        EXPECT_NE(std::string::npos, observed.find(expected)) << "observed: '" << observed << "'";
+        EXPECT_EQ(std::string::npos, jsRuntime->getANRAttributionInfo().find("[stuck-in:"));
+    };
+
+    verifyAttribution("[stuck-in: test.nativeRunnable]", [&](JavaScriptThreadTask&& task) {
+        jsRuntime->dispatchOnJsThread(
+            STRING_LITERAL("test.nativeRunnable"), JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(task));
+    });
+
+    verifyAttribution("[stuck-in: runtime.performGc]", [&](JavaScriptThreadTask&& task) {
+        jsRuntime->dispatchOnJsThread(
+            JsThreadDispatchReason::PerformGc, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(task));
+    });
 }
 
 TEST_P(RuntimeFixture, canGetFileEntry) {
@@ -10037,7 +10135,7 @@ TEST_P(RuntimeFixture, cancelsComponentCreationIfDestroyIsCalledBeforeComponentI
     group->enter();
 
     wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThreadAsync(
-        nullptr, [group](JavaScriptEntryParameters& entry) { group->blockingWait(); });
+        STRING_LITERAL("test.runtime"), [group](JavaScriptEntryParameters& entry) { group->blockingWait(); });
 
     auto callback = makeShared<ValueFunctionWithCallable>([&](const auto& callContext) -> Value {
         onRenderCalled = true;

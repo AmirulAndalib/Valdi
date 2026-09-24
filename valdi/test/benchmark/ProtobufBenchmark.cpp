@@ -55,7 +55,8 @@ static void doBench(JavaScriptEngineType jsEngineType, std::string_view function
 
     auto moduleFunction = wrapper.benchmarkModule.getMapValue(functionName).getFunctionRef();
 
-    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThreadSync(nullptr, [&](const auto& jsEntry) {
+    const auto attribution = STRING_LITERAL("benchmark.protobuf");
+    wrapper.runtime->getJavaScriptRuntime()->dispatchOnJsThreadSync(attribution, [&](const auto& jsEntry) {
         auto doBench = (*moduleFunction)(ValueFunctionFlagsPropagatesError,
                                          {Value(makeShared<ValueTypedArray>(Uint8Array, bytes))})
                            .value()

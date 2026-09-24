@@ -119,7 +119,7 @@ void RuntimeWrapper::setViewModel(const Valdi::SharedContext& context, const Val
 void RuntimeWrapper::flushJsQueue() {
     if (standaloneRuntime->getRuntime().getJavaScriptRuntime() != nullptr) {
         standaloneRuntime->getRuntime().getJavaScriptRuntime()->dispatchSynchronouslyOnJsThread(
-            [](auto& jsEntry) { return; });
+            STRING_LITERAL("test.flushJsQueue"), [](auto& jsEntry) { return; });
     }
 }
 
@@ -211,8 +211,9 @@ void RuntimeWrapper::hotReload(const Valdi::ResourceId& resourceId, const Valdi:
     std::vector<Valdi::Shared<Valdi::Resource>> resources;
     resources.emplace_back(Valdi::makeShared<Valdi::Resource>(resourceId, bytes));
 
+    const auto attribution = STRING_LITERAL("test.hotReload");
     runtime->getJavaScriptRuntime()->dispatchOnJsThreadSync(
-        nullptr, [runtime = runtime, resources = std::move(resources)](auto& /*jsEntry*/) {
+        attribution, [runtime = runtime, resources = std::move(resources)](auto& /*jsEntry*/) {
             runtime->updateResources(resources);
         });
 }

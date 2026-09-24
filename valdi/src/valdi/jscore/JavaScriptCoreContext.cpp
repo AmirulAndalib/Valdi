@@ -1258,7 +1258,9 @@ void JavaScriptCoreContext::startDebugger([[maybe_unused]] bool isWorker) {
     if (taskScheduler != nullptr) {
         JSRunLoopSetScheduleCallback(taskScheduler, [](void* opaque, uint32_t delayMs) {
             auto taskScheduler = reinterpret_cast<Valdi::JavaScriptTaskScheduler*>(opaque);
-            taskScheduler->dispatchOnJsThreadAsyncAfter(nullptr, delayMs, [](auto& /*jsEntry*/) { JSRunLoopFlush(); });
+            taskScheduler->dispatchOnJsThreadAsyncAfter(Valdi::JsThreadDispatchReason::JavaScriptRunLoopFlush,
+                                                        delayMs,
+                                                        [](auto& /*jsEntry*/) { JSRunLoopFlush(); });
         });
     }
 

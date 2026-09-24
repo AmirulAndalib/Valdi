@@ -107,6 +107,8 @@ namespace Valdi {
 constexpr int kTraceRecordingTimeoutSeconds = 30;
 constexpr uint64_t kMaxJavaScriptSafeInteger = 9007199254740991ULL;
 
+static StringBox dispatchReasonName(JsThreadDispatchReason reason);
+
 constexpr uint64_t clampTraceDroppedEventCountForJavaScript(uint64_t value) {
     return value > kMaxJavaScriptSafeInteger ? kMaxJavaScriptSafeInteger : value;
 }
@@ -618,7 +620,8 @@ const Ref<DispatchQueue>& JavaScriptRuntime::getJsDispatchQueue() const {
 }
 
 void JavaScriptRuntime::setValueToGlobalObject(const StringBox& name, const Value& value) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::SetValueToGlobalObject;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         auto globalKey = STRING_LITERAL("global");
         auto jsValueResult = valueToJSValue(entry.jsContext,
                                             value,
@@ -2118,8 +2121,11 @@ JSValueRef JavaScriptRuntime::runtimeScheduleWorkItem(JSFunctionNativeCallContex
     auto delayMs = std::chrono::milliseconds(static_cast<int64_t>(delayResult));
 
     auto funcContext = func->getContext();
+    auto dispatchAttribution =
+        anrDiagnosticsEnabled() ? dispatchReasonName(JsThreadDispatchReason::ScheduleWorkItem) : StringBox();
     auto dispatchFunc = makeJsThreadDispatchFunction(
-        Ref(std::move(funcContext)), [func = std::move(func), interruptible](JavaScriptEntryParameters& jsEntry) {
+        Ref(std::move(funcContext)),
+        [func = std::move(func), interruptible](JavaScriptEntryParameters& jsEntry) {
             auto jsValue = func->getJsValue(jsEntry.jsContext, jsEntry.exceptionTracker);
             if (!jsEntry.exceptionTracker) {
                 if (interruptible) {
@@ -2130,7 +2136,8 @@ JSValueRef JavaScriptRuntime::runtimeScheduleWorkItem(JSFunctionNativeCallContex
 
             JSFunctionCallContext callContext(jsEntry.jsContext, nullptr, 0, jsEntry.exceptionTracker);
             jsEntry.jsContext.callObjectAsFunction(jsValue, callContext);
-        });
+        },
+        std::move(dispatchAttribution));
 
     task_id_t taskId = _dispatchQueue->asyncAfter(std::move(dispatchFunc), delayMs);
 
@@ -2751,7 +2758,8 @@ void JavaScriptRuntime::dispatchPerformGcToWorkers() {
 }
 
 void JavaScriptRuntime::performGc() {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::PerformGc;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         dispatchPerformGcToWorkers();
         performGcNow(entry.jsContext);
     });
@@ -2760,12 +2768,14 @@ void JavaScriptRuntime::performGc() {
 JavaScriptContextMemoryStatistics JavaScriptRuntime::dumpMemoryStatistics() {
     JavaScriptContextMemoryStatistics stats;
     dispatchSynchronouslyOnJsThread(
+        JsThreadDispatchReason::DumpMemoryStatistics,
         [=, &stats](JavaScriptEntryParameters& entry) { stats = this->dumpMemoryStatistics(entry.jsContext); });
     return stats;
 }
 
 void JavaScriptRuntime::dumpMemoryStatisticsAsync(Function<void(JavaScriptContextMemoryStatistics)> completion) {
-    dispatchOnJsThreadAsync(nullptr, [this, completion](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::DumpMemoryStatistics;
+    dispatchOnJsThreadAsync(reason, [this, completion](JavaScriptEntryParameters& entry) {
         completion(this->dumpMemoryStatistics(entry.jsContext));
     });
 }
@@ -2804,7 +2814,8 @@ void JavaScriptRuntime::callComponentFunction(const Ref<Context>& context,
 void JavaScriptRuntime::callModuleFunction(const StringBox& module,
                                            const StringBox& functionName,
                                            const Ref<ValueArray>& parameters) {
-    dispatchOnJsThreadAsync(nullptr, [this, module, functionName, parameters](auto& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::CallModuleFunction;
+    dispatchOnJsThreadAsync(reason, [this, module, functionName, parameters](auto& jsEntry) {
         auto importResult = this->importModule(module, jsEntry);
         if (!jsEntry.exceptionTracker) {
             return;
@@ -2993,7 +3004,8 @@ void JavaScriptRuntime::onModuleUnloaded(const ResourceId& resourceId, JavaScrip
 }
 
 void JavaScriptRuntime::unloadAllModules() {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::UnloadAllModules;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         if (!_modules.empty()) {
             std::vector<ResourceId> resourceIds;
             for (const auto& it : _modules) {
@@ -3010,7 +3022,8 @@ void JavaScriptRuntime::unloadAllModules() {
 void JavaScriptRuntime::unloadUnusedModules(const Ref<AsyncGroup>& completionGroup) {
     completionGroup->enter();
 
-    dispatchOnJsThreadUnattributed([this, completionGroup = completionGroup](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::UnloadUnusedModules;
+    dispatchOnJsThreadAsync(reason, [this, completionGroup = completionGroup](JavaScriptEntryParameters& entry) {
         for (const auto& jsWorker : getAllWorkers()) {
             jsWorker->unloadUnusedModules(completionGroup);
         }
@@ -3091,7 +3104,8 @@ bool JavaScriptRuntime::isInEvalMode() const {
 }
 
 void JavaScriptRuntime::reevalUnloadedModulesIfNeeded() {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::ReevalUnloadedModules;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         auto it = _pendingModulesToReload.begin();
         while (it != _pendingModulesToReload.end()) {
             importModule(*it, entry);
@@ -3106,7 +3120,8 @@ void JavaScriptRuntime::reevalUnloadedModulesIfNeeded() {
 
 void JavaScriptRuntime::unloadModulesAndDependentModules(const std::vector<ResourceId>& resourceIds,
                                                          bool isHotReloading) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::UnloadModulesAndDependents;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         for (const auto& jsWorker : getAllWorkers()) {
             jsWorker->unloadModulesAndDependentModules(resourceIds, isHotReloading);
         }
@@ -3121,7 +3136,7 @@ void JavaScriptRuntime::unloadModulesAndDependentModules(const std::vector<Resou
 bool JavaScriptRuntime::isJsModuleLoaded(const ResourceId& resourceId) {
     bool loaded = false;
 
-    dispatchSynchronouslyOnJsThread([&](JavaScriptEntryParameters& entry) {
+    dispatchSynchronouslyOnJsThread(JsThreadDispatchReason::IsJsModuleLoaded, [&](JavaScriptEntryParameters& entry) {
         auto pathResult = entry.jsContext.newStringUTF8(resourceId.toAbsolutePath(), entry.exceptionTracker);
         if (!entry.exceptionTracker) {
             onRecoverableError("isJsModuleLoaded", entry.exceptionTracker);
@@ -3237,7 +3252,8 @@ void JavaScriptRuntime::onModulesUnloaded(const JSValue& value,
 }
 
 void JavaScriptRuntime::registerJavaScriptModuleFactory(const Ref<JavaScriptModuleFactory>& moduleFactory) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::RegisterModuleFactory;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         _moduleFactories.push_back(moduleFactory);
         auto modulePath = moduleFactory->getModulePath();
         auto pathResult = entry.jsContext.newStringUTF8(modulePath.toStringView(), entry.exceptionTracker);
@@ -3274,7 +3290,8 @@ void JavaScriptRuntime::registerJavaScriptModuleFactory(const Ref<JavaScriptModu
 }
 
 void JavaScriptRuntime::registerTypeConverter(const StringBox& typeName, const StringBox& functionPath) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::RegisterTypeConverter;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& jsEntry) {
         auto parsedPath = ComponentPath::parse(functionPath);
 
         auto importResult = this->importModule(parsedPath.getResourceId(), jsEntry);
@@ -3436,7 +3453,7 @@ JavaScriptContextMemoryStatistics JavaScriptRuntime::dumpMemoryStatistics(IJavaS
 
 Result<Value> JavaScriptRuntime::evaluateScript(const BytesView& script, const StringBox& sourceFilename) {
     Result<Value> result;
-    dispatchSynchronouslyOnJsThread([&](JavaScriptEntryParameters& jsEntry) {
+    dispatchSynchronouslyOnJsThread(JsThreadDispatchReason::EvaluateScript, [&](JavaScriptEntryParameters& jsEntry) {
         auto loadResult =
             loadJsModuleFromBytes(jsEntry.jsContext, script, sourceFilename, nullptr, 0, jsEntry.exceptionTracker);
 
@@ -3467,7 +3484,7 @@ Result<Void> JavaScriptRuntime::evalModuleSync(const StringBox& path, bool reeva
 
     Result<Void> result = Void();
 
-    dispatchSynchronouslyOnJsThread([&](JavaScriptEntryParameters& jsEntry) {
+    dispatchSynchronouslyOnJsThread(JsThreadDispatchReason::EvalModuleSync, [&](JavaScriptEntryParameters& jsEntry) {
         if (reevalOnReload) {
             _modulesToAutoReload.insert(resourceIdResult.value());
         }
@@ -3499,7 +3516,8 @@ int32_t JavaScriptRuntime::pushModuleToMarshaller(
     Marshaller& marshaller) {
     int32_t retValue = 0;
     bool taskRan = false;
-    dispatchOnJsThreadSync(nullptr, [&](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::PushModuleToMarshaller;
+    dispatchOnJsThreadSync(reason, [&](JavaScriptEntryParameters& jsEntry) {
         taskRan = true;
         auto importResult = this->importModule(path, jsEntry);
         if (!jsEntry.exceptionTracker) {
@@ -3547,7 +3565,8 @@ int32_t JavaScriptRuntime::pushModuleToMarshaller(
 }
 
 void JavaScriptRuntime::addModuleUnloadObserver(const Valdi::StringBox& path, const Valdi::Value& observer) {
-    dispatchOnJsThreadAsync(nullptr, [this, path, observer](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::AddModuleUnloadObserver;
+    dispatchOnJsThreadAsync(reason, [this, path, observer](JavaScriptEntryParameters& jsEntry) {
         auto importResult = this->importModule(path, jsEntry);
         if (!jsEntry.exceptionTracker) {
             onRecoverableError("getModule", jsEntry.exceptionTracker);
@@ -3559,7 +3578,8 @@ void JavaScriptRuntime::addModuleUnloadObserver(const Valdi::StringBox& path, co
 }
 
 void JavaScriptRuntime::preloadModule(const StringBox& path, int32_t maxDepth) {
-    dispatchOnJsThreadAsync(nullptr, [=](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::PreloadModule;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& jsEntry) {
         VALDI_TRACE_META("Valdi.preloadModule", path);
 
         std::initializer_list<JSValueRef> params = {
@@ -3591,7 +3611,8 @@ void JavaScriptRuntime::preloadModules(const std::vector<StringBox>& paths, int3
         }
     }
 
-    dispatchOnJsThreadAsync(nullptr, [=](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::PreloadModules;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& jsEntry) {
         VALDI_TRACE("Valdi.preloadModules");
 
         auto pathsArray =
@@ -3616,7 +3637,8 @@ void JavaScriptRuntime::preloadModules(const std::vector<StringBox>& paths, int3
 }
 
 void JavaScriptRuntime::warmUpValueMarshaller(const Value& value) {
-    dispatchOnJsThreadAsync(nullptr, [value](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::WarmUpValueMarshaller;
+    dispatchOnJsThreadAsync(reason, [value](JavaScriptEntryParameters& jsEntry) {
         VALDI_TRACE("Valdi.warmUpValueMarshaller");
         valueToJSValue(jsEntry.jsContext, value, ReferenceInfoBuilder(), jsEntry.exceptionTracker);
     });
@@ -3674,7 +3696,7 @@ std::shared_ptr<snap::valdi_core::JSRuntime> JavaScriptRuntime::createWorker() {
 }
 
 void JavaScriptRuntime::runOnJsThread(const Value& runnable) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    dispatchOnJsThreadAsync(STRING_LITERAL("runtime.runOnJsThread"), [=](JavaScriptEntryParameters& entry) {
         auto* func = runnable.getFunction();
         if (func != nullptr) {
             (*func)();
@@ -3683,7 +3705,8 @@ void JavaScriptRuntime::runOnJsThread(const Value& runnable) {
 }
 
 void JavaScriptRuntime::daemonClientConnected(const Shared<IDaemonClient>& daemonClient) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::DaemonClientConnected;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& jsEntry) {
         Value wrappedDaemonClient;
 
         wrappedDaemonClient.setMapValue("connectionId", Value(daemonClient->getConnectionId()));
@@ -3731,7 +3754,8 @@ void JavaScriptRuntime::daemonClientConnected(const Shared<IDaemonClient>& daemo
 }
 
 void JavaScriptRuntime::daemonClientDisconnected(const Shared<IDaemonClient>& daemonClient) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::DaemonClientDisconnected;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& jsEntry) {
         const auto& it = _daemonClients.find(daemonClient->getConnectionId());
         if (it != _daemonClients.end()) {
             auto daemonClientJs = it->second;
@@ -3749,7 +3773,8 @@ void JavaScriptRuntime::daemonClientDisconnected(const Shared<IDaemonClient>& da
 void JavaScriptRuntime::daemonClientDidReceiveClientPayload(const Shared<IDaemonClient>& daemonClient,
                                                             int senderClientId,
                                                             const BytesView& payload) {
-    dispatchOnJsThreadUnattributed([=](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::DaemonClientPayload;
+    dispatchOnJsThreadAsync(reason, [=](JavaScriptEntryParameters& entry) {
         const auto& it = _daemonClients.find(daemonClient->getConnectionId());
         if (it != _daemonClients.end()) {
             auto payloadString = entry.jsContext.newStringUTF8(payload.asStringView(), entry.exceptionTracker);
@@ -3826,15 +3851,16 @@ void JavaScriptRuntime::notifyDaemonClientEvent(IJavaScriptContext& jsContext,
 }
 
 void JavaScriptRuntime::setDefaultViewManagerContext(const Ref<ViewManagerContext>& viewManagerContext) {
-    dispatchOnJsThreadUnattributed([=](auto& /*entry*/) { _defaultViewManagerContext = viewManagerContext; });
+    constexpr auto reason = JsThreadDispatchReason::SetDefaultViewManagerContext;
+    dispatchOnJsThreadAsync(reason, [=](auto& /*entry*/) { _defaultViewManagerContext = viewManagerContext; });
 }
 
 std::future<Result<DumpedLogs>> JavaScriptRuntime::dumpLogs(bool includeMetadata, bool includeVerbose) {
     auto promise = Valdi::makeShared<std::promise<Result<DumpedLogs>>>();
     auto future = promise->get_future();
 
-    dispatchOnJsThreadUnattributed([promise, this, includeMetadata, includeVerbose](
-                                       JavaScriptEntryParameters& jsEntry) {
+    constexpr auto reason = JsThreadDispatchReason::DumpLogs;
+    JavaScriptThreadTask task = [promise, this, includeMetadata, includeVerbose](JavaScriptEntryParameters& jsEntry) {
         auto bugReportModule = importModule(STRING_LITERAL("valdi_core/src/BugReporter"), jsEntry);
         if (!jsEntry.exceptionTracker) {
             promise->set_value(jsEntry.exceptionTracker.extractError());
@@ -3898,7 +3924,8 @@ std::future<Result<DumpedLogs>> JavaScriptRuntime::dumpLogs(bool includeMetadata
             }
         }
         promise->set_value(std::move(logs));
-    });
+    };
+    dispatchOnJsThreadAsync(reason, std::move(task));
 
     return future;
 }
@@ -3986,7 +4013,7 @@ void JavaScriptRuntime::lockNextWorker(std::vector<IJavaScriptContext*>& jsConte
 
 void JavaScriptRuntime::lockAllJSContexts(std::vector<IJavaScriptContext*>& jsContexts,
                                           const DispatchFunction& onDone) {
-    dispatchSynchronouslyOnJsThread([&](JavaScriptEntryParameters& jsEntry) {
+    dispatchSynchronouslyOnJsThread(JsThreadDispatchReason::LockAllJSContexts, [&](JavaScriptEntryParameters& jsEntry) {
         jsContexts.emplace_back(&jsEntry.jsContext);
 
         auto jsWorkers = getAllWorkers();
@@ -3995,16 +4022,127 @@ void JavaScriptRuntime::lockAllJSContexts(std::vector<IJavaScriptContext*>& jsCo
     });
 }
 
-void JavaScriptRuntime::dispatchOnJsThreadUnattributed(JavaScriptThreadTask&& function) {
-    dispatchOnJsThread(nullptr, JavaScriptTaskScheduleTypeDefault, 0, std::move(function));
+static StringBox dispatchReasonName(JsThreadDispatchReason reason) {
+    switch (reason) {
+        case JsThreadDispatchReason::SetValueToGlobalObject:
+            return STRING_LITERAL("runtime.setValueToGlobalObject");
+        case JsThreadDispatchReason::PerformGc:
+            return STRING_LITERAL("runtime.performGc");
+        case JsThreadDispatchReason::DumpMemoryStatistics:
+            return STRING_LITERAL("runtime.dumpMemoryStatistics");
+        case JsThreadDispatchReason::UnloadAllModules:
+            return STRING_LITERAL("runtime.unloadAllModules");
+        case JsThreadDispatchReason::UnloadUnusedModules:
+            return STRING_LITERAL("runtime.unloadUnusedModules");
+        case JsThreadDispatchReason::ReevalUnloadedModules:
+            return STRING_LITERAL("runtime.reevalUnloadedModulesIfNeeded");
+        case JsThreadDispatchReason::UnloadModulesAndDependents:
+            return STRING_LITERAL("runtime.unloadModulesAndDependentModules");
+        case JsThreadDispatchReason::IsJsModuleLoaded:
+            return STRING_LITERAL("runtime.isJsModuleLoaded");
+        case JsThreadDispatchReason::EvaluateScript:
+            return STRING_LITERAL("runtime.evaluateScript");
+        case JsThreadDispatchReason::EvalModuleSync:
+            return STRING_LITERAL("runtime.evalModuleSync");
+        case JsThreadDispatchReason::RegisterModuleFactory:
+            return STRING_LITERAL("runtime.registerJavaScriptModuleFactory");
+        case JsThreadDispatchReason::RegisterTypeConverter:
+            return STRING_LITERAL("runtime.registerTypeConverter");
+        case JsThreadDispatchReason::CallModuleFunction:
+            return STRING_LITERAL("runtime.callModuleFunction");
+        case JsThreadDispatchReason::PushModuleToMarshaller:
+            return STRING_LITERAL("runtime.pushModuleToMarshaller");
+        case JsThreadDispatchReason::AddModuleUnloadObserver:
+            return STRING_LITERAL("runtime.addModuleUnloadObserver");
+        case JsThreadDispatchReason::PreloadModule:
+            return STRING_LITERAL("runtime.preloadModule");
+        case JsThreadDispatchReason::PreloadModules:
+            return STRING_LITERAL("runtime.preloadModules");
+        case JsThreadDispatchReason::ScheduleWorkItem:
+            return STRING_LITERAL("runtime.scheduleWorkItem");
+        case JsThreadDispatchReason::WarmUpValueMarshaller:
+            return STRING_LITERAL("runtime.warmUpValueMarshaller");
+        case JsThreadDispatchReason::ExclusiveJsThreadLock:
+            return STRING_LITERAL("runtime.runWithExclusiveJsThreadLock");
+        case JsThreadDispatchReason::WorkerPostInit:
+            return STRING_LITERAL("runtime.workerPostInit");
+        case JsThreadDispatchReason::WorkerPostMessage:
+            return STRING_LITERAL("runtime.workerPostMessage");
+        case JsThreadDispatchReason::MessagePortReleaseHandle:
+            return STRING_LITERAL("runtime.messagePortReleaseHandle");
+        case JsThreadDispatchReason::MessagePortDispatch:
+            return STRING_LITERAL("runtime.messagePortDispatch");
+        case JsThreadDispatchReason::ErrorStackTrace:
+            return STRING_LITERAL("runtime.errorStackTrace");
+        case JsThreadDispatchReason::TypedArrayConversion:
+            return STRING_LITERAL("runtime.typedArrayConversion");
+        case JsThreadDispatchReason::JavaScriptRunLoopFlush:
+            return STRING_LITERAL("runtime.javaScriptRunLoopFlush");
+        case JsThreadDispatchReason::DebuggerTickle:
+            return STRING_LITERAL("runtime.debuggerTickle");
+        case JsThreadDispatchReason::ANRDetectorAcknowledgement:
+            return STRING_LITERAL("runtime.anrDetectorAcknowledgement");
+        case JsThreadDispatchReason::ANRDetectorNudge:
+            return STRING_LITERAL("runtime.anrDetectorNudge");
+        case JsThreadDispatchReason::HotReloadStashData:
+            return STRING_LITERAL("runtime.hotReloadStashData");
+        case JsThreadDispatchReason::HotReloadRestoreData:
+            return STRING_LITERAL("runtime.hotReloadRestoreData");
+        case JsThreadDispatchReason::LockAllJSContexts:
+            return STRING_LITERAL("runtime.lockAllJSContexts");
+        case JsThreadDispatchReason::DaemonClientConnected:
+            return STRING_LITERAL("runtime.daemonClientConnected");
+        case JsThreadDispatchReason::DaemonClientDisconnected:
+            return STRING_LITERAL("runtime.daemonClientDisconnected");
+        case JsThreadDispatchReason::DaemonClientPayload:
+            return STRING_LITERAL("runtime.daemonClientDidReceiveClientPayload");
+        case JsThreadDispatchReason::SetDefaultViewManagerContext:
+            return STRING_LITERAL("runtime.setDefaultViewManagerContext");
+        case JsThreadDispatchReason::DumpLogs:
+            return STRING_LITERAL("runtime.dumpLogs");
+        case JsThreadDispatchReason::DumpHeap:
+            return STRING_LITERAL("runtime.dumpHeap");
+        case JsThreadDispatchReason::StartProfiling:
+            return STRING_LITERAL("runtime.startProfiling");
+        case JsThreadDispatchReason::StopProfiling:
+            return STRING_LITERAL("runtime.stopProfiling");
+    }
+    return STRING_LITERAL("runtime.dispatch");
 }
 
 void JavaScriptRuntime::dispatchOnJsThread(Ref<Context> ownerContext,
                                            JavaScriptTaskScheduleType scheduleType,
                                            uint32_t delayMs,
                                            JavaScriptThreadTask&& function) {
-    auto dispatchFunc = makeJsThreadDispatchFunction(
-        ownerContext != nullptr ? std::move(ownerContext) : Ref(_globalContext), std::move(function));
+    dispatchOnJsThreadImpl(std::move(ownerContext), scheduleType, delayMs, StringBox(), std::move(function));
+}
+
+void JavaScriptRuntime::dispatchOnJsThread(JsThreadDispatchReason reason,
+                                           JavaScriptTaskScheduleType scheduleType,
+                                           uint32_t delayMs,
+                                           JavaScriptThreadTask&& function) {
+    auto attribution = anrDiagnosticsEnabled() ? dispatchReasonName(reason) : StringBox();
+    dispatchOnJsThreadImpl(nullptr, scheduleType, delayMs, std::move(attribution), std::move(function));
+}
+
+void JavaScriptRuntime::dispatchOnJsThread(const StringBox& attribution,
+                                           JavaScriptTaskScheduleType scheduleType,
+                                           uint32_t delayMs,
+                                           JavaScriptThreadTask&& function) {
+    SC_ASSERT(!anrDiagnosticsEnabled() || !attribution.isEmpty());
+    auto dispatchAttribution = anrDiagnosticsEnabled() ? attribution : StringBox();
+    dispatchOnJsThreadImpl(nullptr, scheduleType, delayMs, std::move(dispatchAttribution), std::move(function));
+}
+
+void JavaScriptRuntime::dispatchOnJsThreadImpl(Ref<Context> ownerContext,
+                                               JavaScriptTaskScheduleType scheduleType,
+                                               uint32_t delayMs,
+                                               StringBox dispatchAttribution,
+                                               JavaScriptThreadTask&& function) {
+    auto dispatchFunc =
+        makeJsThreadDispatchFunction(ownerContext != nullptr ? std::move(ownerContext) : Ref(_globalContext),
+                                     std::move(function),
+                                     std::move(dispatchAttribution));
 
     if (scheduleType == JavaScriptTaskScheduleTypeAlwaysAsync) {
         _dispatchQueue->asyncAfter(std::move(dispatchFunc), std::chrono::milliseconds(delayMs));
@@ -4029,7 +4167,17 @@ void JavaScriptRuntime::dispatchOnJsThread(Ref<Context> ownerContext,
 }
 
 void JavaScriptRuntime::dispatchSynchronouslyOnJsThread(JavaScriptThreadTask&& function) {
-    dispatchOnJsThread(nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
+    dispatchOnJsThreadImpl(
+        nullptr, JavaScriptTaskScheduleTypeAlwaysSync, 0, StringBox(), std::move(function));
+}
+
+void JavaScriptRuntime::dispatchSynchronouslyOnJsThread(JsThreadDispatchReason reason,
+                                                        JavaScriptThreadTask&& function) {
+    dispatchOnJsThread(reason, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
+}
+
+void JavaScriptRuntime::dispatchSynchronouslyOnJsThread(const StringBox& attribution, JavaScriptThreadTask&& function) {
+    dispatchOnJsThread(attribution, JavaScriptTaskScheduleTypeAlwaysSync, 0, std::move(function));
 }
 
 void JavaScriptRuntime::dispatchOnMainThread(DispatchFunction func) {
@@ -4045,11 +4193,15 @@ Ref<Context> JavaScriptRuntime::getLastDispatchedContext() const {
 }
 
 void JavaScriptRuntime::setANRDiagnosticsEnabled(bool enabled) {
-    _anrDiagnosticsEnabled = enabled;
+    _anrDiagnosticsEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+bool JavaScriptRuntime::anrDiagnosticsEnabled() const {
+    return _anrDiagnosticsEnabled.load(std::memory_order_relaxed);
 }
 
 bool JavaScriptRuntime::anrDiagnosticsActiveOnJsThread() {
-    return _anrDiagnosticsEnabled && isInJsThread();
+    return anrDiagnosticsEnabled() && isInJsThread();
 }
 
 StringBox JavaScriptRuntime::anrNativeCallNameForTraceSpan(const StringBox& traceName) {
@@ -4075,7 +4227,7 @@ bool JavaScriptRuntime::isReadyForANRDetection() const {
 }
 
 std::string JavaScriptRuntime::getANRAttributionInfo() const {
-    if (!_anrDiagnosticsEnabled) {
+    if (!anrDiagnosticsEnabled()) {
         return {};
     }
 
@@ -4104,7 +4256,8 @@ std::string JavaScriptRuntime::getANRAttributionInfo() const {
 }
 
 DispatchFunction JavaScriptRuntime::makeJsThreadDispatchFunction(Ref<Context>&& ownerContext,
-                                                                 JavaScriptThreadTask&& jsTask) {
+                                                                 JavaScriptThreadTask&& jsTask,
+                                                                 StringBox dispatchAttribution) {
     SC_ASSERT(ownerContext != nullptr);
     return [this,
             // Retain the runtime for the task's lifetime so an in-flight JS-thread task can't have a
@@ -4115,7 +4268,8 @@ DispatchFunction JavaScriptRuntime::makeJsThreadDispatchFunction(Ref<Context>&& 
             // dropping thread. Gated by the same kill switch as the destructor join.
             retainedSelf = (_joinJsThreadOnTeardown ? strongSmallRef(this) : Ref<JavaScriptRuntime>()),
             retainedContext = RetainedContext(std::move(ownerContext)),
-            jsTask = std::move(jsTask)]() {
+            jsTask = std::move(jsTask),
+            dispatchAttribution = std::move(dispatchAttribution)]() {
         // _running is cleared only by onInitError (teardownOnJsThread no longer clears it), so
         // !_running here uniquely means module-loader init failed while the context is still
         // non-null. Refuse: queued work must not run against a runtime that never finished
@@ -4150,7 +4304,12 @@ DispatchFunction JavaScriptRuntime::makeJsThreadDispatchFunction(Ref<Context>&& 
             {
                 JavaScriptEntryParameters jsEntry(jsContext, exceptionTracker, ownerContext);
 
-                jsTask(jsEntry);
+                if (!dispatchAttribution.isEmpty()) {
+                    ScopedNativeCallActivity nativeCallActivity(this, dispatchAttribution);
+                    jsTask(jsEntry);
+                } else {
+                    jsTask(jsEntry);
+                }
             }
 
             if (!exceptionTracker) {
@@ -4286,11 +4445,13 @@ const Ref<Metrics>& JavaScriptRuntime::getMetrics() const {
 }
 
 void JavaScriptRuntime::startProfiling() {
-    dispatchOnJsThreadUnattributed([](JavaScriptEntryParameters& entry) { entry.jsContext.startProfiling(); });
+    constexpr auto reason = JsThreadDispatchReason::StartProfiling;
+    dispatchOnJsThreadAsync(reason, [](JavaScriptEntryParameters& entry) { entry.jsContext.startProfiling(); });
 }
 
 void JavaScriptRuntime::stopProfiling(Function<void(const Result<std::vector<std::string>>&)> onComplete) {
-    dispatchOnJsThreadUnattributed([completion = std::move(onComplete)](JavaScriptEntryParameters& entry) {
+    constexpr auto reason = JsThreadDispatchReason::StopProfiling;
+    dispatchOnJsThreadAsync(reason, [completion = std::move(onComplete)](JavaScriptEntryParameters& entry) {
         completion(entry.jsContext.stopProfiling());
     });
 }
@@ -4306,7 +4467,8 @@ TimePoint JavaScriptRuntime::getPerformanceTimeOrigin() const {
 Result<BytesView> JavaScriptRuntime::dumpHeap() {
     if constexpr (Valdi::shouldEnableJsHeapDump()) {
         Result<BytesView> result;
-        dispatchSynchronouslyOnJsThread([this, &result](JavaScriptEntryParameters& entry) {
+        constexpr auto reason = JsThreadDispatchReason::DumpHeap;
+        dispatchSynchronouslyOnJsThread(reason, [this, &result](JavaScriptEntryParameters& entry) {
             std::vector<IJavaScriptContext*> jsContexts;
 
             lockAllJSContexts(jsContexts, [&]() {
