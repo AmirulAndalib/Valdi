@@ -36,9 +36,6 @@ archive_override(module_name = "rules_hdrs", urls = [VALDI_URL], strip_prefix = 
 bazel_dep(name = "valdi_toolchain")
 archive_override(module_name = "valdi_toolchain", urls = [VALDI_URL], strip_prefix = VALDI_PREFIX + "/bin")
 
-bazel_dep(name = "resvg_libs")
-archive_override(module_name = "resvg_libs", urls = [VALDI_URL], strip_prefix = VALDI_PREFIX + "/third-party/resvg/resvg_libs")
-
 # -- Valdi Widgets (https://github.com/Snapchat/Valdi_Widgets) ---------------
 WIDGETS_TAG = "{{VALDI_WIDGETS_RELEASE_TAG}}"
 

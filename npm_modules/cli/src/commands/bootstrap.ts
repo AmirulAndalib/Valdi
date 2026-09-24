@@ -57,9 +57,9 @@ const VALDI_GIT_URL = 'https://github.com/Snapchat/Valdi';
 const VALDI_WIDGETS_GIT_URL = 'https://github.com/Snapchat/Valdi_Widgets';
 
 /** Pinned Valdi release used by default for reproducible bootstraps. Bump when cutting a new Valdi release. */
-const DEFAULT_VALDI_RELEASE_TAG = 'beta-0.1.1';
+const DEFAULT_VALDI_RELEASE_TAG = 'beta-0.2.0';
 /** Pinned Valdi_Widgets release used by default. Should match the Valdi release cycle. */
-const DEFAULT_VALDI_WIDGETS_RELEASE_TAG = 'beta-0.1.1';
+const DEFAULT_VALDI_WIDGETS_RELEASE_TAG = 'beta-0.2.0';
 
 
 function isAlreadyInitialized(): boolean {
@@ -220,7 +220,6 @@ const VALDI_SUB_MODULES: readonly { name: string; subPath: string }[] = [
   { name: 'skia_user_config', subPath: 'third-party/skia_user_config' },
   { name: 'rules_hdrs', subPath: 'third-party/rules_hdrs' },
   { name: 'valdi_toolchain', subPath: 'bin' },
-  { name: 'resvg_libs', subPath: 'third-party/resvg/resvg_libs' },
 ];
 
 function applyLocalOverrides(localValdiPath: string) {
