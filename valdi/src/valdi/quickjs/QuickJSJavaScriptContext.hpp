@@ -199,6 +199,7 @@ public:
 
     void willEnterVM() override;
     void willExitVM(Valdi::JSExceptionTracker& exceptionTracker) override;
+    void markPromiseRejectionHandled(const Valdi::JSValue& promise) override;
     void requestExecutionTermination() override;
 
 protected:

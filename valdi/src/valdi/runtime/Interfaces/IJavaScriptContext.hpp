@@ -369,6 +369,13 @@ public:
     virtual void willExitVM(JSExceptionTracker& exceptionTracker);
 
     /**
+     Tells the engine that native code owns the rejection of the given promise, so the engine
+     must not report it as unhandled. Must not run any JS. No-op for engines that don't track
+     rejections this way, and for values that are not promises.
+     */
+    virtual void markPromiseRejectionHandled(const JSValue& promise);
+
+    /**
      Stash a JSValue for later retrieval, which will keep it
      alive until removedStashedJSValue is called.
      */

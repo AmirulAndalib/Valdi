@@ -1210,6 +1210,11 @@ bool QuickJSJavaScriptContext::isValueEqual(const Valdi::JSValue& left, const Va
     return JS_VALUE_GET_PTR(fromValdiJSValue(left)) == JS_VALUE_GET_PTR(fromValdiJSValue(right));
 }
 
+void QuickJSJavaScriptContext::markPromiseRejectionHandled(const Valdi::JSValue& promise) {
+    auto guard = _threadAccessChecker.guard();
+    JS_PromiseMarkRejectionHandled(_context, fromValdiJSValue(promise));
+}
+
 bool QuickJSJavaScriptContext::isValueLong(const Valdi::JSValue& value) {
     auto guard = _threadAccessChecker.guard();
     auto jsValue = fromValdiJSValue(value);

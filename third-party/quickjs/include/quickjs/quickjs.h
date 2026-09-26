@@ -807,6 +807,9 @@ typedef enum JSPromiseStateEnum {
 JSValue JS_NewPromiseCapability(JSContext* ctx, JSValue* resolving_funcs);
 JSPromiseStateEnum JS_PromiseState(JSContext* ctx, JSValue promise);
 JSValue JS_PromiseResult(JSContext* ctx, JSValue promise);
+/* Marks the rejection of 'promise' as handled for the host rejection tracker
+   without attaching a reaction. No-op if 'promise' is not a promise. */
+void JS_PromiseMarkRejectionHandled(JSContext* ctx, JSValueConst promise);
 
 /* is_handled = TRUE means that the rejection is handled */
 typedef void JSHostPromiseRejectionTracker(

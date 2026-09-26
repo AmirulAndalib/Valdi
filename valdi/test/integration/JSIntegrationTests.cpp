@@ -3,8 +3,10 @@
 #include "utils/platform/TargetPlatform.hpp"
 #include "valdi/runtime/Interfaces/IJavaScriptBridge.hpp"
 #include "valdi/runtime/JavaScript/JSFunctionWithCallable.hpp"
+#include "valdi/runtime/JavaScript/JSPromise.hpp"
 #include "valdi_core/cpp/Utils/ByteBuffer.hpp"
 #include "valdi_core/cpp/Utils/StaticString.hpp"
+#include "valdi_core/cpp/Utils/ValueMarshaller.hpp"
 #include <chrono>
 #include <future>
 #include <gtest/gtest.h>
@@ -2235,6 +2237,128 @@ TEST_P(JSContextFixture, callsUnhandledPromiseCallbackWhenRejectedPromiseIsUnhan
     ASSERT_EQ(ValueType::Double, listener.unhandledPromiseResults[0].getType());
 
     ASSERT_EQ(Value(42.0), listener.unhandledPromiseResults[0]);
+}
+
+// Once wrapped in a JSPromise, native code owns the rejection and gets it through
+// PromiseCallback::onFailure, so the engine can't tell whether it goes unobserved.
+TEST_P(JSContextFixture, doesntCallUnhandledPromiseCallbackForPromisesHandedToNative) {
+    SKIP_IF_V8("Ticket: 2259");
+    SKIP_IF_JSCORE("JavaScriptCore reports rejections when its API call returns, before native code sees the promise");
+    SKIP_IF_HERMES("Unhandled Promise Callback is not yet supported in Hermes");
+
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    MockJavaScriptContextListener listener;
+    Ref<Promise> nativePromise;
+
+    {
+        auto jsEntry = wrapper.makeJsEntry();
+        auto& context = jsEntry.context;
+        auto& exceptionTracker = jsEntry.exceptionTracker;
+
+        context.setListener(&listener);
+
+        auto jsPromise = context.evaluate(R""""(
+            (() => {
+                return new Promise((resolve, reject) => {
+                    reject(42);
+                });
+            })()
+        )"""",
+                                          "unnamed.js",
+                                          exceptionTracker);
+        jsEntry.checkException();
+
+        nativePromise =
+            makeShared<JSPromise>(context, jsPromise.get(), ReferenceInfoBuilder().build(), nullptr, exceptionTracker);
+        jsEntry.checkException();
+    }
+
+    ASSERT_EQ(static_cast<size_t>(0), listener.unhandledPromiseResults.size());
+}
+
+// Wrapping must not run JS: a `then` accessor is the cheapest way to detect a property read.
+TEST_P(JSContextFixture, doesntReadThenWhenWrappingPromiseForNative) {
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+
+    auto jsPromise = context.evaluate(R""""(
+        (() => {
+            globalThis.thenReadCount = 0;
+            const promise = new Promise((resolve, reject) => reject(42));
+            Object.defineProperty(promise, 'then', {
+                get() {
+                    globalThis.thenReadCount++;
+                    return Promise.prototype.then;
+                },
+            });
+            return promise;
+        })()
+    )"""",
+                                      "unnamed.js",
+                                      exceptionTracker);
+    jsEntry.checkException();
+
+    auto nativePromise =
+        makeShared<JSPromise>(context, jsPromise.get(), ReferenceInfoBuilder().build(), nullptr, exceptionTracker);
+    jsEntry.checkException();
+
+    auto thenReadCount = context.evaluate("globalThis.thenReadCount", "unnamed.js", exceptionTracker);
+    jsEntry.checkException();
+    ASSERT_EQ(0, context.valueToInt(thenReadCount.get(), exceptionTracker));
+}
+
+// Promise.prototype.then() runs the species constructor lookup and the subclass constructor
+// synchronously, so wrapping a subclass instance must not trigger either.
+TEST_P(JSContextFixture, doesntRunSpeciesHooksWhenWrappingPromiseForNative) {
+    SKIP_IF_HERMES("Hermes does not support Symbol.species");
+
+    MAIN_THREAD_INIT();
+
+    auto wrapper = createWrapper();
+    auto jsEntry = wrapper.makeJsEntry();
+    auto& context = jsEntry.context;
+    auto& exceptionTracker = jsEntry.exceptionTracker;
+
+    auto jsPromise = context.evaluate(R""""(
+        (() => {
+            globalThis.speciesReadCount = 0;
+            globalThis.subclassConstructCount = 0;
+            class SubPromise extends Promise {
+                constructor(executor) {
+                    globalThis.subclassConstructCount++;
+                    super(executor);
+                }
+                static get [Symbol.species]() {
+                    globalThis.speciesReadCount++;
+                    return SubPromise;
+                }
+            }
+            const promise = new SubPromise((resolve, reject) => reject(42));
+            globalThis.subclassConstructCount = 0;
+            return promise;
+        })()
+    )"""",
+                                      "unnamed.js",
+                                      exceptionTracker);
+    jsEntry.checkException();
+
+    auto nativePromise =
+        makeShared<JSPromise>(context, jsPromise.get(), ReferenceInfoBuilder().build(), nullptr, exceptionTracker);
+    jsEntry.checkException();
+
+    auto speciesReadCount = context.evaluate("globalThis.speciesReadCount", "unnamed.js", exceptionTracker);
+    jsEntry.checkException();
+    ASSERT_EQ(0, context.valueToInt(speciesReadCount.get(), exceptionTracker));
+
+    auto subclassConstructCount = context.evaluate("globalThis.subclassConstructCount", "unnamed.js", exceptionTracker);
+    jsEntry.checkException();
+    ASSERT_EQ(0, context.valueToInt(subclassConstructCount.get(), exceptionTracker));
 }
 
 TEST_P(JSContextFixture, doesntCallUnhandledPromiseCallbackForHandledPromises) {

@@ -126,7 +126,10 @@ JSPromise::JSPromise(IJavaScriptContext& jsContext,
                      JSExceptionTracker& exceptionTracker)
     : _jsValue(jsContext, jsValue, referenceInfo, exceptionTracker, false),
       _valueMarshaller(valueMarshaller),
-      _cancelable(JSPromiseCancel::isJSPromiseCancelable(jsContext, jsValue)) {}
+      _cancelable(JSPromiseCancel::isJSPromiseCancelable(jsContext, jsValue)) {
+    // onComplete() runs a task later, after the engine has already flushed its rejection tracker.
+    jsContext.markPromiseRejectionHandled(jsValue);
+}
 
 JSPromise::~JSPromise() = default;
 

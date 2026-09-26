@@ -543,4 +543,6 @@ void IJavaScriptContext::willEnterVM() {}
 
 void IJavaScriptContext::willExitVM(JSExceptionTracker& exceptionTracker) {}
 
+void IJavaScriptContext::markPromiseRejectionHandled(const JSValue& promise) {}
+
 } // namespace Valdi

@@ -45491,6 +45491,22 @@ JSValue JS_PromiseResult(JSContext* ctx, JSValue promise) {
     return JS_DupValue(ctx, s->promise_result);
 }
 
+/* Same tracker bookkeeping as perform_promise_then(), without attaching a
+   reaction or running any JS. No-op for values that are not promises. */
+void JS_PromiseMarkRejectionHandled(JSContext* ctx, JSValueConst promise) {
+    JSPromiseData* s = JS_GetOpaque(promise, JS_CLASS_PROMISE);
+    if (!s || s->is_handled)
+        return;
+    if (s->promise_state == JS_PROMISE_REJECTED) {
+        JSRuntime* rt = ctx->rt;
+        if (rt->host_promise_rejection_tracker) {
+            rt->host_promise_rejection_tracker(
+                ctx, promise, s->promise_result, TRUE, rt->host_promise_rejection_tracker_opaque);
+        }
+    }
+    s->is_handled = TRUE;
+}
+
 static int js_create_resolving_functions(JSContext* ctx, JSValue* args, JSValueConst promise);
 
 static void promise_reaction_data_free(JSRuntime* rt, JSPromiseReactionData* rd) {
