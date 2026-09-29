@@ -66,7 +66,8 @@ RuntimeManagerWrapper::RuntimeManagerWrapper(JavaEnv env,
                                              jobject javaScriptEngineType,
                                              uint64_t maxCacheSizeInBytes,
                                              jint jsThreadQoS,
-                                             jint anrTimeoutMs)
+                                             jint anrTimeoutMs,
+                                             jboolean enableAtomicInitialAutoRenderState)
     : _mainThreadDispatcher(Valdi::makeShared<MainThreadDispatcher>(env, mainThreadDispatcher)),
       _logger(Valdi::makeShared<Logger>(env, logger)),
       _contextManager(env, contextManager, "ContextManager"),
@@ -106,6 +107,7 @@ RuntimeManagerWrapper::RuntimeManagerWrapper(JavaEnv env,
                                                                    /* disableHotReloader */ false,
                                                                    /* isStandalone */ false,
                                                                    std::nullopt);
+        _runtimeManager->setAtomicInitialAutoRenderStateEnabled(enableAtomicInitialAutoRenderState);
         _runtimeManager->postInit();
         _runtimeManager->setKeepDebuggerServiceOnPause(static_cast<bool>(keepDebuggerServiceOnPause));
         _runtimeManager->setApplicationId(_applicationId);

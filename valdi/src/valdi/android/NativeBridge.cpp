@@ -179,7 +179,8 @@ jlong ValdiAndroid::NativeBridge::createRuntimeManager( // NOLINT
     jlong maxCacheSizeInBytes,
     jobject javaScriptEngineType,
     jint jsThreadQoS,
-    jint anrTimeoutMs) {
+    jint anrTimeoutMs,
+    jboolean enableAtomicInitialAutoRenderState) {
     auto javaEnv = ValdiAndroid::JavaEnv();
 
     auto* runtimeManagerWrapper = new ValdiAndroid::RuntimeManagerWrapper(javaEnv,
@@ -204,7 +205,8 @@ jlong ValdiAndroid::NativeBridge::createRuntimeManager( // NOLINT
                                                                           javaScriptEngineType,
                                                                           static_cast<uint64_t>(maxCacheSizeInBytes),
                                                                           jsThreadQoS,
-                                                                          anrTimeoutMs);
+                                                                          anrTimeoutMs,
+                                                                          enableAtomicInitialAutoRenderState);
 
     return reinterpret_cast<std::uintptr_t>(runtimeManagerWrapper);
 }

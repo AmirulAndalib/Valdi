@@ -74,7 +74,8 @@ public:
                           jobject javaScriptEngineType,
                           uint64_t maxCacheSizeInBytes,
                           jint jsThreadQoS,
-                          jint anrTimeoutMs);
+                          jint anrTimeoutMs,
+                          jboolean enableAtomicInitialAutoRenderState);
     ~RuntimeManagerWrapper();
 
     const Valdi::Ref<Valdi::ViewManagerContext>& getAndroidViewManagerContext() const;

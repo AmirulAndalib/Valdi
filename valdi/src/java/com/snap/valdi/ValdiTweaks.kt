@@ -49,6 +49,7 @@ data class ValdiTweaks(
          /**
           * When true, clearing the Valdi `selection` attribute does not move the caret (matches iOS).
           * When false, legacy behavior resets the caret to index 0.
-          */
+         */
          val editTextResetSelectionMatchesIos: Boolean = false,
+         val enableAtomicInitialAutoRenderState: Boolean = false,
 )

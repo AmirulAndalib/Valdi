@@ -147,6 +147,8 @@ public:
 
     void setTweakValueProvider(const Shared<ITweakValueProvider>& tweakValueProvider);
 
+    void setAtomicInitialAutoRenderStateEnabled(bool enabled);
+
     void setMmapCacheDirectory(const Path& path);
 
     JavaScriptContextMemoryStatistics dumpMemoryStatistics();
@@ -227,6 +229,7 @@ private:
     bool _disableRuntimeAutoInit = false;
     bool _keepDebuggerServiceOnPause = false;
     bool _debuggerServiceEnabled = false;
+    bool _atomicInitialAutoRenderStateEnabled = false;
     int _loadOperationsCount = 0;
 
     void removeExpiredRuntimes();

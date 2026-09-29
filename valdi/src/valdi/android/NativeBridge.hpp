@@ -95,7 +95,8 @@ public:
                                       jlong maxCacheSizeInBytes,
                                       jobject javaScriptEngineType,
                                       jint jsThreadQoS,
-                                      jint anrTimeoutMs);
+                                      jint anrTimeoutMs,
+                                      jboolean enableAtomicInitialAutoRenderState);
 
     static jlong getViewNodePoint(fbjni::alias_ref<fbjni::JClass> clazz,
                                   jlong runtimeHandle,

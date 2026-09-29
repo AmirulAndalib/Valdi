@@ -26,7 +26,8 @@ public class NativeBridge {
                                                       long maxCacheSizeInBytes,
                                                       Object javaScriptEngineType,
                                                       int javascriptThreadQoS,
-                                                      int anrTimeoutMs);
+                                                      int anrTimeoutMs,
+                                                      boolean enableAtomicInitialAutoRenderState);
 
     public static native void deleteRuntimeManager(long runtimeManagerHandle);
 

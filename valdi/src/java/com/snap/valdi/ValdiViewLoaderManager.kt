@@ -307,7 +307,8 @@ class ValdiRuntimeManager(context: Context,
                     maxCacheSizeInBytes,
                     javaScriptEngineType,
                     (tweaks?.jsThreadQoS ?: QoSClass.MAX).value,
-                    anrTimeoutMs
+                    anrTimeoutMs,
+                    tweaks?.enableAtomicInitialAutoRenderState ?: false,
             )
         }
 

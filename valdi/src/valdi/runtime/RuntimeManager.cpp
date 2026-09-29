@@ -243,6 +243,7 @@ SharedRuntime RuntimeManager::createRuntime(const Shared<IResourceLoader>& resou
 
     bool shouldInit = true;
     bool autoRenderDisabled;
+    bool atomicInitialAutoRenderStateEnabled;
     {
         std::lock_guard<Mutex> guard(_mutex);
         removeExpiredRuntimes();
@@ -254,6 +255,7 @@ SharedRuntime RuntimeManager::createRuntime(const Shared<IResourceLoader>& resou
         attributionResolver = _attributionResolver;
         metrics = _metrics;
         autoRenderDisabled = _loadOperationsCount > 0;
+        atomicInitialAutoRenderStateEnabled = _atomicInitialAutoRenderStateEnabled;
         // Apply state that has a peer RuntimeManager::set*() iterating runtimes
         // while still holding _mutex. If we read into a local and applied after
         // releasing the lock, a concurrent setter could interleave: it would
@@ -266,8 +268,13 @@ SharedRuntime RuntimeManager::createRuntime(const Shared<IResourceLoader>& resou
         // already operate on runtimes they iterate.
         runtime->setMmapCacheDirectory(_mmapCacheDirectory);
         runtime->setRuntimeTweaks(_runtimeTweaks);
+        if (atomicInitialAutoRenderStateEnabled) {
+            runtime->setAutoRenderDisabled(autoRenderDisabled);
+        }
     }
-    runtime->setAutoRenderDisabled(autoRenderDisabled);
+    if (!atomicInitialAutoRenderStateEnabled) {
+        runtime->setAutoRenderDisabled(autoRenderDisabled);
+    }
     runtime->setMetrics(metrics);
     runtime->getContextManager().setAttributionResolver(attributionResolver);
 
@@ -650,6 +657,11 @@ void RuntimeManager::setTweakValueProvider(const Shared<ITweakValueProvider>& tw
     for (const auto& runtime : runtimes) {
         runtime->setRuntimeTweaks(runtimeTweaks);
     }
+}
+
+void RuntimeManager::setAtomicInitialAutoRenderStateEnabled(bool enabled) {
+    std::lock_guard<Mutex> guard(_mutex);
+    _atomicInitialAutoRenderStateEnabled = enabled;
 }
 
 void RuntimeManager::cancelDeferredGCTask() {

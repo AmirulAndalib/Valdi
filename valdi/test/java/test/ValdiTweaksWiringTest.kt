@@ -5,6 +5,7 @@ import com.snap.valdi.ValdiTweaks
 import java.io.File
 import java.util.jar.JarFile
 import java.util.zip.ZipEntry
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,6 +30,12 @@ import org.junit.Test
  * hardcoded "add new consumers here" list is the thing that rots.
  */
 class ValdiTweaksWiringTest {
+
+    @Test
+    fun atomicInitialAutoRenderStateDefaultsOffAndCanBeEnabled() {
+        assertFalse(ValdiTweaks().enableAtomicInitialAutoRenderState)
+        assertTrue(ValdiTweaks(enableAtomicInitialAutoRenderState = true).enableAtomicInitialAutoRenderState)
+    }
 
     /**
      * Tweaks this test knowingly does not require a consumer for. Each entry needs a reason — an
