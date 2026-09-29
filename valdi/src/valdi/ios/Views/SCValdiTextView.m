@@ -2169,6 +2169,12 @@ static void SCValdiCallEventWithReason(id<SCValdiFunction> function, UITextView 
 
 - (BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text
 {
+    // UIKit can replay an undo range recorded when the text was longer; applying it is out of bounds and throws.
+    // Kept above the "\n" branch so a refused replay can't fire onReturn or dismiss the keyboard.
+    if (NSMaxRange(range) > textView.text.length) {
+        return NO;
+    }
+
     // When the user just typed a singular line return
     if ([text isEqualToString:@"\n"]) {
         // Since there is no textviewShouldReturn, we schedule one such event if we see a linereturn
