@@ -61,6 +61,9 @@ single_version_override(
     patches = [
         "@valdi//registry/modules/rules_android/0.6.5/patches:rules_android_hermetic_sdk.patch",
         "@valdi//registry/modules/rules_android/0.6.5/patches:rules_android_module_bzl.patch",
+        # Fetch com_android_dex from the AOSP GitHub mirror instead of
+        # android.googlesource.com, which frequently 503s and wedges android builds.
+        "@valdi//registry/modules/rules_android/0.6.5/patches:rules_android_com_android_dex_mirror.patch",
     ],
     version = "0.6.5",
 )

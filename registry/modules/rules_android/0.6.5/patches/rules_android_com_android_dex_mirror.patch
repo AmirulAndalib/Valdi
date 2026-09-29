@@ -1,0 +1,16 @@
+--- bzlmod_extensions/com_android_dex.bzl
++++ bzlmod_extensions/com_android_dex.bzl
+@@ -22,7 +22,12 @@
+     # NOTE(b/317109605): Cannot depend on a stable sha256 hash for googlesource repositories.
+     http_archive(
+         name = "com_android_dex",
+-        url = "https://android.googlesource.com/platform/dalvik/+archive/5a81c499a569731e2395f7c8d13c0e0d4e17a2b6.tar.gz",
++        # Fetch dalvik from the AOSP GitHub mirror instead of android.googlesource.com.
++        # The googlesource +archive endpoint frequently 503s under load (no first-party
++        # status page), which wedges every android build. The mirror serves the same
++        # commit; GitHub archives nest under a top-level dir, hence strip_prefix.
++        url = "https://github.com/aosp-mirror/platform_dalvik/archive/5a81c499a569731e2395f7c8d13c0e0d4e17a2b6.tar.gz",
++        strip_prefix = "platform_dalvik-5a81c499a569731e2395f7c8d13c0e0d4e17a2b6",
+         build_file = Label("//bzlmod_extensions:com_android_dex.BUILD"),
+     )
+ 
